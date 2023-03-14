@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.shtif.runtimetransformhandle": "0.1.3",
     "com.unity.collab-proxy": "2.0.1",
     "com.unity.feature.development": "1.0.1",
     "com.unity.ide.rider": "3.0.18",
@@ -41,5 +42,14 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0"
-  }
+  },
+  "scopedRegistries": [
+    {
+      "name": "Shtif Registry",
+      "url": "http://package.binaryego.com:4873",
+      "scopes": [
+        "com.shtif"
+      ]
+    }
+  ]
 }
