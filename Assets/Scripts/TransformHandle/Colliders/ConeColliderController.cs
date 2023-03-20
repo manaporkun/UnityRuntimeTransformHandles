@@ -1,4 +1,5 @@
 ﻿using TransformHandle.Utils;
+using UnityEditor;
 using UnityEngine;
 
 namespace TransformHandle
@@ -14,6 +15,8 @@ namespace TransformHandle
 		[SerializeField] private float height;
 		[SerializeField] private float bottomRadius;
 
+		[SerializeField] private bool save;
+
 		private MeshCollider _meshCollider;
 		private MeshFilter _meshFilter;
 
@@ -28,6 +31,14 @@ namespace TransformHandle
 			UpdateCollider();
 		}
 
+		private void Update()
+		{
+			if (Input.GetKeyDown(KeyCode.K))
+			{
+				UpdateCollider();
+			}
+		}
+
 		private void UpdateCollider()
 		{
 			var newMesh = MeshUtils.CreateCone(
@@ -39,6 +50,11 @@ namespace TransformHandle
 			
 			_meshFilter.sharedMesh = newMesh;
 			_meshCollider.sharedMesh = newMesh;
+			
+			if (save)
+			{
+				AssetDatabase.CreateAsset(newMesh, "Assets/cone.asset");
+			}
 		}
 	}
 }
