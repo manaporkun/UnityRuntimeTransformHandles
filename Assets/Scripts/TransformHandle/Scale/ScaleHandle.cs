@@ -4,7 +4,7 @@ namespace TransformHandle
 {
     public class ScaleHandle : MonoBehaviour
     {
-        private TransformHandle _parentHandle;
+        private Handle _parentHandle;
         
         public ScaleAxis xAxis;
         public ScaleAxis yAxis;
@@ -14,11 +14,11 @@ namespace TransformHandle
         
         private bool _handleInitialized;
 
-        public void Initialize(TransformHandle transformHandle)
+        public void Initialize(Handle handle)
         {
             if (_handleInitialized) return;
             
-            _parentHandle = transformHandle;
+            _parentHandle = handle;
             
             if (_parentHandle.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
                 xAxis.Initialize(_parentHandle, Vector3.right);

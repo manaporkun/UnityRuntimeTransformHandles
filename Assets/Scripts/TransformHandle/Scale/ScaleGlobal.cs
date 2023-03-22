@@ -10,9 +10,9 @@ namespace TransformHandle
         private Vector3 _axis;
         private Vector3 _startScale;
         
-        public void Initialize(TransformHandle transformHandle, Vector3 pAxis)
+        public void Initialize(Handle handle, Vector3 pAxis)
         {
-            ParentHandle = transformHandle;
+            ParentHandle = handle;
             _axis = pAxis;
             DefaultColor = defaultColor;
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TransformHandle.Utils;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace TransformHandle
 {
@@ -9,8 +10,8 @@ namespace TransformHandle
     {
         public Camera mainCamera;
         
-        [SerializeField] private GameObject _transformHandlePrefab;
-        [SerializeField] private GameObject _ghostPrefab;
+        [SerializeField] private GameObject transformHandlePrefab;
+        [SerializeField] private GameObject ghostPrefab;
         
         [SerializeField] private LayerMask layerMask;
         
@@ -26,10 +27,10 @@ namespace TransformHandle
         private HandleBase _hoveredHandle;
         
         private Ghost _interactedGhost;
-        private TransformHandle _interactedHandle;
+        private Handle _interactedHandle;
         
         private HashSet<Transform> _transformHashSet;
-        private Dictionary<TransformHandle, TransformGroup> _handleGroupMap;
+        private Dictionary<Handle, TransformGroup> _handleGroupMap;
         private Dictionary<Ghost, TransformGroup> _ghostGroupMap;
         
         private bool _handleActive;
@@ -40,35 +41,64 @@ namespace TransformHandle
             
             mainCamera = mainCamera == null ? Camera.main : mainCamera;
             
-            _rayHits = new RaycastHit[16];
-            
-            _handleGroupMap = new Dictionary<TransformHandle, TransformGroup>();
+            _handleGroupMap = new Dictionary<Handle, TransformGroup>();
             _ghostGroupMap = new Dictionary<Ghost, TransformGroup>();
             _transformHashSet = new HashSet<Transform>();
         }
 
-        public TransformHandle CreateHandle(Transform target)
+        public Handle CreateHandle(Transform target)
         {
-            if (!_transformHashSet.Add(target)) { Debug.LogWarning($"{target} already has a handle."); return null; }
+            if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return null; }
             
-            var ghost = Instantiate(_ghostPrefab).GetComponent<Ghost>();
+            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
             ghost.Initialize();
 
-            var transformHandle = Instantiate(_transformHandlePrefab).GetComponent<TransformHandle>();
+            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
             transformHandle.Enable(ghost.transform);            
-
+            
             var group = new TransformGroup(ghost, transformHandle);
-            group.AddTransform(target);
             
             _handleGroupMap.Add(transformHandle, group);
             _ghostGroupMap.Add(ghost, group);
+            
+            AddTarget(target, transformHandle);
             
             _handleActive = true;
 
             return transformHandle;
         }
         
-        public void DestroyHandle(TransformHandle handle)
+        public Handle CreateHandleFromList(List<Transform> targets)
+        {
+            if(targets.Count == 0) { Debug.LogWarning("List is empty."); return null; }
+            
+            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
+            ghost.Initialize();
+
+            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            transformHandle.Enable(ghost.transform);      
+            
+            var group = new TransformGroup(ghost, transformHandle);
+            _handleGroupMap.Add(transformHandle, group);
+            _ghostGroupMap.Add(ghost, group);
+
+            foreach (var target in targets)
+            {
+                if (_transformHashSet.Contains(target))
+                {
+                    Debug.LogWarning($"{target} already has a handle."); 
+                    DestroyHandle(transformHandle);
+                    return null;
+                }
+                AddTarget(target, transformHandle);
+            }
+
+            _handleActive = true;
+
+            return transformHandle;
+        }
+        
+        public void DestroyHandle(Handle handle)
         {
             if(handle == null) { Debug.LogError("Handle is already null"); return;}
             
@@ -92,7 +122,7 @@ namespace TransformHandle
             }
         }
         
-        public void AddTarget(Transform target, TransformHandle handle)
+        public void AddTarget(Transform target, Handle handle)
         {
             if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return; }
             if(handle == null) { Debug.LogError("Handle is null"); return;}
@@ -103,13 +133,17 @@ namespace TransformHandle
             
             var averagePosRotScale = group.GetAveragePosRotScale();
             group.GroupGhost.UpdateGhostTransform(averagePosRotScale);
+            
+            _transformHashSet.Add(target);
         }
 
-        public void RemoveTarget(Transform target, TransformHandle handle)
+        public void RemoveTarget(Transform target, Handle handle)
         {
             if (!_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} doesn't have a handle."); return;}
             if(handle == null) { Debug.LogError("Handle is null"); return;}
 
+            _transformHashSet.Remove(target);
+            
             var group = _handleGroupMap[handle];
             var groupElementsRemoved = group.RemoveTransform(target);
             if (groupElementsRemoved) { DestroyHandle(handle); return; }
@@ -126,7 +160,7 @@ namespace TransformHandle
             _handleHitPoint = Vector3.zero;
             
             GetHandle(ref _hoveredHandle, ref _handleHitPoint);
-
+            
             HandleOverEffect(_hoveredHandle);
 
             MouseInput();
@@ -135,15 +169,17 @@ namespace TransformHandle
         
         private void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
         {
+            _rayHits = new RaycastHit[16];
+
             var ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-            var size = Physics.RaycastNonAlloc(ray, _rayHits, layerMask);
+            var size = Physics.RaycastNonAlloc(ray, _rayHits, 1000, layerMask);
                 
             if (size == 0)
             {
                 if (_hoveredHandle == null) return;
                 return;
             }
-
+            
             Array.Sort(_rayHits, (x,y) => x.distance.CompareTo(y.distance));
 
             foreach (var hit in _rayHits)
@@ -247,12 +283,11 @@ namespace TransformHandle
                     ChangeHandlePivot(group, !group.IsOriginOnCenter);
                 }
             }
-
         }
 
         private void OnInteractionStart()
         {
-            _interactedHandle = _draggingHandle.GetComponentInParent<TransformHandle>();
+            _interactedHandle = _draggingHandle.GetComponentInParent<Handle>();
             _interactedGhost = _handleGroupMap[_interactedHandle].GroupGhost;
             _interactedGhost.OnInteractionStart();
         }
@@ -271,16 +306,16 @@ namespace TransformHandle
             _interactedGhost.UpdateGhostTransform(averagePosRotScale);
         }
         
-        public void ChangeHandleType(TransformHandle handle, HandleType type)
+        public void ChangeHandleType(Handle handle, HandleType type)
         {
             if(handle == null) { Debug.LogError("Handle is null"); return;}
-            handle.type = type;
+            handle.ChangeHandleType(type);
         }
 
-        public void ChangeHandleSpace(TransformHandle handle, Space space)
+        public void ChangeHandleSpace(Handle handle, Space space)
         {
             if(handle == null) { Debug.LogError("Handle is null"); return;}
-            handle.space = space;
+            handle.ChangeHandleSpace(space);
             
             var group = _handleGroupMap[handle];
             group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
@@ -315,7 +350,7 @@ namespace TransformHandle
     public class TransformGroup
     {
         public Ghost GroupGhost {get; private set;}
-        public TransformHandle GroupHandle {get; private set;}
+        public Handle GroupHandle {get; private set;}
         
         public bool IsOriginOnCenter;
 
@@ -323,7 +358,7 @@ namespace TransformHandle
         private Dictionary<Transform, MeshRenderer> _transformRendererMap;
         private Dictionary<Transform, Bounds> _transformBoundsMap;
 
-        public TransformGroup(Ghost groupGhost, TransformHandle groupHandle)
+        public TransformGroup(Ghost groupGhost, Handle groupHandle)
         {
             GroupGhost = groupGhost;
             GroupHandle = groupHandle;
@@ -440,7 +475,8 @@ namespace TransformHandle
 
             foreach (var tElement in TransformHashSet)
             {
-                centerPositions.Add(GetCenterPoint(tElement));
+                var centerPoint = GetCenterPoint(tElement);
+                centerPositions.Add(centerPoint);
                 
                 if (space == Space.World) continue;
                 sumQuaternion *= tElement.rotation;

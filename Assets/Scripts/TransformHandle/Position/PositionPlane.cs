@@ -16,9 +16,9 @@ namespace TransformHandle
         private Plane _plane;
         private Vector3 _interactionOffset;
 
-        public void Initialize(TransformHandle transformHandle, Vector3 axis1, Vector3 axis2, Vector3 perp)
+        public void Initialize(Handle handle, Vector3 axis1, Vector3 axis2, Vector3 perp)
         {
-            ParentHandle = transformHandle;
+            ParentHandle = handle;
             _axis1 = axis1;
             _axis2 = axis2;
             _perp = perp;
