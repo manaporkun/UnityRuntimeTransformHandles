@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TransformHandle
 {
-    public class TransformHandle : MonoBehaviour
+    public class Handle : MonoBehaviour
     {
         private bool IsHandlesActive { get; set; }
 
@@ -34,6 +34,8 @@ namespace TransformHandle
             PositionHandle = GetComponentInChildren<PositionHandle>();
             RotationHandle = GetComponentInChildren<RotationHandle>();
             ScaleHandle = GetComponentInChildren<ScaleHandle>();
+
+            _cameraEventHandler = GetComponent<HandleCameraEventHandler>();
 
             Clear();
         }
@@ -109,12 +111,12 @@ namespace TransformHandle
             CreateHandles();
         }
 
-        public virtual void ChangeHandleSpace(int arg)
+        public virtual void ChangeHandleSpace(Space space)
         {
             if (type == HandleType.Scale)
-                space = Space.Self;
+                this.space = Space.Self;
             else
-                space = (Space)arg == Space.Self ? Space.Self : Space.World;
+                this.space = space == Space.Self ? Space.Self : Space.World;
         }
 
         public virtual void ChangeAxes(HandleAxes handleAxes)

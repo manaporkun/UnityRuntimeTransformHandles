@@ -9,7 +9,7 @@ namespace TransformHandle
         public event Action InteractionEnd;
         public event Action<float> InteractionUpdate;
         
-        protected TransformHandle ParentHandle;
+        protected Handle ParentHandle;
 
         protected Color DefaultColor;
 
@@ -21,17 +21,10 @@ namespace TransformHandle
 
         public float delta;
 
-        protected void InitializeMaterial()
-        {
-            Material = new Material(Shader.Find("sHTiF/HandleShader"))
-            {
-                color = DefaultColor
-            };
-        }
-        
         public virtual void SetDefaultColor()
         {
             Material.color = DefaultColor;
+            Debug.Log(DefaultColor);
         }
         
         public virtual void SetColor(Color color)

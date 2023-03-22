@@ -19,9 +19,9 @@ namespace TransformHandle
         private float _interactionDistance;
         private Ray _rAxisRay;
         
-        public void Initialize(TransformHandle transformHandle, Vector3 pAxis)
+        public void Initialize(Handle handle, Vector3 pAxis)
         {
-            ParentHandle = transformHandle;
+            ParentHandle = handle;
             _axis = pAxis;
             DefaultColor = defaultColor;
             
