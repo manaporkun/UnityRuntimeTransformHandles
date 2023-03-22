@@ -17,12 +17,12 @@ namespace TransformHandle
         private Vector3 _interactionOffset;
         private Ray _rAxisRay;
         
-        public void Initialize(TransformHandle transformHandle)
+        public void Initialize(Handle handle)
         {
-            ParentHandle = transformHandle;
+            ParentHandle = handle;
             _handleCamera = ParentHandle.handleCamera;
 
-            _axis = coneMeshRenderer.transform.forward;
+            _axis = coneMeshRenderer.transform.up;
             DefaultColor = defaultColor;
         }
 
