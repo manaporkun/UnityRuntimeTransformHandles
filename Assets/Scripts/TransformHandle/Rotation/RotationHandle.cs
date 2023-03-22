@@ -9,15 +9,15 @@ namespace TransformHandle
         public RotationAxis yAxis;
         public RotationAxis zAxis;
 
-        private TransformHandle _parentHandle;
+        private Handle _parentHandle;
 
         private bool _handleInitialized;
 
-        public void Initialize(TransformHandle transformHandle)
+        public void Initialize(Handle handle)
         {
             if (_handleInitialized) return;
             
-            _parentHandle = transformHandle;
+            _parentHandle = handle;
             transform.SetParent(_parentHandle.transform, false);
 
             if (_parentHandle.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)

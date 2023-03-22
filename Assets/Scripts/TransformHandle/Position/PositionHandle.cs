@@ -12,32 +12,32 @@ namespace TransformHandle
         public PositionPlane yPlane;
         public PositionPlane zPlane;
 
-        private TransformHandle _parentHandle;
+        private Handle _parentHandle;
 
         private bool _handleInitialized;
 
-        public void Initialize(TransformHandle transformHandle)
+        public void Initialize(Handle handle)
         {
             if (_handleInitialized) return;
             
-            _parentHandle = transformHandle;
+            _parentHandle = handle;
 
             if (_parentHandle.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
             {
                 xAxis.gameObject.SetActive(true);
-                xAxis.Initialize(transformHandle);
+                xAxis.Initialize(handle);
             }
 
             if (_parentHandle.axes is HandleAxes.Y or HandleAxes.XY or HandleAxes.YZ or HandleAxes.XYZ)
             {
                 yAxis.gameObject.SetActive(true);
-                yAxis.Initialize(transformHandle);
+                yAxis.Initialize(handle);
             }
 
             if (_parentHandle.axes is HandleAxes.Z or HandleAxes.XZ or HandleAxes.YZ or HandleAxes.XYZ)
             {
                 zAxis.gameObject.SetActive(true);
-                zAxis.Initialize(transformHandle);
+                zAxis.Initialize(handle);
             }
 
             if (_parentHandle.axes is HandleAxes.XY or HandleAxes.XYZ)
