@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace TransformHandle
 {
@@ -39,14 +40,16 @@ namespace TransformHandle
         protected virtual void OnEnable()
         {
             handleCamera = TransformHandleManager.Instance.mainCamera;
+            RenderPipelineManager.beginCameraRendering += OnPreRenderCallback;
         }
 
         protected virtual void OnDisable()
         {
             Disable();
+            RenderPipelineManager.beginCameraRendering -= OnPreRenderCallback;
         }
 
-        private void OnPreRender()
+        private void OnPreRenderCallback(ScriptableRenderContext scriptableRenderContext, Camera camera)
         {
             OnAutoScale();
         }
