@@ -51,10 +51,10 @@ namespace TransformHandle
 			_meshFilter.sharedMesh = newMesh;
 			_meshCollider.sharedMesh = newMesh;
 			
-			if (save)
+			/*if (save)
 			{
 				AssetDatabase.CreateAsset(newMesh, "Assets/cone.asset");
-			}
+			}*/
 		}
 	}
 }
