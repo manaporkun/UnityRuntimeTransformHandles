@@ -41,7 +41,7 @@ namespace TransformHandle
             DestroyImmediate(gameObject);
         }
 
-        private void LateUpdate()
+        protected virtual void LateUpdate()
         {
             if(!_originIndicator) return;
             _originIndicator.transform.position = transform.position;
@@ -123,19 +123,19 @@ namespace TransformHandle
         private void UpdatePosition()
         {
             var positionChange = GhostTransform.position - _initialProperties.Position;
-            _handleManager.GroupPositionUpdate(this, positionChange);
+            _handleManager.UpdateGroupPosition(this, positionChange);
         }
 
         private void UpdateRotation()
         {
             var rotationChange = GhostTransform.rotation * Quaternion.Inverse(_initialProperties.Rotation);
-            _handleManager.GroupRotationUpdate(this, rotationChange);
+            _handleManager.UpdateGroupRotation(this, rotationChange);
         }
 
         private void UpdateScale()
         {
             var scaleChange= GhostTransform.localScale - _initialProperties.Scale;
-            _handleManager.GroupScaleUpdate(this, scaleChange);
+            _handleManager.UpdateGroupScaleUpdate(this, scaleChange);
         }
         
         private void ResetInitialGhostTransformProperties()
