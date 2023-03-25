@@ -43,19 +43,19 @@ namespace TransformHandle
             if (_parentHandle.axes is HandleAxes.XY or HandleAxes.XYZ)
             {
                 zPlane.gameObject.SetActive(true);
-                zPlane.Initialize(_parentHandle, Vector3.right, Vector3.up, -Vector3.forward);
+                zPlane.Initialize(_parentHandle, Vector3.forward, Vector3.up, -Vector3.right);
             }
 
             if (_parentHandle.axes is HandleAxes.YZ or HandleAxes.XYZ)
             {
                 xPlane.gameObject.SetActive(true);
-                xPlane.Initialize(_parentHandle, Vector3.up, Vector3.forward, Vector3.right);
+                xPlane.Initialize(_parentHandle, Vector3.right, Vector3.forward, Vector3.up);
             }
 
             if (_parentHandle.axes is HandleAxes.XZ or HandleAxes.XYZ)
             {
                 yPlane.gameObject.SetActive(true);
-                yPlane.Initialize(_parentHandle, Vector3.right, Vector3.forward, Vector3.up);
+                yPlane.Initialize(_parentHandle, Vector3.right, Vector3.up, Vector3.forward);
             }
             
             _handleInitialized = true;
