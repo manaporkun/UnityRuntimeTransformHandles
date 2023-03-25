@@ -5,6 +5,8 @@ using UnityEngine;
 public class ObjSelector : MonoBehaviour
 {
     [SerializeField] private LayerMask layerMask;
+    [SerializeField] private Color selectedColor;
+    [SerializeField] private Color unselectedColor;
     
     private Camera _camera;
     private CameraMovement _cameraMovement;
@@ -88,7 +90,7 @@ public class ObjSelector : MonoBehaviour
         hitInfoTransform.tag = "Untagged";
         var renderer = hitInfoTransform.gameObject.GetComponent<Renderer>();
         if (renderer == null) renderer = hitInfoTransform.GetComponentInChildren<Renderer>();
-        renderer.material.color = Color.white;
+        renderer.material.color = unselectedColor;
     }
 
     private void SelectObject(Transform hitInfoTransform)
@@ -98,7 +100,7 @@ public class ObjSelector : MonoBehaviour
         hitInfoTransform.tag = "Selected";
         var renderer = hitInfoTransform.gameObject.GetComponent<Renderer>();
         if (renderer == null) renderer =  hitInfoTransform.GetComponentInChildren<Renderer>();
-        renderer.material.color = Color.cyan;
+        renderer.material.color = selectedColor;
     }
     
     private void CreateHandle(Transform hitTransform)
