@@ -32,8 +32,6 @@ namespace TransformHandle
 
             _rotationHandleScale = transform.parent.GetComponent<RotationHandle>().transform
                 .lossyScale;
-
-            //transform.localRotation = Quaternion.FromToRotation(Vector3.up, _axis);
         }
 
         public override void Interact(Vector3 pPreviousPosition)
