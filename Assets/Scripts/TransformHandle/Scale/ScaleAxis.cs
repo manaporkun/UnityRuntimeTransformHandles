@@ -30,7 +30,7 @@ namespace TransformHandle
 
         protected void Update()
         {
-            lineMeshRenderer.transform.localScale = new Vector3(1, 1, 1+delta);
+            lineMeshRenderer.transform.localScale = new Vector3(1, 1 + delta, 1);
             cubeMeshRenderer.transform.localPosition = _axis * (Size * (1 + delta));
         }
 
@@ -42,10 +42,10 @@ namespace TransformHandle
             var hitPoint = _rAxisRay.GetPoint(closestT);
             
             var distance = Vector3.Distance(ParentHandle.target.position, hitPoint);
-            var axisScaleDelta    = distance / _interactionDistance - 1f;
+            var axisScaleDelta = distance / _interactionDistance - 1f;
 
             var snapping = ParentHandle.scaleSnap;
-            var   snap     = Mathf.Abs(Vector3.Dot(snapping, _axis));
+            var snap = Mathf.Abs(Vector3.Dot(snapping, _axis));
             if (snap != 0)
             {
                 if (ParentHandle.snappingType == SnappingType.Relative)
