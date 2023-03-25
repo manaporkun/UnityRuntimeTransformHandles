@@ -42,7 +42,12 @@ public class ObjSelector : MonoBehaviour
                 if(_handleDictionary.ContainsKey(hitTransform)) return;
                 if (_lastHandle == null) { CreateHandle(hitTransform); }
                 else { AddTarget(hitTransform); }
-                SelectObject(hitTransform);
+                
+                var children = hitTransform.GetComponentsInChildren<Transform>();
+                foreach (var child in children)
+                {
+                    SelectObject(child);
+                }
             }
         }
 
@@ -56,6 +61,11 @@ public class ObjSelector : MonoBehaviour
                 if(!_handleDictionary.ContainsKey(hitTransform)) return;
                 RemoveTarget(hitTransform);
                 DeselectObject(hitTransform);
+                var children = hitTransform.GetComponentsInChildren<Transform>();
+                foreach (var child in children)
+                {
+                    DeselectObject(child);
+                }
             }
         }
 
@@ -71,29 +81,35 @@ public class ObjSelector : MonoBehaviour
         }
     }
 
-    private static void DeselectObject(Component hitInfoTransform)
+    private void DeselectObject(Transform hitInfoTransform)
     {
+        _handleDictionary.Remove(hitInfoTransform);
+
         hitInfoTransform.tag = "Untagged";
-        hitInfoTransform.gameObject.GetComponent<Renderer>().material.color = Color.white;
+        var renderer = hitInfoTransform.gameObject.GetComponent<Renderer>();
+        if (renderer == null) renderer = hitInfoTransform.GetComponentInChildren<Renderer>();
+        renderer.material.color = Color.white;
     }
 
-    private static void SelectObject(Component hitInfoTransform)
+    private void SelectObject(Transform hitInfoTransform)
     {
+        _handleDictionary.Add(hitInfoTransform, _lastHandle);
+
         hitInfoTransform.tag = "Selected";
-        hitInfoTransform.gameObject.GetComponent<Renderer>().material.color = Color.red;
+        var renderer = hitInfoTransform.gameObject.GetComponent<Renderer>();
+        if (renderer == null) renderer =  hitInfoTransform.GetComponentInChildren<Renderer>();
+        renderer.material.color = Color.cyan;
     }
     
     private void CreateHandle(Transform hitTransform)
     {
         var handle = _transformHandleManager.CreateHandle(hitTransform);
-        _handleDictionary.Add(hitTransform, handle);
         _lastHandle = handle;
     }
     
     private void AddTarget(Transform hitTransform)
     {
         _transformHandleManager.AddTarget(hitTransform, _lastHandle);
-        _handleDictionary.Add(hitTransform, _lastHandle);
     }
     
     private void RemoveTarget(Transform hitTransform)
@@ -102,7 +118,6 @@ public class ObjSelector : MonoBehaviour
         if (_lastHandle == handle) _lastHandle = null;
 
         _transformHandleManager.RemoveTarget(hitTransform, handle);
-        _handleDictionary.Remove(hitTransform);
     }
 
     private void OnHandleInteractionStart()
