@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using TransformHandle.Utils;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace TransformHandle
 {
@@ -10,12 +9,27 @@ namespace TransformHandle
     {
         public Camera mainCamera;
         
+        [Header("Prefabs")]
         [SerializeField] private GameObject transformHandlePrefab;
         [SerializeField] private GameObject ghostPrefab;
         
+        [Header("Settings")]
         [SerializeField] private LayerMask layerMask;
-        
         [SerializeField] private Color highlightColor = Color.white;
+        
+        [Header("Shortcuts")]
+        [SerializeField] private KeyCode positionShortcut = KeyCode.W;
+        [SerializeField] private KeyCode rotationShortcut = KeyCode.E;
+        [SerializeField] private KeyCode scaleShortcut = KeyCode.R;
+        [SerializeField] private KeyCode allShortcut = KeyCode.LeftAlt + (int)KeyCode.A;
+        [SerializeField] private KeyCode spaceShortcut = KeyCode.X;
+        [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
+        
+        public event Action OnHandleCreatedEvent;
+        public event Action OnHandleDestroyedEvent;
+        public event Action OnInteractionStartEvent;
+        public event Action OnInteractionEvent;
+        public event Action OnInteractionEndEvent;
         
         private RaycastHit[] _rayHits;
         
@@ -64,6 +78,8 @@ namespace TransformHandle
             AddTarget(target, transformHandle);
             
             _handleActive = true;
+            
+            OnHandleCreatedEvent?.Invoke();
 
             return transformHandle;
         }
@@ -94,6 +110,8 @@ namespace TransformHandle
             }
 
             _handleActive = true;
+            
+            OnHandleCreatedEvent?.Invoke();
 
             return transformHandle;
         }
@@ -110,6 +128,8 @@ namespace TransformHandle
             group.GroupGhost.Terminate();
             
             DestroyImmediate(handle.gameObject);
+            
+            OnHandleDestroyedEvent?.Invoke();
             
             if (_handleGroupMap.Count == 0) _handleActive = false;
         }
@@ -236,7 +256,7 @@ namespace TransformHandle
         
         private void KeyboardInput()
         {
-            if (Input.GetKeyDown(KeyCode.W))
+            if (Input.GetKeyDown(positionShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -244,7 +264,7 @@ namespace TransformHandle
                 }
             }
             
-            if (Input.GetKeyDown(KeyCode.E))
+            if (Input.GetKeyDown(rotationShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -252,7 +272,7 @@ namespace TransformHandle
                 }
             }
             
-            if (Input.GetKeyDown(KeyCode.R))
+            if (Input.GetKeyDown(scaleShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -260,7 +280,7 @@ namespace TransformHandle
                 }
             }
             
-            if (Input.GetKeyDown(KeyCode.Q))
+            if (Input.GetKeyDown(allShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -268,7 +288,7 @@ namespace TransformHandle
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.X))
+            if (Input.GetKeyDown(spaceShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -276,7 +296,7 @@ namespace TransformHandle
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.Z))
+            if (Input.GetKeyDown(pivotShortcut))
             {
                 foreach (var group in _handleGroupMap.Values)
                 {
@@ -290,11 +310,15 @@ namespace TransformHandle
             _interactedHandle = _draggingHandle.GetComponentInParent<Handle>();
             _interactedGhost = _handleGroupMap[_interactedHandle].GroupGhost;
             _interactedGhost.OnInteractionStart();
+            
+            OnInteractionStartEvent?.Invoke();
         }
 
         private void OnInteraction()
         {
             _interactedGhost.OnInteraction(_interactedHandle.type);
+            
+            OnInteractionEvent?.Invoke();
         }
 
         private void OnInteractionEnd()
@@ -304,9 +328,11 @@ namespace TransformHandle
 
             var averagePosRotScale = group.GetAveragePosRotScale();
             _interactedGhost.UpdateGhostTransform(averagePosRotScale);
+            
+            OnInteractionEndEvent?.Invoke();
         }
         
-        public void ChangeHandleType(Handle handle, HandleType type)
+        public static void ChangeHandleType(Handle handle, HandleType type)
         {
             if(handle == null) { Debug.LogError("Handle is null"); return;}
             handle.ChangeHandleType(type);
@@ -354,7 +380,7 @@ namespace TransformHandle
         
         public bool IsOriginOnCenter;
 
-        public HashSet<Transform> TransformHashSet;
+        private HashSet<Transform> _transformHashSet;
         private Dictionary<Transform, MeshRenderer> _transformRendererMap;
         private Dictionary<Transform, Bounds> _transformBoundsMap;
 
@@ -363,7 +389,7 @@ namespace TransformHandle
             GroupGhost = groupGhost;
             GroupHandle = groupHandle;
             
-            TransformHashSet = new HashSet<Transform>();
+            _transformHashSet = new HashSet<Transform>();
             _transformRendererMap = new Dictionary<Transform, MeshRenderer>();
             _transformBoundsMap = new Dictionary<Transform, Bounds>();
         }
@@ -374,7 +400,7 @@ namespace TransformHandle
             
             var meshRenderer = tElement.GetComponent<MeshRenderer>();
             
-            TransformHashSet.Add(tElement);
+            _transformHashSet.Add(tElement);
             _transformRendererMap.Add(tElement, meshRenderer);
             _transformBoundsMap.Add(tElement, meshRenderer != null ? meshRenderer.bounds : tElement.GetBounds());
 
@@ -383,11 +409,11 @@ namespace TransformHandle
         
         public bool RemoveTransform(Transform transform)
         {
-            TransformHashSet.Remove(transform);
+            _transformHashSet.Remove(transform);
             _transformRendererMap.Remove(transform);
             _transformBoundsMap.Remove(transform);
             
-            return TransformHashSet.Count == 0;
+            return _transformHashSet.Count == 0;
         }
 
         public void UpdateBounds()
@@ -471,9 +497,9 @@ namespace TransformHandle
             var centerPositions = new List<Vector3>();
             var sumQuaternion = Quaternion.identity;
 
-            var transformsCount = TransformHashSet.Count;
+            var transformsCount = _transformHashSet.Count;
 
-            foreach (var tElement in TransformHashSet)
+            foreach (var tElement in _transformHashSet)
             {
                 var centerPoint = GetCenterPoint(tElement);
                 centerPositions.Add(centerPoint);
@@ -498,7 +524,7 @@ namespace TransformHandle
         
         private bool IsTargetRelativeToSelectedOnes(Transform newTarget)
         {
-            foreach (var transformInHash in TransformHashSet)
+            foreach (var transformInHash in _transformHashSet)
             {
                 if (transformInHash.IsDeepParentOf(newTarget)) return true;
 
