@@ -111,12 +111,12 @@ namespace TransformHandle
             CreateHandles();
         }
 
-        public virtual void ChangeHandleSpace(Space space)
+        public virtual void ChangeHandleSpace(Space newSpace)
         {
             if (type == HandleType.Scale)
-                this.space = Space.Self;
+                space = Space.Self;
             else
-                this.space = space == Space.Self ? Space.Self : Space.World;
+                space = newSpace == Space.Self ? Space.Self : Space.World;
         }
 
         public virtual void ChangeAxes(HandleAxes handleAxes)
