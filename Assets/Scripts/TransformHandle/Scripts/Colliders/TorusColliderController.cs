@@ -43,7 +43,9 @@ namespace TransformHandle
 			_meshFilter.sharedMesh = newMesh;
 			_meshCollider.sharedMesh = newMesh;
 			
+			/*
 			AssetDatabase.CreateAsset(newMesh, "Assets/torus.asset");
+			*/
 		}
 	}
 }
