@@ -75,7 +75,8 @@ namespace TransformHandle
             _handleGroupMap.Add(transformHandle, group);
             _ghostGroupMap.Add(ghost, group);
             
-            AddTarget(target, transformHandle);
+            var success = AddTarget(target, transformHandle);
+            if (!success) { DestroyHandle(transformHandle); }
             
             _handleActive = true;
             
@@ -142,19 +143,21 @@ namespace TransformHandle
             }
         }
         
-        public void AddTarget(Transform target, Handle handle)
+        public bool AddTarget(Transform target, Handle handle)
         {
-            if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return; }
-            if(handle == null) { Debug.LogError("Handle is null"); return;}
+            if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return false; }
+            if(handle == null) { Debug.LogError("Handle is null"); return false;}
 
             var group = _handleGroupMap[handle];
             var targetAdded = group.AddTransform(target);
-            if(!targetAdded) { Debug.LogWarning($"{target} is relative to the selected ones."); return; }
+            if(!targetAdded) { Debug.LogWarning($"{target} is relative to the selected ones."); return false; }
             
             var averagePosRotScale = group.GetAveragePosRotScale();
             group.GroupGhost.UpdateGhostTransform(averagePosRotScale);
             
             _transformHashSet.Add(target);
+
+            return true;
         }
 
         public void RemoveTarget(Transform target, Handle handle)
@@ -403,7 +406,7 @@ namespace TransformHandle
             _transformHashSet.Add(tElement);
             _transformRendererMap.Add(tElement, meshRenderer);
             _transformBoundsMap.Add(tElement, meshRenderer != null ? meshRenderer.bounds : tElement.GetBounds());
-
+            
             return true;
         }
         
@@ -514,7 +517,7 @@ namespace TransformHandle
                 averagePosition += centerPosition;
             }
             averagePosition /= transformsCount;
-
+            
             averagePosRotScale.Position = averagePosition;
             averagePosRotScale.Rotation = sumQuaternion;
             averagePosRotScale.Scale = Vector3.one;
