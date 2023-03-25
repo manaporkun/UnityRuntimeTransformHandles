@@ -26,33 +26,27 @@ namespace TransformHandle
 
         public bool autoScale;
         public Camera handleCamera;
-
-        private HandleCameraEventHandler _cameraEventHandler;
         
         protected virtual void Awake()
         {
             PositionHandle = GetComponentInChildren<PositionHandle>();
             RotationHandle = GetComponentInChildren<RotationHandle>();
             ScaleHandle = GetComponentInChildren<ScaleHandle>();
-
-            _cameraEventHandler = GetComponent<HandleCameraEventHandler>();
-
+            
             Clear();
         }
         
         protected virtual void OnEnable()
         {
             handleCamera = TransformHandleManager.Instance.mainCamera;
-            _cameraEventHandler.PreRender += OnPreRenderEvent;
         }
 
         protected virtual void OnDisable()
         {
-            _cameraEventHandler.PreRender -= OnPreRenderEvent;
             Disable();
         }
 
-        protected virtual void OnPreRenderEvent()
+        private void OnPreRender()
         {
             OnAutoScale();
         }
