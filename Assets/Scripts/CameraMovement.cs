@@ -10,6 +10,11 @@ public class CameraMovement : MonoBehaviour
     private const string XAxis = "Mouse X";
     private const string YAxis = "Mouse Y";
 
+    private void Awake()
+    {
+        _rotation = transform.localRotation.eulerAngles;
+    }
+
     private void Update(){
         _rotation.x += Input.GetAxis(XAxis) * sensitivity;
         _rotation.x = Mathf.Clamp(_rotation.x, -xRotationLimit, xRotationLimit);

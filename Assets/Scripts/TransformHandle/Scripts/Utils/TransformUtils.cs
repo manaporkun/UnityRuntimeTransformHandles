@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace TransformHandle.Utils
@@ -16,14 +18,24 @@ namespace TransformHandle.Utils
             // Use Transform.IsChildOf to check if the other transform is a child of this transform
             return other.IsChildOf(self);
         }
-        
+
         public static Bounds GetBounds(this Transform transform)
         {
-            var bounds = new Bounds(transform.position, Vector3.zero);
-            foreach (var renderer in transform.GetComponentsInChildren<Renderer>())
+            var bounds = new Bounds(Vector3.zero, Vector3.zero);
+            var renderers = transform.GetComponentsInChildren<Renderer>();
+            var renderersCount = renderers.Length;
+            
+            var averageCenter = Vector3.zero;
+            var averageSize = Vector3.zero;
+            foreach (var renderer in renderers)
             {
-                bounds.Encapsulate(renderer.bounds);
+                var bound = renderer.bounds;
+                averageCenter += bound.center;
+                averageSize += bound.size;
             }
+            bounds.center = averageCenter/renderersCount;
+            bounds.size = averageSize/renderersCount;
+            
             return bounds;
         }
     }
