@@ -17,14 +17,11 @@ namespace TransformHandle
 
         protected Vector3 HitPoint;
 
-        protected bool IsInteracting = false;
-
         public float delta;
 
         public virtual void SetDefaultColor()
         {
             Material.color = DefaultColor;
-            Debug.Log(DefaultColor);
         }
         
         public virtual void SetColor(Color color)
@@ -36,7 +33,6 @@ namespace TransformHandle
         {
             HitPoint = pHitPoint;
             InteractionStart?.Invoke();
-            IsInteracting = true;
         }
 
         public virtual void Interact(Vector3 pPreviousPosition)
@@ -46,7 +42,6 @@ namespace TransformHandle
 
         public virtual void EndInteraction()
         {
-            IsInteracting = false;
             InteractionEnd?.Invoke();
             delta = 0;
             SetDefaultColor();

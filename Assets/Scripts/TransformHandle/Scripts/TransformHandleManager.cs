@@ -25,11 +25,11 @@ namespace TransformHandle
         [SerializeField] private KeyCode spaceShortcut = KeyCode.X;
         [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
         
-        public event Action OnHandleCreatedEvent;
-        public event Action OnHandleDestroyedEvent;
-        public event Action OnInteractionStartEvent;
-        public event Action OnInteractionEvent;
-        public event Action OnInteractionEndEvent;
+        public virtual event Action OnHandleCreatedEvent;
+        public virtual event Action OnHandleDestroyedEvent;
+        public virtual event Action OnInteractionStartEvent;
+        public virtual event Action OnInteractionEvent;
+        public virtual event Action OnInteractionEndEvent;
         
         private RaycastHit[] _rayHits;
         
@@ -190,7 +190,7 @@ namespace TransformHandle
             KeyboardInput();
         }
         
-        private void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
+        protected virtual void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
         {
             _rayHits = new RaycastHit[16];
 
@@ -217,7 +217,7 @@ namespace TransformHandle
             }
         }
 
-        private void HandleOverEffect(HandleBase handleBase)
+        protected virtual void HandleOverEffect(HandleBase handleBase)
         {
             if (_draggingHandle == null && _previousAxis != null && _previousAxis != handleBase)
             {
@@ -232,7 +232,7 @@ namespace TransformHandle
             _previousAxis = handleBase;
         }
 
-        private void MouseInput()
+        protected virtual void MouseInput()
         {
             if (Input.GetMouseButton(0) && _draggingHandle != null)
             {
@@ -257,7 +257,7 @@ namespace TransformHandle
             _previousMousePosition = Input.mousePosition;
         }
         
-        private void KeyboardInput()
+        protected virtual void KeyboardInput()
         {
             if (Input.GetKeyDown(positionShortcut))
             {
@@ -308,7 +308,7 @@ namespace TransformHandle
             }
         }
 
-        private void OnInteractionStart()
+        protected virtual void OnInteractionStart()
         {
             _interactedHandle = _draggingHandle.GetComponentInParent<Handle>();
             _interactedGhost = _handleGroupMap[_interactedHandle].GroupGhost;
@@ -317,14 +317,14 @@ namespace TransformHandle
             OnInteractionStartEvent?.Invoke();
         }
 
-        private void OnInteraction()
+        protected virtual void OnInteraction()
         {
             _interactedGhost.OnInteraction(_interactedHandle.type);
             
             OnInteractionEvent?.Invoke();
         }
 
-        private void OnInteractionEnd()
+        protected virtual void OnInteractionEnd()
         {
             var group = _handleGroupMap[_interactedHandle];
             group.UpdateBounds();
@@ -357,19 +357,19 @@ namespace TransformHandle
             group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
         }
         
-        public void GroupPositionUpdate(Ghost ghost, Vector3 positionChange)
+        public void UpdateGroupPosition(Ghost ghost, Vector3 positionChange)
         {
             var group = _ghostGroupMap[ghost];
             group.UpdatePositions(positionChange);
         }
         
-        public void GroupRotationUpdate(Ghost ghost, Quaternion rotationChange)
+        public void UpdateGroupRotation(Ghost ghost, Quaternion rotationChange)
         {
             var group = _ghostGroupMap[ghost];
             group.UpdateRotations(rotationChange);
         }
         
-        public void GroupScaleUpdate(Ghost ghost, Vector3 scaleChange)
+        public void UpdateGroupScaleUpdate(Ghost ghost, Vector3 scaleChange)
         {
             var group = _ghostGroupMap[ghost];
             group.UpdateScales(scaleChange);
