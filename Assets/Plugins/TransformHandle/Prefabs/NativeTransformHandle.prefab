@@ -1445,7 +1445,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37d802fc6dfb4b92b00d61c937d99862, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoScaleSizeInPixels: 192
+  autoScaleSizeInPixels: 1000
+  autoScale: 1
   target: {fileID: 0}
   axes: 6
   space: 0
@@ -1454,7 +1455,6 @@ MonoBehaviour:
   positionSnap: {x: 0, y: 0, z: 0}
   rotationSnap: 0
   scaleSnap: {x: 0, y: 0, z: 0}
-  autoScale: 1
   handleCamera: {fileID: 0}
 --- !u!1 &5827055863681706732
 GameObject:

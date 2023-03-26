@@ -1,20 +1,13 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace TransformHandle
 {
     public class Handle : MonoBehaviour
     {
-        private bool IsHandlesActive { get; set; }
+        [SerializeField] private float autoScaleSizeInPixels = 192;
+        [SerializeField] public bool autoScale;
 
-        [SerializeField]
-        private float autoScaleSizeInPixels = 192;
-
-        private PositionHandle PositionHandle { get; set; }
-        private RotationHandle RotationHandle { get; set; }
-        private ScaleHandle ScaleHandle { get; set; }
-        
         public Transform target;
         public HandleAxes axes = HandleAxes.XYZ;
         public Space space = Space.Self;
@@ -25,8 +18,13 @@ namespace TransformHandle
         public float rotationSnap;
         public Vector3 scaleSnap = Vector3.zero;
 
-        public bool autoScale;
         public Camera handleCamera;
+
+        private PositionHandle PositionHandle { get; set; }
+        private RotationHandle RotationHandle { get; set; }
+        private ScaleHandle ScaleHandle { get; set; }
+        
+        private float _initialDistanceToCamera;
         
         protected virtual void Awake()
         {
@@ -40,23 +38,21 @@ namespace TransformHandle
         protected virtual void OnEnable()
         {
             handleCamera = TransformHandleManager.Instance.mainCamera;
-            RenderPipelineManager.beginCameraRendering += OnPreRenderCallback;
+            _initialDistanceToCamera = (transform.position - handleCamera.transform.position).magnitude;
         }
 
         protected virtual void OnDisable()
         {
             Disable();
-            RenderPipelineManager.beginCameraRendering -= OnPreRenderCallback;
-        }
-
-        private void OnPreRenderCallback(ScriptableRenderContext scriptableRenderContext, Camera camera)
-        {
-            OnAutoScale();
         }
 
         protected virtual void LateUpdate()
         {
             UpdateHandleTransformation();
+            
+            if (!autoScale) return;
+            var currentFOV = handleCamera.fieldOfView;
+            transform.PreserveScaleOnScreen(_initialDistanceToCamera, currentFOV, autoScaleSizeInPixels, handleCamera);
         }
         
         public virtual void Enable(Transform targetTransform)
@@ -65,8 +61,6 @@ namespace TransformHandle
             transform.position = targetTransform.position;
             
             CreateHandles();
-            
-            IsHandlesActive = true;
         }
 
         public virtual void Disable()
@@ -74,32 +68,8 @@ namespace TransformHandle
             target = null;
 
             Clear();
-            
-            IsHandlesActive = false;
         }
-        
-        protected virtual void OnAutoScale()
-        {
-            if(!autoScale || !IsHandlesActive) return;
-            
-            var p1 = transform.TransformPoint(Vector3.zero);
-            var p2 = transform.TransformPoint(handleCamera.transform.up);
-            
-            var s1 = handleCamera.WorldToScreenPoint(p1);
-            var s2 = handleCamera.WorldToScreenPoint(p2);
-            
-            var dist = Vector3.Distance(s1, s2);
-            if (dist > 0)
-            {
-                var scaleMultiplierInPx = autoScaleSizeInPixels / dist;
-                transform.localScale *= scaleMultiplierInPx;
-            }
-            else
-            {
-                transform.localScale = Vector3.one;
-            }
-        }
-        
+
         public virtual void ChangeHandleType(HandleType handleType)
         {
             type = handleType;
