@@ -32,10 +32,25 @@ public class ObjSelector : MonoBehaviour
     }
 
     private void Update()
-  
     {
+        if (Input.GetKey(KeyCode.LeftControl) && Input.GetMouseButtonDown(0))
+        {
+            var ray = _camera.ScreenPointToRay(Input.mousePosition);
+            if (Physics.Raycast(ray, out var hit, 1000f, layerMask))
+            {
+                var hitTransform = hit.transform;
+                if(_handleDictionary.ContainsKey(hitTransform)) return;
+                CreateHandle(hitTransform);
+                
+                var children = hitTransform.GetComponentsInChildren<Transform>();
+                foreach (var child in children)
+                {
+                    SelectObject(child);
+                }
+            }
+        }
         // Add the object to handle if exists, else create a new handle
-        if (Input.GetMouseButtonDown(0))
+        else if (Input.GetMouseButtonDown(0))
         {
             var ray = _camera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out var hit, 1000f, layerMask))
@@ -52,7 +67,6 @@ public class ObjSelector : MonoBehaviour
                 }
             }
         }
-
         // Remove the object from handle
         if (Input.GetMouseButtonDown(1))
         {
