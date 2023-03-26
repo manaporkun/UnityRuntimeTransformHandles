@@ -27,7 +27,7 @@ TransformHandleManager uses Unity events to allow external scripts to react to h
 
 ### Ghost.cs
 
-"Ghost" is used to represent a empty transform object that is being manipulated by the user through a transform handle system. The Ghost transform is instantiated when a handle created and is responsible for updating its position, rotation, and scale based on the user's input.
+"Ghost" is used to represent an empty transform object that is being manipulated by the user through a transform handle system. The Ghost transform is instantiated when a handle created and is responsible for updating its position, rotation, and scale based on the user's input.
 
 ### Handle.cs
 
