@@ -21,7 +21,7 @@ namespace TransformHandle
         [SerializeField] private KeyCode positionShortcut = KeyCode.W;
         [SerializeField] private KeyCode rotationShortcut = KeyCode.E;
         [SerializeField] private KeyCode scaleShortcut = KeyCode.R;
-        [SerializeField] private KeyCode allShortcut = KeyCode.LeftAlt + (int)KeyCode.A;
+        [SerializeField] private KeyCode allShortcut = KeyCode.A;
         [SerializeField] private KeyCode spaceShortcut = KeyCode.X;
         [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
         

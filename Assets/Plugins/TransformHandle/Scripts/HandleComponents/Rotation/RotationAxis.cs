@@ -20,7 +20,7 @@ namespace TransformHandle
         
         private Quaternion _startRotation;
 
-        private Vector3 _rotationHandleScale;
+        private Transform _rotationHandleTransform;
 
         public void Initialize(Handle handle, Vector3 pAxis)
         {
@@ -30,8 +30,7 @@ namespace TransformHandle
             
             _handleCamera = ParentHandle.handleCamera;
 
-            _rotationHandleScale = transform.parent.GetComponent<RotationHandle>().transform
-                .lossyScale;
+            _rotationHandleTransform = transform.GetComponentInParent<Handle>().transform;
         }
 
         public override void Interact(Vector3 pPreviousPosition)
@@ -67,7 +66,7 @@ namespace TransformHandle
                 ParentHandle.target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
             }
             _arcMesh = MeshUtils.CreateArc(transform.position, HitPoint, _rotatedAxis, 
-                _rotationHandleScale.x, angleRadians, 
+                _rotationHandleTransform.localScale.x, angleRadians, 
                 Mathf.Abs(Mathf.CeilToInt(angleDegrees)) + 1);
             DrawArc();
 

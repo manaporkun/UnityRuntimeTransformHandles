@@ -1445,7 +1445,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37d802fc6dfb4b92b00d61c937d99862, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoScaleSizeInPixels: 1000
+  autoScaleSizeInPixels: 192
   autoScale: 1
   target: {fileID: 0}
   axes: 6
