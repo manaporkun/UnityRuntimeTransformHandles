@@ -24,8 +24,6 @@ namespace TransformHandle
         private RotationHandle RotationHandle { get; set; }
         private ScaleHandle ScaleHandle { get; set; }
         
-        private float _initialDistanceToCamera;
-        
         protected virtual void Awake()
         {
             PositionHandle = GetComponentInChildren<PositionHandle>();
@@ -38,7 +36,6 @@ namespace TransformHandle
         protected virtual void OnEnable()
         {
             handleCamera = TransformHandleManager.Instance.mainCamera;
-            _initialDistanceToCamera = (transform.position - handleCamera.transform.position).magnitude;
         }
 
         protected virtual void OnDisable()
@@ -51,8 +48,7 @@ namespace TransformHandle
             UpdateHandleTransformation();
             
             if (!autoScale) return;
-            var currentFOV = handleCamera.fieldOfView;
-            transform.PreserveScaleOnScreen(_initialDistanceToCamera, currentFOV, autoScaleSizeInPixels, handleCamera);
+            transform.PreserveScaleOnScreen(handleCamera.fieldOfView, autoScaleSizeInPixels, handleCamera);
         }
         
         public virtual void Enable(Transform targetTransform)
