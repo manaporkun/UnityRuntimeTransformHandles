@@ -1,4 +1,4 @@
-Shader "Handles/Handle"
+Shader "Handles/Origin"
 {
     Properties
     {

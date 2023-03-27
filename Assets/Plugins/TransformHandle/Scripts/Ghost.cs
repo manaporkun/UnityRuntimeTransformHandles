@@ -5,12 +5,8 @@ namespace TransformHandle
 {
     public class Ghost : MonoBehaviour
     {
-        [SerializeField] private GameObject originIndicatorPrefab;
-
         private TransformHandleManager _handleManager;
         
-        private GameObject _originIndicator;
-        private MeshRenderer _originIndicatorRenderer;
         
         private PosRotScale _initialProperties;
         
@@ -19,38 +15,11 @@ namespace TransformHandle
         public virtual void Initialize()
         {
             _handleManager = TransformHandleManager.Instance;
-            
-            if (originIndicatorPrefab == null)
-            {
-                Debug.LogWarning("Origin indicator prefab is not set.");
-            }
-            else
-            {
-                _originIndicator = Instantiate(originIndicatorPrefab);
-                _originIndicatorRenderer = _originIndicator.GetComponent<MeshRenderer>();
-                if (_originIndicatorRenderer == null)
-                {
-                    Debug.LogWarning("Origin indicator prefab does not have a mesh renderer.");
-                }
-            }
         }
 
         public virtual void Terminate()
         {
-            if(_originIndicator != null) DestroyImmediate(_originIndicator);
             DestroyImmediate(gameObject);
-        }
-
-        protected virtual void LateUpdate()
-        {
-            if(!_originIndicator) return;
-            _originIndicator.transform.position = transform.position;
-        }
-
-        public void SetOriginIndicatorColor(Color color)
-        {
-            if (_originIndicatorRenderer == null) return;
-            _originIndicatorRenderer.material.color = color;
         }
 
         public void UpdateGhostTransform(PosRotScale average)
