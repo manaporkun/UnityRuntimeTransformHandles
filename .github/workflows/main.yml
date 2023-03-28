@@ -1,29 +1,23 @@
-name: Unity Package Build
+name: Create Unity Package
 
-on:
-  push:
-    branches: [main]
+on: push
 
 jobs:
-  build:
+  echo:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/checkout@v2
+    - run: |
+        echo "Packages/runtime-transform-handles/Runtime.meta" > metaList
+        find /Packages/runtime-transform-handles/Runtime/ -name \*.meta >> metaList
 
-      - name: Set up Unity environment
-        uses: game-ci/unity-builder@v2
-        with:
-          unityVersion: 2020.3.1f1
+    - run: mkdir UnityPackage
 
-      - name: Build Unity Package
-        uses: game-ci/unity-builder@v2
-        with:
-          target: StandaloneWindows64
-          outputDir: Build
-
-      - name: Upload Package
-        uses: actions/upload-artifact@v2
-        with:
-          name: RuntimeTransformHandles
-          path: Build/RuntimeTransformHandles.unitypackage
+    - uses: pCYSl5EDgo/create-unitypackage@master
+      with:
+        package-path: 'UnityPackage/handles.unitypackage'
+        include-files: metaList
+    - uses: actions/upload-artifact@master
+      with:
+        path: UnityPackage
+        name: handles
