@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Set up Unity environment
-        uses: webbertakken/unity-actions@v2
+        uses: game-ci/unity-builder@v2
         with:
           unityVersion: 2021.3.21f1
 
