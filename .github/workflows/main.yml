@@ -1,0 +1,29 @@
+name: Unity Package Build
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Unity environment
+        uses: game-ci/unity-builder@v2
+        with:
+          unityVersion: 2021.3.21f1
+
+      - name: Build Unity Package
+        uses: game-ci/unity-builder@v2
+        with:
+          target: StandaloneWindows64
+          outputDir: Build
+
+      - name: Upload Package
+        uses: actions/upload-artifact@v2
+        with:
+          name: RuntimeTransformHandles
+          path: Build/RuntimeTransformHandles.unitypackage
