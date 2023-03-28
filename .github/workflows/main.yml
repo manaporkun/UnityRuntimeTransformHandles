@@ -9,7 +9,7 @@ jobs:
     - uses: actions/checkout@v2
     - run: |
         echo "Packages/runtime-transform-handles/Runtime.meta" > metaList
-        find /Packages/runtime-transform-handles/Runtime/ -name \*.meta >> metaList
+        find Packages/runtime-transform-handles/Runtime/ -name \*.meta >> metaList
 
     - run: mkdir UnityPackage
 
