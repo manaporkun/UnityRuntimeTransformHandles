@@ -11,6 +11,23 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 ### Video
 [![Video](https://i.imgur.com/OSXsYXA.png)](https://www.youtube.com/watch?v=-6tpim397F0)
 
+## Install
+
+1. Open the Package Manager from `Window > Package Manager`
+2. `"+" button > Add package from git URL`
+3. Enter the following
+   * https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles
+
+Or, open `Packages/manifest.json` and add the following to the dependencies block.
+
+```json
+{
+    "dependencies": {
+         "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles/"
+    }
+}
+```
+
 ## Main Components
 
 ### ObjSelector.cs
