@@ -75,3 +75,10 @@ jobs:
           name: 'UNITY_LICENSE'
           value: '${{ steps.ulfRead.outputs.content }}'
           token: ${{ secrets.PAT }}
+          
+      # Add the error handling step here!
+      - name: 🩺 Upload error screenshot
+        uses: actions/upload-artifact@v1
+        with:
+          name: screenshot_error
+          path: error.png
