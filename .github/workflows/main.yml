@@ -8,8 +8,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - run: |
-        echo "Packages/runtime-transform-handles/Runtime.meta" > metaList
-        find Packages/runtime-transform-handles/Runtime/ -name \*.meta >> metaList
+        echo "Packages/runtime-transform-handles" > metaList
+        find Packages/runtime-transform-handles/ -name \*.meta >> metaList
 
     - run: mkdir UnityPackage
 
