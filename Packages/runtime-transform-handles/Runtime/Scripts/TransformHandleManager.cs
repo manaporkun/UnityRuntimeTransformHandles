@@ -194,9 +194,25 @@ namespace TransformHandles
         {
             _rayHits = new RaycastHit[16];
 
-            var ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-            var size = Physics.RaycastNonAlloc(ray, _rayHits, 1000, layerMask);
-                
+            var size = 0;
+            try
+            {
+                var ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                size = Physics.RaycastNonAlloc(ray, _rayHits, 1000, layerMask);
+            }
+            catch (MissingReferenceException)
+            {
+                mainCamera = Camera.main;
+                Debug.Log("Camera is null, trying to find main camera");
+
+                if (mainCamera == null)
+                {
+                    Debug.Log("Main camera is null, aborting");
+                    Destroy(gameObject);
+                    return;
+                }
+            }
+            
             if (size == 0)
             {
                 if (_hoveredHandle == null) return;
