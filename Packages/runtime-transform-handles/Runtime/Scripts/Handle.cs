@@ -24,6 +24,8 @@ namespace TransformHandles
         private RotationHandle RotationHandle { get; set; }
         private ScaleHandle ScaleHandle { get; set; }
         
+        private static TransformHandleManager Manager => TransformHandleManager.Instance;
+        
         protected virtual void Awake()
         {
             PositionHandle = GetComponentInChildren<PositionHandle>();
@@ -35,12 +37,17 @@ namespace TransformHandles
         
         protected virtual void OnEnable()
         {
-            handleCamera = TransformHandleManager.Instance.mainCamera;
+            handleCamera = Manager.mainCamera;
         }
 
         protected virtual void OnDisable()
         {
             Disable();
+        }
+
+        protected void OnDestroy()
+        {
+            if (Manager != null) Manager.RemoveHandle(this);
         }
 
         protected virtual void LateUpdate()

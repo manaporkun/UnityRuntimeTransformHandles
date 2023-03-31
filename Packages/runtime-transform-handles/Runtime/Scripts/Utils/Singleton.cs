@@ -1,41 +1,62 @@
 using UnityEngine;
 
-namespace TransformHandles.Utils
+public class Singleton<T> : MonoBehaviour where T : Singleton<T>
 {
-    
-    public class Singleton<T> : MonoBehaviour where T : Singleton<T>
+    private static T _instance;
+
+    public static T Instance
     {
-        private static T _instance;
-
-        public static T Instance
+        get
         {
-            get
+            if (ApplicationQuitManager.ApplicationQuitting)
             {
-                if (_instance != null) return _instance;
-                _instance = FindObjectOfType<T>();
+                return null;
+            }
 
-                if (_instance != null) return _instance;
-                var obj = new GameObject
-                {
-                    name = typeof(T).Name
-                };
-                _instance = obj.AddComponent<T>();
-                return _instance;
-            }
-        }
+            if (_instance != null) return _instance;
+            _instance = FindObjectOfType<T>();
 
-        protected virtual void Awake()
-        {
-            if (_instance == null)
-            {
-                _instance = this as T;
-                DontDestroyOnLoad(gameObject);
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            if (_instance != null) return _instance;
+            var obj = new GameObject(typeof(T).Name);
+            _instance = obj.AddComponent<T>();
+
+            return _instance;
         }
     }
 
+    protected virtual void Awake()
+    {
+        if (_instance == null)
+        {
+            _instance = (T)this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else if (_instance != this)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    protected virtual void OnDestroy()
+    {
+        if (_instance == this)
+        {
+            _instance = null;
+        }
+    }
+
+    private void OnApplicationQuit()
+    {
+        ApplicationQuitManager.SetApplicationQuitting(true);
+    }
+}
+
+public static class ApplicationQuitManager
+{
+    public static bool ApplicationQuitting { get; private set; }
+
+    public static void SetApplicationQuitting(bool quitting)
+    {
+        ApplicationQuitting = quitting;
+    }
 }
