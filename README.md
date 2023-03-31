@@ -1,6 +1,6 @@
 # Runtime Transform Handles for Unity 
 
-![Icon](Assets/Settings/icon.png)
+![Icon](https://i.imgur.com/NRdmzlQ.png)
 
 ## About
 
