@@ -11,7 +11,8 @@ public class ObjSelector : MonoBehaviour
     private Camera _camera;
     private CameraMovement _cameraMovement;
 
-    private TransformHandleManager _transformHandleManager;
+    private TransformHandleManager _manager;
+    
     private Handle _lastHandle;
     private Dictionary<Transform, Handle> _handleDictionary;
 
@@ -20,15 +21,22 @@ public class ObjSelector : MonoBehaviour
         _camera = Camera.main;
         if (_camera != null) _cameraMovement = _camera.GetComponent<CameraMovement>();
         
-        _transformHandleManager = TransformHandleManager.Instance;
+        _manager = TransformHandleManager.Instance;
         _handleDictionary = new Dictionary<Transform, Handle>();
     }
 
-    private void Start()
+    private void OnEnable()
     {
-        TransformHandleManager.Instance.OnInteractionStartEvent += OnHandleInteractionStart;
-        TransformHandleManager.Instance.OnInteractionEvent += OnHandleInteraction;
-        TransformHandleManager.Instance.OnInteractionEndEvent += OnHandleInteractionEnd;
+        _manager.OnInteractionStartEvent += OnHandleInteractionStart;
+        _manager.OnInteractionEvent += OnHandleInteraction;
+        _manager.OnInteractionEndEvent += OnHandleInteractionEnd;
+    }
+
+    private void OnDisable()
+    {
+        _manager.OnInteractionStartEvent -= OnHandleInteractionStart;
+        _manager.OnInteractionEvent -= OnHandleInteraction;
+        _manager.OnInteractionEndEvent -= OnHandleInteractionEnd;
     }
 
     private void Update()
@@ -102,9 +110,9 @@ public class ObjSelector : MonoBehaviour
         _handleDictionary.Remove(hitInfoTransform);
 
         hitInfoTransform.tag = "Untagged";
-        var renderer = hitInfoTransform.gameObject.GetComponent<Renderer>();
-        if (renderer == null) renderer = hitInfoTransform.GetComponentInChildren<Renderer>();
-        renderer.material.color = unselectedColor;
+        var rendererComponent = hitInfoTransform.gameObject.GetComponent<Renderer>();
+        if (rendererComponent == null) rendererComponent = hitInfoTransform.GetComponentInChildren<Renderer>();
+        rendererComponent.material.color = unselectedColor;
     }
 
     private void SelectObject(Transform hitInfoTransform)
@@ -112,20 +120,20 @@ public class ObjSelector : MonoBehaviour
         _handleDictionary.Add(hitInfoTransform, _lastHandle);
 
         hitInfoTransform.tag = "Selected";
-        var renderer = hitInfoTransform.gameObject.GetComponent<Renderer>();
-        if (renderer == null) renderer =  hitInfoTransform.GetComponentInChildren<Renderer>();
-        renderer.material.color = selectedColor;
+        var rendererComponent = hitInfoTransform.gameObject.GetComponent<Renderer>();
+        if (rendererComponent == null) rendererComponent =  hitInfoTransform.GetComponentInChildren<Renderer>();
+        rendererComponent.material.color = selectedColor;
     }
     
     private void CreateHandle(Transform hitTransform)
     {
-        var handle = _transformHandleManager.CreateHandle(hitTransform);
+        var handle = _manager.CreateHandle(hitTransform);
         _lastHandle = handle;
     }
     
     private void AddTarget(Transform hitTransform)
     {
-        _transformHandleManager.AddTarget(hitTransform, _lastHandle);
+        _manager.AddTarget(hitTransform, _lastHandle);
     }
     
     private void RemoveTarget(Transform hitTransform)
@@ -133,7 +141,7 @@ public class ObjSelector : MonoBehaviour
         var handle = _handleDictionary[hitTransform];
         if (_lastHandle == handle) _lastHandle = null;
 
-        _transformHandleManager.RemoveTarget(hitTransform, handle);
+        _manager.RemoveTarget(hitTransform, handle);
     }
 
     private void OnHandleInteractionStart()
@@ -141,9 +149,9 @@ public class ObjSelector : MonoBehaviour
         _cameraMovement.enabled = false;
     }
 
-    private void OnHandleInteraction()
+    private static void OnHandleInteraction(Handle handle)
     {
-        
+        Debug.Log($"{handle.name} is being interacted with");
     }
     
     private void OnHandleInteractionEnd()

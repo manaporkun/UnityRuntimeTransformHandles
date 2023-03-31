@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TransformHandles.Utils;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace TransformHandles
 {
@@ -26,9 +27,10 @@ namespace TransformHandles
         [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
         
         public virtual event Action OnHandleCreatedEvent;
+        public virtual event Action OnHandleRemovedEvent;
         public virtual event Action OnHandleDestroyedEvent;
         public virtual event Action OnInteractionStartEvent;
-        public virtual event Action OnInteractionEvent;
+        public virtual event Action<Handle> OnInteractionEvent;
         public virtual event Action OnInteractionEndEvent;
         
         private RaycastHit[] _rayHits;
@@ -48,16 +50,38 @@ namespace TransformHandles
         private Dictionary<Ghost, TransformGroup> _ghostGroupMap;
         
         private bool _handleActive;
+        private bool _isInitialized;
 
-        protected override void Awake()
+        private void OnEnable()
         {
-            base.Awake();
+            SceneManager.activeSceneChanged += OnActiveSceneChanged;
+            
+            InitializeManager();
+        }
+
+        private void OnDisable()
+        {
+            SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+        }
+
+        protected virtual void OnActiveSceneChanged(Scene arg0, Scene scene)
+        {
+            _isInitialized = false;
+            
+            InitializeManager();
+        }
+        
+        private void InitializeManager()
+        {
+            if(_isInitialized) return;
             
             mainCamera = mainCamera == null ? Camera.main : mainCamera;
             
             _handleGroupMap = new Dictionary<Handle, TransformGroup>();
             _ghostGroupMap = new Dictionary<Ghost, TransformGroup>();
             _transformHashSet = new HashSet<Transform>();
+            
+            _isInitialized = true;
         }
 
         public Handle CreateHandle(Transform target)
@@ -116,23 +140,36 @@ namespace TransformHandles
 
             return transformHandle;
         }
-        
-        public void DestroyHandle(Handle handle)
+
+        public void RemoveHandle(Handle handle)
         {
             if(handle == null) { Debug.LogError("Handle is already null"); return;}
+            if(_handleGroupMap == null) return;
             
             var group = _handleGroupMap[handle];
+            if (group == null) { Debug.LogError("Group is null"); return;}
+            
             _handleGroupMap.Remove(handle);
-            _ghostGroupMap.Remove(group.GroupGhost);
-            
             handle.Disable();
-            group.GroupGhost.Terminate();
-            
-            DestroyImmediate(handle.gameObject);
-            
-            OnHandleDestroyedEvent?.Invoke();
+
+            var groupGhost = group.GroupGhost;
+            if (groupGhost != null)
+            {
+                _ghostGroupMap.Remove(groupGhost);
+                group.GroupGhost.Terminate();
+            }
+                
+            OnHandleRemovedEvent?.Invoke();
             
             if (_handleGroupMap.Count == 0) _handleActive = false;
+        }
+
+        public void DestroyHandle(Handle handle)
+        {
+            RemoveHandle(handle);
+            
+            DestroyImmediate(handle.gameObject);
+            OnHandleDestroyedEvent?.Invoke();
         }
         
         public void DestroyAllHandles()
@@ -337,7 +374,7 @@ namespace TransformHandles
         {
             _interactedGhost.OnInteraction(_interactedHandle.type);
             
-            OnInteractionEvent?.Invoke();
+            OnInteractionEvent?.Invoke(_interactedHandle);
         }
 
         protected virtual void OnInteractionEnd()
