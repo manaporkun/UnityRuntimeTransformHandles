@@ -85,11 +85,13 @@ namespace TransformHandles
 
         private void Update()
         {
+            if(_handleCamera == null) return;
+            
             var axis1 = _axis1;
             var rAxis1 = ParentHandle.space == Space.Self
                 ? ParentHandle.target.rotation * axis1
                 : axis1;
-            var angle1 = Vector3.Angle(ParentHandle.handleCamera.transform.forward, rAxis1);
+            var angle1 = Vector3.Angle(_handleCamera.transform.forward, rAxis1);
             if (angle1 < 90)
                 axis1 = -axis1;
 
@@ -97,7 +99,7 @@ namespace TransformHandles
             var rAxis2 = ParentHandle.space == Space.Self
                 ? ParentHandle.target.rotation * axis2
                 : axis2;
-            var angle2 = Vector3.Angle(ParentHandle.handleCamera.transform.forward, rAxis2);
+            var angle2 = Vector3.Angle(_handleCamera.transform.forward, rAxis2);
             if (angle2 < 90)
                 axis2 = -axis2;
 
