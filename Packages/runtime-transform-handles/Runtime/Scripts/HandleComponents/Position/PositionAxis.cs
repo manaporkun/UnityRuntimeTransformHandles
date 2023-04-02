@@ -16,13 +16,24 @@ namespace TransformHandles
 
         private Vector3 _interactionOffset;
         private Ray _rAxisRay;
+        private GameObject _coneGameObject;
+        private GameObject _lineGameObject;
+        
+        private Transform _coneTransform;
+        private Transform _cameraTransform;
         
         public void Initialize(Handle handle)
         {
             ParentHandle = handle;
             _handleCamera = ParentHandle.handleCamera;
 
-            _axis = coneMeshRenderer.transform.up;
+            _coneGameObject = coneMeshRenderer.gameObject;
+            _lineGameObject = lineMeshRenderer.gameObject;
+            
+            _coneTransform = _coneGameObject.transform;
+            _cameraTransform = _handleCamera.transform;
+            
+            _axis = _coneTransform.up;
             DefaultColor = defaultColor;
         }
 
@@ -86,6 +97,14 @@ namespace TransformHandles
         {
             coneMeshRenderer.material.color = DefaultColor;
             lineMeshRenderer.material.color = DefaultColor;
+        }
+
+        private void LateUpdate()
+        {
+            var dot = Vector3.Dot(_coneTransform.up, _cameraTransform.forward);
+            var notVisible = dot is < -.975f or > 0.975f;
+            _lineGameObject.SetActive(!notVisible);
+            _coneGameObject.SetActive(!notVisible);
         }
     }
 }
