@@ -15,6 +15,9 @@ namespace TransformHandles
         private Vector3 _perp;
         private Plane _plane;
         private Vector3 _interactionOffset;
+        
+        private GameObject _quadGameObject;
+        private Transform _cameraTransform;
 
         public void Initialize(Handle handle, Vector3 axis1, Vector3 axis2, Vector3 perp)
         {
@@ -27,7 +30,10 @@ namespace TransformHandles
 
             DefaultColor = defaultColor;
             
-            transform.localPosition = (_axis1 + _axis2) * 0.125f;
+            _quadGameObject = quadMeshRenderer.gameObject;
+            _cameraTransform = _handleCamera.transform;
+            
+            _quadGameObject.transform.localPosition = (_axis1 + _axis2) * 0.2f;
         }
 
         public override void Interact(Vector3 pPreviousPosition)
@@ -91,21 +97,28 @@ namespace TransformHandles
             var rAxis1 = ParentHandle.space == Space.Self
                 ? ParentHandle.target.rotation * axis1
                 : axis1;
-            var angle1 = Vector3.Angle(_handleCamera.transform.forward, rAxis1);
+            var angle1 = Vector3.Angle(_cameraTransform.forward, rAxis1);
             if (angle1 < 90)
                 axis1 = -axis1;
-
+            
             var axis2 = _axis2;
             var rAxis2 = ParentHandle.space == Space.Self
                 ? ParentHandle.target.rotation * axis2
                 : axis2;
-            var angle2 = Vector3.Angle(_handleCamera.transform.forward, rAxis2);
+            var angle2 = Vector3.Angle(_cameraTransform.forward, rAxis2);
             if (angle2 < 90)
                 axis2 = -axis2;
-
-            transform.localPosition = (axis1 + axis2) * 0.125f;
+            
+            _quadGameObject.transform.localPosition = (axis1 + axis2) * 0.2f;
         }
         
+        private void LateUpdate()
+        {
+            var dot = Vector3.Dot(_quadGameObject.transform.up, _cameraTransform.forward);
+            var notVisible = dot is < -.35f or > 0.35f;
+            _quadGameObject.SetActive(notVisible);
+        }
+
         public override void SetColor(Color color)
         {
             quadMeshRenderer.material.color = color;
