@@ -7,6 +7,11 @@ namespace TransformHandles
     {
         [SerializeField] private float autoScaleSizeInPixels = 192;
         [SerializeField] public bool autoScale;
+        
+        public virtual event Action<Handle> OnInteractionStartEvent;
+        public virtual event Action<Handle> OnInteractionEvent;
+        public virtual event Action<Handle> OnInteractionEndEvent;
+        public virtual event Action<Handle> OnHandleDestroyedEvent; 
 
         public Transform target;
         public HandleAxes axes = HandleAxes.XYZ;
@@ -47,7 +52,10 @@ namespace TransformHandles
 
         protected void OnDestroy()
         {
-            if (Manager != null) Manager.RemoveHandle(this);
+            if (Manager == null) return;
+            
+            Manager.RemoveHandle(this);
+            OnHandleDestroyedEvent?.Invoke(this);
         }
 
         protected virtual void LateUpdate()
@@ -71,6 +79,21 @@ namespace TransformHandles
             target = null;
 
             Clear();
+        }
+
+        public virtual void InteractionStart()
+        {
+            OnInteractionStartEvent?.Invoke(this);
+        }
+
+        public virtual void InteractionStay()
+        {
+            OnInteractionEvent?.Invoke(this);
+        }
+        
+        public virtual void InteractionEnd()
+        {
+            OnInteractionEndEvent?.Invoke(this);
         }
 
         public virtual void ChangeHandleType(HandleType handleType)
