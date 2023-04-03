@@ -25,20 +25,6 @@ public class ObjSelector : MonoBehaviour
         _handleDictionary = new Dictionary<Transform, Handle>();
     }
 
-    private void OnEnable()
-    {
-        _manager.OnInteractionStartEvent += OnHandleInteractionStart;
-        _manager.OnInteractionEvent += OnHandleInteraction;
-        _manager.OnInteractionEndEvent += OnHandleInteractionEnd;
-    }
-
-    private void OnDisable()
-    {
-        _manager.OnInteractionStartEvent -= OnHandleInteractionStart;
-        _manager.OnInteractionEvent -= OnHandleInteraction;
-        _manager.OnInteractionEndEvent -= OnHandleInteractionEnd;
-    }
-
     private void Update()
     {
         if (Input.GetKey(KeyCode.LeftControl) && Input.GetMouseButtonDown(0))
@@ -129,8 +115,13 @@ public class ObjSelector : MonoBehaviour
     {
         var handle = _manager.CreateHandle(hitTransform);
         _lastHandle = handle;
+        
+        handle.OnInteractionStartEvent += OnHandleInteractionStart;
+        handle.OnInteractionEvent += OnHandleInteraction;
+        handle.OnInteractionEndEvent += OnHandleInteractionEnd;
+        handle.OnHandleDestroyedEvent += OnHandleDestroyed;
     }
-    
+
     private void AddTarget(Transform hitTransform)
     {
         _manager.AddTarget(hitTransform, _lastHandle);
@@ -144,7 +135,7 @@ public class ObjSelector : MonoBehaviour
         _manager.RemoveTarget(hitTransform, handle);
     }
 
-    private void OnHandleInteractionStart()
+    private void OnHandleInteractionStart(Handle handle)
     {
         _cameraMovement.enabled = false;
     }
@@ -154,8 +145,16 @@ public class ObjSelector : MonoBehaviour
         Debug.Log($"{handle.name} is being interacted with");
     }
     
-    private void OnHandleInteractionEnd()
+    private void OnHandleInteractionEnd(Handle handle)
     {
         _cameraMovement.enabled = true;
+    }
+    
+    private void OnHandleDestroyed(Handle handle)
+    {
+        handle.OnInteractionStartEvent -= OnHandleInteractionStart;
+        handle.OnInteractionEvent -= OnHandleInteraction;
+        handle.OnInteractionEndEvent -= OnHandleInteractionEnd;
+        handle.OnHandleDestroyedEvent -= OnHandleDestroyed;
     }
 }
