@@ -166,8 +166,6 @@ namespace TransformHandles
 
         public void DestroyHandle(Handle handle)
         {
-            RemoveHandle(handle);
-            
             DestroyImmediate(handle.gameObject);
             OnHandleDestroyedEvent?.Invoke();
         }
