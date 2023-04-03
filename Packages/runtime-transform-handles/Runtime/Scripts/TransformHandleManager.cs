@@ -25,14 +25,7 @@ namespace TransformHandles
         [SerializeField] private KeyCode allShortcut = KeyCode.A;
         [SerializeField] private KeyCode spaceShortcut = KeyCode.X;
         [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
-        
-        public virtual event Action OnHandleCreatedEvent;
-        public virtual event Action OnHandleRemovedEvent;
-        public virtual event Action OnHandleDestroyedEvent;
-        public virtual event Action OnInteractionStartEvent;
-        public virtual event Action<Handle> OnInteractionEvent;
-        public virtual event Action OnInteractionEndEvent;
-        
+
         private RaycastHit[] _rayHits;
         
         private Vector3 _previousMousePosition;
@@ -104,8 +97,6 @@ namespace TransformHandles
             
             _handleActive = true;
             
-            OnHandleCreatedEvent?.Invoke();
-
             return transformHandle;
         }
         
@@ -136,8 +127,6 @@ namespace TransformHandles
 
             _handleActive = true;
             
-            OnHandleCreatedEvent?.Invoke();
-
             return transformHandle;
         }
 
@@ -158,16 +147,13 @@ namespace TransformHandles
                 _ghostGroupMap.Remove(groupGhost);
                 group.GroupGhost.Terminate();
             }
-                
-            OnHandleRemovedEvent?.Invoke();
             
             if (_handleGroupMap.Count == 0) _handleActive = false;
         }
 
-        public void DestroyHandle(Handle handle)
+        private static void DestroyHandle(Handle handle)
         {
             DestroyImmediate(handle.gameObject);
-            OnHandleDestroyedEvent?.Invoke();
         }
         
         public void DestroyAllHandles()
@@ -365,14 +351,14 @@ namespace TransformHandles
             _interactedGhost = _handleGroupMap[_interactedHandle].GroupGhost;
             _interactedGhost.OnInteractionStart();
             
-            OnInteractionStartEvent?.Invoke();
+            _interactedHandle.InteractionStart();
         }
 
         protected virtual void OnInteraction()
         {
             _interactedGhost.OnInteraction(_interactedHandle.type);
             
-            OnInteractionEvent?.Invoke(_interactedHandle);
+            _interactedHandle.InteractionStay();
         }
 
         protected virtual void OnInteractionEnd()
@@ -383,7 +369,7 @@ namespace TransformHandles
             var averagePosRotScale = group.GetAveragePosRotScale();
             _interactedGhost.UpdateGhostTransform(averagePosRotScale);
             
-            OnInteractionEndEvent?.Invoke();
+            _interactedHandle.InteractionEnd();
         }
         
         public static void ChangeHandleType(Handle handle, HandleType type)
