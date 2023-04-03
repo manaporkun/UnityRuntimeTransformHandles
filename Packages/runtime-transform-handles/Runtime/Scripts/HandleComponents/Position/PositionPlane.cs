@@ -115,7 +115,7 @@ namespace TransformHandles
         private void LateUpdate()
         {
             var dot = Vector3.Dot(_quadGameObject.transform.up, _cameraTransform.forward);
-            var notVisible = dot is < -.35f or > 0.35f;
+            var notVisible = dot is < -.25f or > 0.25f;
             _quadGameObject.SetActive(notVisible);
         }
 
