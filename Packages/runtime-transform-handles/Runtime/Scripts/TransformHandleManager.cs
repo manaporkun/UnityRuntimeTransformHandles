@@ -366,9 +366,6 @@ namespace TransformHandles
             var group = _handleGroupMap[_interactedHandle];
             group.UpdateBounds();
 
-            var averagePosRotScale = group.GetAveragePosRotScale();
-            _interactedGhost.UpdateGhostTransform(averagePosRotScale);
-            
             _interactedHandle.InteractionEnd();
         }
         
@@ -420,18 +417,18 @@ namespace TransformHandles
         
         public bool IsOriginOnCenter;
 
-        private HashSet<Transform> _transformHashSet;
-        private Dictionary<Transform, MeshRenderer> _transformRendererMap;
-        private Dictionary<Transform, Bounds> _transformBoundsMap;
+        public HashSet<Transform> Transforms { get; }
+        public Dictionary<Transform, MeshRenderer> RenderersMap { get; }
+        public Dictionary<Transform, Bounds> BoundsMap { get; }
 
         public TransformGroup(Ghost groupGhost, Handle groupHandle)
         {
             GroupGhost = groupGhost;
             GroupHandle = groupHandle;
             
-            _transformHashSet = new HashSet<Transform>();
-            _transformRendererMap = new Dictionary<Transform, MeshRenderer>();
-            _transformBoundsMap = new Dictionary<Transform, Bounds>();
+            Transforms = new HashSet<Transform>();
+            RenderersMap = new Dictionary<Transform, MeshRenderer>();
+            BoundsMap = new Dictionary<Transform, Bounds>();
         }
 
         public bool AddTransform(Transform tElement)
@@ -440,34 +437,34 @@ namespace TransformHandles
             
             var meshRenderer = tElement.GetComponent<MeshRenderer>();
             
-            _transformHashSet.Add(tElement);
-            _transformRendererMap.Add(tElement, meshRenderer);
-            _transformBoundsMap.Add(tElement, meshRenderer != null ? meshRenderer.bounds : tElement.GetBounds());
+            Transforms.Add(tElement);
+            RenderersMap.Add(tElement, meshRenderer);
+            BoundsMap.Add(tElement, meshRenderer != null ? meshRenderer.bounds : tElement.GetBounds());
             
             return true;
         }
         
         public bool RemoveTransform(Transform transform)
         {
-            _transformHashSet.Remove(transform);
-            _transformRendererMap.Remove(transform);
-            _transformBoundsMap.Remove(transform);
+            Transforms.Remove(transform);
+            RenderersMap.Remove(transform);
+            BoundsMap.Remove(transform);
             
-            return _transformHashSet.Count == 0;
+            return Transforms.Count == 0;
         }
 
         public void UpdateBounds()
         {
-            foreach (var (tElement, meshRenderer) in _transformRendererMap)
+            foreach (var (tElement, meshRenderer) in RenderersMap)
             {
                 var bounds = meshRenderer ? meshRenderer.bounds : tElement.GetBounds();
-                _transformBoundsMap[tElement] = bounds;
+                BoundsMap[tElement] = bounds;
             }
         }
         
         public void UpdatePositions(Vector3 positionChange)
         {
-            foreach (var tElement in _transformRendererMap.Keys)
+            foreach (var tElement in RenderersMap.Keys)
             {
                 tElement.position += positionChange;
             }
@@ -478,7 +475,7 @@ namespace TransformHandles
             var ghostPosition = GroupGhost.transform.position;
             var rotationAxis = rotationChange.normalized.eulerAngles;
             var rotationChangeMagnitude = rotationChange.eulerAngles.magnitude;
-            foreach (var tElement in _transformRendererMap.Keys)
+            foreach (var tElement in RenderersMap.Keys)
             {
                 if (GroupHandle.space == Space.Self)
                 {
@@ -494,7 +491,7 @@ namespace TransformHandles
 
         public void UpdateScales(Vector3 scaleChange)
         {
-            foreach (var (tElement, meshRenderer) in _transformRendererMap)
+            foreach (var (tElement, meshRenderer) in RenderersMap)
             {
                 if (IsOriginOnCenter)
                 {
@@ -525,7 +522,7 @@ namespace TransformHandles
 
         private Vector3 GetCenterPoint(Transform tElement)
         {
-            return IsOriginOnCenter ? _transformBoundsMap[tElement].center : tElement.position;
+            return IsOriginOnCenter ? BoundsMap[tElement].center : tElement.position;
         }
         
         public PosRotScale GetAveragePosRotScale()
@@ -537,9 +534,9 @@ namespace TransformHandles
             var centerPositions = new List<Vector3>();
             var sumQuaternion = Quaternion.identity;
 
-            var transformsCount = _transformHashSet.Count;
+            var transformsCount = Transforms.Count;
 
-            foreach (var tElement in _transformHashSet)
+            foreach (var tElement in Transforms)
             {
                 var centerPoint = GetCenterPoint(tElement);
                 centerPositions.Add(centerPoint);
@@ -564,7 +561,7 @@ namespace TransformHandles
         
         private bool IsTargetRelativeToSelectedOnes(Transform newTarget)
         {
-            foreach (var transformInHash in _transformHashSet)
+            foreach (var transformInHash in Transforms)
             {
                 if (transformInHash.IsDeepParentOf(newTarget)) return true;
 
