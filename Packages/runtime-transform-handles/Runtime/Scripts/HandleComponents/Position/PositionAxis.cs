@@ -59,7 +59,7 @@ namespace TransformHandles
             {
                 if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
                 if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
-                if (snapping.x != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
+                if (snapping.z != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
             }
             
             ParentHandle.target.position = position;
