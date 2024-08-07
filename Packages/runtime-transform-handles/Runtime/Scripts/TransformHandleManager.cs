@@ -546,8 +546,6 @@ namespace TransformHandles
         {
             var space = GroupHandle.space;
             
-            var averagePosRotScale = new PosRotScale();
-            
             var centerPositions = new List<Vector3>();
             var sumQuaternion = Quaternion.identity;
 
@@ -569,9 +567,7 @@ namespace TransformHandles
             }
             averagePosition /= transformsCount;
             
-            averagePosRotScale.Position = averagePosition;
-            averagePosRotScale.Rotation = sumQuaternion;
-            averagePosRotScale.Scale = Vector3.one;
+            var averagePosRotScale = new PosRotScale(averagePosition, sumQuaternion, Vector3.one);
 
             return averagePosRotScale;
         }

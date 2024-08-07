@@ -21,9 +21,7 @@ namespace TransformHandles
 
         public void UpdateGhostTransform(PosRotScale average)
         {
-            GhostTransform.position = average.Position;
-            GhostTransform.rotation = average.Rotation;
-            GhostTransform.localScale = average.Scale;
+            average.ApplyToTransform(GhostTransform);
         }
 
         public void ResetGhostTransform()
@@ -35,12 +33,7 @@ namespace TransformHandles
 
         public virtual void OnInteractionStart()
         {
-            _initialProperties = new PosRotScale()
-            {
-                Position = GhostTransform.position,
-                Rotation = GhostTransform.rotation,
-                Scale = GhostTransform.lossyScale
-            };
+            _initialProperties = PosRotScale.FromTransform(GhostTransform);
         }
 
         public virtual void OnInteraction(HandleType handleType)
