@@ -12,50 +12,50 @@ namespace TransformHandles
         public PositionPlane yPlane;
         public PositionPlane zPlane;
 
-        private Handle _parentHandle;
+        private HandleGroup _parentHandleGroup;
 
         private bool _handleInitialized;
 
-        public void Initialize(Handle handle)
+        public void Initialize(HandleGroup handleGroup)
         {
             if (_handleInitialized) return;
             
-            _parentHandle = handle;
+            _parentHandleGroup = handleGroup;
 
-            if (_parentHandle.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
+            if (_parentHandleGroup.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
             {
                 xAxis.gameObject.SetActive(true);
-                xAxis.Initialize(handle);
+                xAxis.Initialize(handleGroup);
             }
 
-            if (_parentHandle.axes is HandleAxes.Y or HandleAxes.XY or HandleAxes.YZ or HandleAxes.XYZ)
+            if (_parentHandleGroup.axes is HandleAxes.Y or HandleAxes.XY or HandleAxes.YZ or HandleAxes.XYZ)
             {
                 yAxis.gameObject.SetActive(true);
-                yAxis.Initialize(handle);
+                yAxis.Initialize(handleGroup);
             }
 
-            if (_parentHandle.axes is HandleAxes.Z or HandleAxes.XZ or HandleAxes.YZ or HandleAxes.XYZ)
+            if (_parentHandleGroup.axes is HandleAxes.Z or HandleAxes.XZ or HandleAxes.YZ or HandleAxes.XYZ)
             {
                 zAxis.gameObject.SetActive(true);
-                zAxis.Initialize(handle);
+                zAxis.Initialize(handleGroup);
             }
 
-            if (_parentHandle.axes is HandleAxes.XY or HandleAxes.XYZ)
+            if (_parentHandleGroup.axes is HandleAxes.XY or HandleAxes.XYZ)
             {
                 zPlane.gameObject.SetActive(true);
-                zPlane.Initialize(_parentHandle, Vector3.forward, Vector3.up, -Vector3.right);
+                zPlane.Initialize(_parentHandleGroup, Vector3.forward, Vector3.up, -Vector3.right);
             }
 
-            if (_parentHandle.axes is HandleAxes.YZ or HandleAxes.XYZ)
+            if (_parentHandleGroup.axes is HandleAxes.YZ or HandleAxes.XYZ)
             {
                 xPlane.gameObject.SetActive(true);
-                xPlane.Initialize(_parentHandle, Vector3.right, Vector3.forward, Vector3.up);
+                xPlane.Initialize(_parentHandleGroup, Vector3.right, Vector3.forward, Vector3.up);
             }
 
-            if (_parentHandle.axes is HandleAxes.XZ or HandleAxes.XYZ)
+            if (_parentHandleGroup.axes is HandleAxes.XZ or HandleAxes.XYZ)
             {
                 yPlane.gameObject.SetActive(true);
-                yPlane.Initialize(_parentHandle, Vector3.right, Vector3.up, Vector3.forward);
+                yPlane.Initialize(_parentHandleGroup, Vector3.right, Vector3.up, Vector3.forward);
             }
             
             _handleInitialized = true;

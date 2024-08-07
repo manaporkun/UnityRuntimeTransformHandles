@@ -22,10 +22,10 @@ namespace TransformHandles
         private Transform _coneTransform;
         private Transform _cameraTransform;
         
-        public void Initialize(Handle handle)
+        public void Initialize(HandleGroup handleGroup)
         {
-            ParentHandle = handle;
-            _handleCamera = ParentHandle.handleCamera;
+            HandleGroup = handleGroup;
+            _handleCamera = HandleGroup.handleCamera;
 
             _coneGameObject = coneMeshRenderer.gameObject;
             _lineGameObject = lineMeshRenderer.gameObject;
@@ -37,7 +37,7 @@ namespace TransformHandles
             DefaultColor = defaultColor;
         }
 
-        public override void Interact(Vector3 pPreviousPosition)
+        public override void OnInteractionActive(Vector3 pPreviousPosition)
         {
             var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
 
@@ -46,35 +46,35 @@ namespace TransformHandles
             
             var offset = hitPoint + _interactionOffset - _startPosition;
             
-            var snapping = ParentHandle.positionSnap;
+            var snapping = HandleGroup.positionSnap;
             var   snap     = Vector3.Scale(snapping, _axis).magnitude;
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Relative)
+            if (snap != 0 && HandleGroup.snappingType == SnappingType.Relative)
             {
                 offset = (Mathf.Round(offset.magnitude / snap) * snap) * offset.normalized; 
             }
 
             var position = _startPosition + offset;
             
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
+            if (snap != 0 && HandleGroup.snappingType == SnappingType.Absolute)
             {
                 if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
                 if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
                 if (snapping.z != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
             }
             
-            ParentHandle.target.position = position;
+            HandleGroup.target.position = position;
 
-            base.Interact(pPreviousPosition);
+            base.OnInteractionActive(pPreviousPosition);
         }
         
-        public override void StartInteraction(Vector3 pHitPoint)
+        public override void OnInteractionStarted(Vector3 pHitPoint)
         {
-            base.StartInteraction(pHitPoint);
+            base.OnInteractionStarted(pHitPoint);
             
-            _startPosition = ParentHandle.target.position;
+            _startPosition = HandleGroup.target.position;
 
-            var rAxis = ParentHandle.space == Space.Self
-                ? ParentHandle.target.rotation * _axis
+            var rAxis = HandleGroup.space == Space.Self
+                ? HandleGroup.target.rotation * _axis
                 : _axis;
             
             _rAxisRay = new Ray(_startPosition, rAxis);

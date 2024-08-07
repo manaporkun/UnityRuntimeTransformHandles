@@ -13,8 +13,8 @@ public class ObjSelector : MonoBehaviour
 
     private TransformHandleManager _manager;
     
-    private Handle _lastHandle;
-    private Dictionary<Transform, Handle> _handleDictionary;
+    private HandleGroup _lastHandleGroup;
+    private Dictionary<Transform, HandleGroup> _handleDictionary;
 
     private void Awake()
     {
@@ -22,7 +22,7 @@ public class ObjSelector : MonoBehaviour
         if (_camera != null) _cameraMovement = _camera.GetComponent<CameraMovement>();
         
         _manager = TransformHandleManager.Instance;
-        _handleDictionary = new Dictionary<Transform, Handle>();
+        _handleDictionary = new Dictionary<Transform, HandleGroup>();
     }
 
     private void Update()
@@ -51,7 +51,7 @@ public class ObjSelector : MonoBehaviour
             {
                 var hitTransform = hit.transform;
                 if(_handleDictionary.ContainsKey(hitTransform)) return;
-                if (_lastHandle == null) { CreateHandle(hitTransform); }
+                if (_lastHandleGroup == null) { CreateHandle(hitTransform); }
                 else { AddTarget(hitTransform); }
                 
                 var children = hitTransform.GetComponentsInChildren<Transform>();
@@ -103,7 +103,7 @@ public class ObjSelector : MonoBehaviour
 
     private void SelectObject(Transform hitInfoTransform)
     {
-        _handleDictionary.Add(hitInfoTransform, _lastHandle);
+        _handleDictionary.Add(hitInfoTransform, _lastHandleGroup);
 
         hitInfoTransform.tag = "Selected";
         var rendererComponent = hitInfoTransform.gameObject.GetComponent<Renderer>();
@@ -114,7 +114,7 @@ public class ObjSelector : MonoBehaviour
     private void CreateHandle(Transform hitTransform)
     {
         var handle = _manager.CreateHandle(hitTransform);
-        _lastHandle = handle;
+        _lastHandleGroup = handle;
         
         handle.OnInteractionStartEvent += OnHandleInteractionStart;
         handle.OnInteractionEvent += OnHandleInteraction;
@@ -124,37 +124,37 @@ public class ObjSelector : MonoBehaviour
 
     private void AddTarget(Transform hitTransform)
     {
-        _manager.AddTarget(hitTransform, _lastHandle);
+        _manager.AddTarget(hitTransform, _lastHandleGroup);
     }
     
     private void RemoveTarget(Transform hitTransform)
     {
         var handle = _handleDictionary[hitTransform];
-        if (_lastHandle == handle) _lastHandle = null;
+        if (_lastHandleGroup == handle) _lastHandleGroup = null;
 
         _manager.RemoveTarget(hitTransform, handle);
     }
 
-    private void OnHandleInteractionStart(Handle handle)
+    private void OnHandleInteractionStart(HandleGroup handleGroup)
     {
         _cameraMovement.enabled = false;
     }
 
-    private static void OnHandleInteraction(Handle handle)
+    private static void OnHandleInteraction(HandleGroup handleGroup)
     {
-        Debug.Log($"{handle.name} is being interacted with");
+        Debug.Log($"{handleGroup.name} is being interacted with");
     }
     
-    private void OnHandleInteractionEnd(Handle handle)
+    private void OnHandleInteractionEnd(HandleGroup handleGroup)
     {
         _cameraMovement.enabled = true;
     }
     
-    private void OnHandleDestroyed(Handle handle)
+    private void OnHandleDestroyed(HandleGroup handleGroup)
     {
-        handle.OnInteractionStartEvent -= OnHandleInteractionStart;
-        handle.OnInteractionEvent -= OnHandleInteraction;
-        handle.OnInteractionEndEvent -= OnHandleInteractionEnd;
-        handle.OnHandleDestroyedEvent -= OnHandleDestroyed;
+        handleGroup.OnInteractionStartEvent -= OnHandleInteractionStart;
+        handleGroup.OnInteractionEvent -= OnHandleInteraction;
+        handleGroup.OnInteractionEndEvent -= OnHandleInteractionEnd;
+        handleGroup.OnHandleDestroyedEvent -= OnHandleDestroyed;
     }
 }

@@ -36,10 +36,10 @@ namespace TransformHandles
         private HandleBase _hoveredHandle;
         
         private Ghost _interactedGhost;
-        private Handle _interactedHandle;
+        private HandleGroup _interactedHandleGroup;
         
         private HashSet<Transform> _transformHashSet;
-        private Dictionary<Handle, TransformGroup> _handleGroupMap;
+        private Dictionary<HandleGroup, TransformGroup> _handleGroupMap;
         private Dictionary<Ghost, TransformGroup> _ghostGroupMap;
         
         private bool _handleActive;
@@ -70,21 +70,21 @@ namespace TransformHandles
             
             mainCamera = mainCamera == null ? Camera.main : mainCamera;
             
-            _handleGroupMap = new Dictionary<Handle, TransformGroup>();
+            _handleGroupMap = new Dictionary<HandleGroup, TransformGroup>();
             _ghostGroupMap = new Dictionary<Ghost, TransformGroup>();
             _transformHashSet = new HashSet<Transform>();
             
             _isInitialized = true;
         }
 
-        public Handle CreateHandle(Transform target)
+        public HandleGroup CreateHandle(Transform target)
         {
             if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return null; }
             
             var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
             ghost.Initialize();
 
-            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<HandleGroup>();
             transformHandle.Enable(ghost.transform);            
             
             var group = new TransformGroup(ghost, transformHandle);
@@ -100,14 +100,14 @@ namespace TransformHandles
             return transformHandle;
         }
         
-        public Handle CreateHandleFromList(List<Transform> targets)
+        public HandleGroup CreateHandleFromList(List<Transform> targets)
         {
             if(targets.Count == 0) { Debug.LogWarning("List is empty."); return null; }
             
             var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
             ghost.Initialize();
 
-            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<HandleGroup>();
             transformHandle.Enable(ghost.transform);      
             
             var group = new TransformGroup(ghost, transformHandle);
@@ -130,16 +130,16 @@ namespace TransformHandles
             return transformHandle;
         }
 
-        public void RemoveHandle(Handle handle)
+        public void RemoveHandle(HandleGroup handleGroup)
         {
-            if(handle == null) { Debug.LogError("Handle is already null"); return;}
+            if(handleGroup == null) { Debug.LogError("Handle is already null"); return;}
             if(_handleGroupMap == null) return;
             
-            var group = _handleGroupMap[handle];
+            var group = _handleGroupMap[handleGroup];
             if (group == null) { Debug.LogError("Group is null"); return;}
             
-            _handleGroupMap.Remove(handle);
-            handle.Disable();
+            _handleGroupMap.Remove(handleGroup);
+            handleGroup.Disable();
 
             var groupGhost = group.GroupGhost;
             if (groupGhost != null)
@@ -151,9 +151,9 @@ namespace TransformHandles
             if (_handleGroupMap.Count == 0) _handleActive = false;
         }
 
-        private static void DestroyHandle(Handle handle)
+        private static void DestroyHandle(HandleGroup handleGroup)
         {
-            DestroyImmediate(handle.gameObject);
+            DestroyImmediate(handleGroup.gameObject);
         }
         
         public void DestroyAllHandles()
@@ -164,12 +164,12 @@ namespace TransformHandles
             }
         }
         
-        public bool AddTarget(Transform target, Handle handle)
+        public bool AddTarget(Transform target, HandleGroup handleGroup)
         {
             if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return false; }
-            if(handle == null) { Debug.LogError("Handle is null"); return false;}
+            if(handleGroup == null) { Debug.LogError("Handle is null"); return false;}
 
-            var group = _handleGroupMap[handle];
+            var group = _handleGroupMap[handleGroup];
             var targetAdded = group.AddTransform(target);
             if(!targetAdded) { Debug.LogWarning($"{target} is relative to the selected ones."); return false; }
             
@@ -181,16 +181,16 @@ namespace TransformHandles
             return true;
         }
 
-        public void RemoveTarget(Transform target, Handle handle)
+        public void RemoveTarget(Transform target, HandleGroup handleGroup)
         {
             if (!_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} doesn't have a handle."); return;}
-            if(handle == null) { Debug.LogError("Handle is null"); return;}
+            if(handleGroup == null) { Debug.LogError("Handle is null"); return;}
 
             _transformHashSet.Remove(target);
             
-            var group = _handleGroupMap[handle];
+            var group = _handleGroupMap[handleGroup];
             var groupElementsRemoved = group.RemoveTransform(target);
-            if (groupElementsRemoved) { DestroyHandle(handle); return; }
+            if (groupElementsRemoved) { DestroyHandle(handleGroup); return; }
             
             var averagePosRotScale = group.GetAveragePosRotScale();
             group.GroupGhost.UpdateGhostTransform(averagePosRotScale);
@@ -273,20 +273,20 @@ namespace TransformHandles
         {
             if (Input.GetMouseButton(0) && _draggingHandle != null)
             {
-                _draggingHandle.Interact(_previousMousePosition);
+                _draggingHandle.OnInteractionActive(_previousMousePosition);
                 OnInteraction();
             }
 
             if (Input.GetMouseButtonDown(0) && _hoveredHandle != null)
             {
                 _draggingHandle = _hoveredHandle;
-                _draggingHandle.StartInteraction(_handleHitPoint);
+                _draggingHandle.OnInteractionStarted(_handleHitPoint);
                 OnInteractionStart();
             }
 
             if (Input.GetMouseButtonUp(0) && _draggingHandle != null)
             {
-                _draggingHandle.EndInteraction();
+                _draggingHandle.OnInteractionEnded();
                 _draggingHandle = null;
                 OnInteractionEnd();
             }
@@ -347,40 +347,40 @@ namespace TransformHandles
 
         protected virtual void OnInteractionStart()
         {
-            _interactedHandle = _draggingHandle.GetComponentInParent<Handle>();
-            _interactedGhost = _handleGroupMap[_interactedHandle].GroupGhost;
+            _interactedHandleGroup = _draggingHandle.GetComponentInParent<HandleGroup>();
+            _interactedGhost = _handleGroupMap[_interactedHandleGroup].GroupGhost;
             _interactedGhost.OnInteractionStart();
             
-            _interactedHandle.InteractionStart();
+            _interactedHandleGroup.InteractionStart();
         }
 
         protected virtual void OnInteraction()
         {
-            _interactedGhost.OnInteraction(_interactedHandle.type);
+            _interactedGhost.OnInteraction(_interactedHandleGroup.type);
             
-            _interactedHandle.InteractionStay();
+            _interactedHandleGroup.InteractionStay();
         }
 
         protected virtual void OnInteractionEnd()
         {
-            var group = _handleGroupMap[_interactedHandle];
+            var group = _handleGroupMap[_interactedHandleGroup];
             group.UpdateBounds();
 
-            _interactedHandle.InteractionEnd();
+            _interactedHandleGroup.InteractionEnd();
         }
         
-        public static void ChangeHandleType(Handle handle, HandleType type)
+        public static void ChangeHandleType(HandleGroup handleGroup, HandleType type)
         {
-            if(handle == null) { Debug.LogError("Handle is null"); return;}
-            handle.ChangeHandleType(type);
+            if(handleGroup == null) { Debug.LogError("Handle is null"); return;}
+            handleGroup.ChangeHandleType(type);
         }
 
-        public void ChangeHandleSpace(Handle handle, Space space)
+        public void ChangeHandleSpace(HandleGroup handleGroup, Space space)
         {
-            if(handle == null) { Debug.LogError("Handle is null"); return;}
-            handle.ChangeHandleSpace(space);
+            if(handleGroup == null) { Debug.LogError("Handle is null"); return;}
+            handleGroup.ChangeHandleSpace(space);
             
-            var group = _handleGroupMap[handle];
+            var group = _handleGroupMap[handleGroup];
             group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
         }
 
@@ -413,7 +413,7 @@ namespace TransformHandles
     public class TransformGroup
     {
         public Ghost GroupGhost {get; }
-        public Handle GroupHandle {get; }
+        public HandleGroup GroupHandleGroup {get; }
         
         public bool IsOriginOnCenter;
 
@@ -421,10 +421,10 @@ namespace TransformHandles
         public Dictionary<Transform, MeshRenderer> RenderersMap { get; }
         public Dictionary<Transform, Bounds> BoundsMap { get; }
 
-        public TransformGroup(Ghost groupGhost, Handle groupHandle)
+        public TransformGroup(Ghost groupGhost, HandleGroup groupHandleGroup)
         {
             GroupGhost = groupGhost;
-            GroupHandle = groupHandle;
+            GroupHandleGroup = groupHandleGroup;
             
             Transforms = new HashSet<Transform>();
             RenderersMap = new Dictionary<Transform, MeshRenderer>();
@@ -477,7 +477,7 @@ namespace TransformHandles
             var rotationChangeMagnitude = rotationChange.eulerAngles.magnitude;
             foreach (var tElement in RenderersMap.Keys)
             {
-                if (GroupHandle.space == Space.Self)
+                if (GroupHandleGroup.space == Space.Self)
                 {
                     tElement.position = rotationChange * (tElement.position - ghostPosition) + ghostPosition;
                     tElement.rotation = rotationChange * tElement.rotation;
@@ -527,7 +527,7 @@ namespace TransformHandles
         
         public PosRotScale GetAveragePosRotScale()
         {
-            var space = GroupHandle.space;
+            var space = GroupHandleGroup.space;
             
             var centerPositions = new List<Vector3>();
             var sumQuaternion = Quaternion.identity;

@@ -4,7 +4,7 @@ namespace TransformHandles
 {
     public class ScaleHandle : MonoBehaviour
     {
-        private Handle _parentHandle;
+        private HandleGroup _parentHandleGroup;
         
         public ScaleAxis xAxis;
         public ScaleAxis yAxis;
@@ -14,57 +14,57 @@ namespace TransformHandles
         
         private bool _handleInitialized;
 
-        public void Initialize(Handle handle)
+        public void Initialize(HandleGroup handleGroup)
         {
             if (_handleInitialized) return;
             
-            _parentHandle = handle;
+            _parentHandleGroup = handleGroup;
             
-            if (_parentHandle.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
-                xAxis.Initialize(_parentHandle, Vector3.right);
+            if (_parentHandleGroup.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
+                xAxis.Initialize(_parentHandleGroup, Vector3.right);
             
-            if (_parentHandle.axes is HandleAxes.Y or HandleAxes.XY or HandleAxes.YZ or HandleAxes.XYZ)
-                yAxis.Initialize(_parentHandle, Vector3.up);
+            if (_parentHandleGroup.axes is HandleAxes.Y or HandleAxes.XY or HandleAxes.YZ or HandleAxes.XYZ)
+                yAxis.Initialize(_parentHandleGroup, Vector3.up);
 
-            if (_parentHandle.axes is HandleAxes.Z or HandleAxes.XZ or HandleAxes.YZ or HandleAxes.XYZ)
-                zAxis.Initialize(_parentHandle, Vector3.forward);
+            if (_parentHandleGroup.axes is HandleAxes.Z or HandleAxes.XZ or HandleAxes.YZ or HandleAxes.XYZ)
+                zAxis.Initialize(_parentHandleGroup, Vector3.forward);
 
-            if (_parentHandle.axes != HandleAxes.X && _parentHandle.axes != HandleAxes.Y && _parentHandle.axes != HandleAxes.Z)
+            if (_parentHandleGroup.axes != HandleAxes.X && _parentHandleGroup.axes != HandleAxes.Y && _parentHandleGroup.axes != HandleAxes.Z)
             {
-                globalScale.Initialize(_parentHandle, HandleBase.GetVectorFromAxes(_parentHandle.axes));
+                globalScale.Initialize(_parentHandleGroup, HandleBase.GetVectorFromAxes(_parentHandleGroup.axes));
                 
-                globalScale.InteractionStart += OnGlobalInteractionStart;
-                globalScale.InteractionUpdate += OnGlobalInteractionUpdate;
-                globalScale.InteractionEnd += OnGlobalInteractionEnd;
+                globalScale.OnInteractionStartedEvent += OnGlobalOnInteractionStartedEvent;
+                globalScale.OnInteractionEndedEvent += OnGlobalOnInteractionEndedEvent;
+                globalScale.OnInteractionActiveEvent += OnGlobalOnInteractionActiveEvent;
             }
 
             _handleInitialized = true;
         }
 
-        private void OnGlobalInteractionStart()
+        private void OnGlobalOnInteractionStartedEvent()
         {
             xAxis.SetColor(Color.yellow);
             yAxis.SetColor(Color.yellow);
             zAxis.SetColor(Color.yellow);
         }
 
-        private void OnGlobalInteractionUpdate(float pDelta)
+        private void OnGlobalOnInteractionEndedEvent(float pDelta)
         {
-            xAxis.delta = pDelta;
-            yAxis.delta = pDelta;
-            zAxis.delta = pDelta;
+            xAxis.Delta = pDelta;
+            yAxis.Delta = pDelta;
+            zAxis.Delta = pDelta;
         }
 
-        private void OnGlobalInteractionEnd()
+        private void OnGlobalOnInteractionActiveEvent()
         {
             xAxis.SetDefaultColor();
-            xAxis.delta = 0;
+            xAxis.Delta = 0;
             
             yAxis.SetDefaultColor();
-            yAxis.delta = 0;
+            yAxis.Delta = 0;
             
             zAxis.SetDefaultColor();
-            zAxis.delta = 0;
+            zAxis.Delta = 0;
         }
     }
 }
