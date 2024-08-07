@@ -19,36 +19,36 @@ namespace TransformHandles
         private float _interactionDistance;
         private Ray _rAxisRay;
         
-        public void Initialize(Handle handle, Vector3 pAxis)
+        public void Initialize(HandleGroup handleGroup, Vector3 pAxis)
         {
-            ParentHandle = handle;
+            HandleGroup = handleGroup;
             _axis = pAxis;
             DefaultColor = defaultColor;
             
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = HandleGroup.handleCamera;
         }
 
         protected void Update()
         {
-            lineMeshRenderer.transform.localScale = new Vector3(1, 1 + delta, 1);
-            cubeMeshRenderer.transform.localPosition = _axis * (Size * (1 + delta));
+            lineMeshRenderer.transform.localScale = new Vector3(1, 1 + Delta, 1);
+            cubeMeshRenderer.transform.localPosition = _axis * (Size * (1 + Delta));
         }
 
-        public override void Interact(Vector3 pPreviousPosition)
+        public override void OnInteractionActive(Vector3 pPreviousPosition)
         {
             var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
 
             var   closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var hitPoint = _rAxisRay.GetPoint(closestT);
             
-            var distance = Vector3.Distance(ParentHandle.target.position, hitPoint);
+            var distance = Vector3.Distance(HandleGroup.target.position, hitPoint);
             var axisScaleDelta = distance / _interactionDistance - 1f;
 
-            var snapping = ParentHandle.scaleSnap;
+            var snapping = HandleGroup.scaleSnap;
             var snap = Mathf.Abs(Vector3.Dot(snapping, _axis));
             if (snap != 0)
             {
-                if (ParentHandle.snappingType == SnappingType.Relative)
+                if (HandleGroup.snappingType == SnappingType.Relative)
                 {
                     axisScaleDelta = Mathf.Round(axisScaleDelta / snap) * snap;
                 }
@@ -59,24 +59,24 @@ namespace TransformHandles
                 }
             }
 
-            delta = axisScaleDelta;
+            Delta = axisScaleDelta;
             var scale = Vector3.Scale(_startScale, _axis * axisScaleDelta + Vector3.one);
 
-            ParentHandle.target.localScale = scale;
+            HandleGroup.target.localScale = scale;
 
-            base.Interact(pPreviousPosition);
+            base.OnInteractionActive(pPreviousPosition);
         }
 
-        public override void StartInteraction(Vector3 pHitPoint)
+        public override void OnInteractionStarted(Vector3 pHitPoint)
         {
-            base.StartInteraction(pHitPoint);
-            _startScale = ParentHandle.target.localScale;
+            base.OnInteractionStarted(pHitPoint);
+            _startScale = HandleGroup.target.localScale;
 
-            var rAxis = ParentHandle.space == Space.Self
-                ? ParentHandle.target.rotation * _axis
+            var rAxis = HandleGroup.space == Space.Self
+                ? HandleGroup.target.rotation * _axis
                 : _axis;
 
-            var position = ParentHandle.target.position;
+            var position = HandleGroup.target.position;
             _rAxisRay = new Ray(position, rAxis);
             
             var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);

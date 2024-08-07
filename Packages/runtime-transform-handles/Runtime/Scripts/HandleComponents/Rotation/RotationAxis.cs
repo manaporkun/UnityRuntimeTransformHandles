@@ -22,65 +22,65 @@ namespace TransformHandles
 
         private Transform _rotationHandleTransform;
 
-        public void Initialize(Handle handle, Vector3 pAxis)
+        public void Initialize(HandleGroup handleGroup, Vector3 pAxis)
         {
-            ParentHandle = handle;
+            HandleGroup = handleGroup;
             _axis = pAxis;
             DefaultColor = defaultColor;
             
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = HandleGroup.handleCamera;
 
-            _rotationHandleTransform = transform.GetComponentInParent<Handle>().transform;
+            _rotationHandleTransform = transform.GetComponentInParent<HandleGroup>().transform;
         }
 
-        public override void Interact(Vector3 pPreviousPosition)
+        public override void OnInteractionActive(Vector3 pPreviousPosition)
         {
             var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
             
             if (!_axisPlane.Raycast(cameraRay, out var hitT))
             {
-                base.Interact(pPreviousPosition);
+                base.OnInteractionActive(pPreviousPosition);
                 return;
             }
             
             var hitPoint     = cameraRay.GetPoint(hitT);
-            var hitDirection = (hitPoint - ParentHandle.target.position).normalized;
+            var hitDirection = (hitPoint - HandleGroup.target.position).normalized;
             var   x            = Vector3.Dot(hitDirection, _tangent);
             var   y            = Vector3.Dot(hitDirection, _biTangent);
             var   angleRadians = Mathf.Atan2(y, x);
             var   angleDegrees = angleRadians * Mathf.Rad2Deg;
 
-            if (ParentHandle.rotationSnap != 0)
+            if (HandleGroup.rotationSnap != 0)
             {
-                angleDegrees = Mathf.Round(angleDegrees / ParentHandle.rotationSnap) * ParentHandle.rotationSnap;
+                angleDegrees = Mathf.Round(angleDegrees / HandleGroup.rotationSnap) * HandleGroup.rotationSnap;
                 angleRadians = angleDegrees * Mathf.Deg2Rad;
             }
 
-            if (ParentHandle.space == Space.Self)
+            if (HandleGroup.space == Space.Self)
             {
-                ParentHandle.target.localRotation = _startRotation * Quaternion.AngleAxis(angleDegrees, _axis);
+                HandleGroup.target.localRotation = _startRotation * Quaternion.AngleAxis(angleDegrees, _axis);
             }
             else
             {
                 var invertedRotatedAxis = Quaternion.Inverse(_startRotation) * _axis;
-                ParentHandle.target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
+                HandleGroup.target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
             }
             _arcMesh = MeshUtils.CreateArc(transform.position, HitPoint, _rotatedAxis, 
                 _rotationHandleTransform.localScale.x, angleRadians, 
                 Mathf.Abs(Mathf.CeilToInt(angleDegrees)) + 1);
             DrawArc();
 
-            base.Interact(pPreviousPosition);
+            base.OnInteractionActive(pPreviousPosition);
         }
 
-        public override void StartInteraction(Vector3 pHitPoint)
+        public override void OnInteractionStarted(Vector3 pHitPoint)
         {
-            base.StartInteraction(pHitPoint);
+            base.OnInteractionStarted(pHitPoint);
             
-            _startRotation = ParentHandle.space == Space.Self ? ParentHandle.target.localRotation : ParentHandle.target.rotation;
+            _startRotation = HandleGroup.space == Space.Self ? HandleGroup.target.localRotation : HandleGroup.target.rotation;
             
 
-            if (ParentHandle.space == Space.Self)
+            if (HandleGroup.space == Space.Self)
             {
                 _rotatedAxis = _startRotation * _axis;
             }
@@ -89,20 +89,20 @@ namespace TransformHandles
                 _rotatedAxis = _axis;
             }
 
-            _axisPlane = new Plane(_rotatedAxis, ParentHandle.target.position);
+            _axisPlane = new Plane(_rotatedAxis, HandleGroup.target.position);
 
             var     cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
             var startHitPoint = _axisPlane.Raycast(cameraRay, out var hitT) ?
                 cameraRay.GetPoint(hitT) : _axisPlane.ClosestPointOnPlane(pHitPoint);
             
-            _tangent   = (startHitPoint - ParentHandle.target.position).normalized;
+            _tangent   = (startHitPoint - HandleGroup.target.position).normalized;
             _biTangent = Vector3.Cross(_rotatedAxis, _tangent);
         }
         
-        public override void EndInteraction()
+        public override void OnInteractionEnded()
         {
-            base.EndInteraction();
-            delta = 0;
+            base.OnInteractionEnded();
+            Delta = 0;
         }
 
         private void DrawArc()

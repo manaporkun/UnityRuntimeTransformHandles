@@ -19,14 +19,14 @@ namespace TransformHandles
         private GameObject _quadGameObject;
         private Transform _cameraTransform;
 
-        public void Initialize(Handle handle, Vector3 axis1, Vector3 axis2, Vector3 perp)
+        public void Initialize(HandleGroup handleGroup, Vector3 axis1, Vector3 axis2, Vector3 perp)
         {
-            ParentHandle = handle;
+            HandleGroup = handleGroup;
             _axis1 = axis1;
             _axis2 = axis2;
             _perp = perp;
             
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = HandleGroup.handleCamera;
 
             DefaultColor = defaultColor;
             
@@ -36,7 +36,7 @@ namespace TransformHandles
             _quadGameObject.transform.localPosition = (_axis1 + _axis2) * 0.2f;
         }
 
-        public override void Interact(Vector3 pPreviousPosition)
+        public override void OnInteractionActive(Vector3 pPreviousPosition)
         {
             var ray = _handleCamera.ScreenPointToRay(Input.mousePosition);
 
@@ -47,10 +47,10 @@ namespace TransformHandles
             var offset = hitPoint + _interactionOffset - _startPosition;
 
             var axis = _axis1 + _axis2;
-            var snapping = ParentHandle.positionSnap;
+            var snapping = HandleGroup.positionSnap;
             
             var snap = Vector3.Scale(snapping, axis).magnitude;
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Relative)
+            if (snap != 0 && HandleGroup.snappingType == SnappingType.Relative)
             {
                 if (snapping.x != 0) offset.x = Mathf.Round(offset.x / snapping.x) * snapping.x;
                 if (snapping.y != 0) offset.y = Mathf.Round(offset.y / snapping.y) * snapping.y;
@@ -59,25 +59,25 @@ namespace TransformHandles
 
             var position = _startPosition + offset;
             
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
+            if (snap != 0 && HandleGroup.snappingType == SnappingType.Absolute)
             {
                 if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
                 if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
                 if (snapping.x != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
             }
 
-            ParentHandle.target.position = position;
+            HandleGroup.target.position = position;
 
-            base.Interact(pPreviousPosition);
+            base.OnInteractionActive(pPreviousPosition);
         }
 
-        public override void StartInteraction(Vector3 pHitPoint)
+        public override void OnInteractionStarted(Vector3 pHitPoint)
         {
-            var rPerp = ParentHandle.space == Space.Self
-                ? ParentHandle.target.rotation * _perp
+            var rPerp = HandleGroup.space == Space.Self
+                ? HandleGroup.target.rotation * _perp
                 : _perp;
 
-            var position = ParentHandle.target.position;
+            var position = HandleGroup.target.position;
             _plane = new Plane(rPerp, position);
             
             var ray = _handleCamera.ScreenPointToRay(Input.mousePosition);
@@ -94,16 +94,16 @@ namespace TransformHandles
             if(_handleCamera == null) return;
             
             var axis1 = _axis1;
-            var rAxis1 = ParentHandle.space == Space.Self
-                ? ParentHandle.target.rotation * axis1
+            var rAxis1 = HandleGroup.space == Space.Self
+                ? HandleGroup.target.rotation * axis1
                 : axis1;
             var angle1 = Vector3.Angle(_cameraTransform.forward, rAxis1);
             if (angle1 < 90)
                 axis1 = -axis1;
             
             var axis2 = _axis2;
-            var rAxis2 = ParentHandle.space == Space.Self
-                ? ParentHandle.target.rotation * axis2
+            var rAxis2 = HandleGroup.space == Space.Self
+                ? HandleGroup.target.rotation * axis2
                 : axis2;
             var angle2 = Vector3.Angle(_cameraTransform.forward, rAxis2);
             if (angle2 < 90)

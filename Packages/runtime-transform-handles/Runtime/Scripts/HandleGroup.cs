@@ -3,15 +3,15 @@ using UnityEngine;
 
 namespace TransformHandles
 {
-    public class Handle : MonoBehaviour
+    public class HandleGroup : MonoBehaviour
     {
         [SerializeField] private float autoScaleSizeInPixels = 192;
         [SerializeField] public bool autoScale;
         
-        public virtual event Action<Handle> OnInteractionStartEvent;
-        public virtual event Action<Handle> OnInteractionEvent;
-        public virtual event Action<Handle> OnInteractionEndEvent;
-        public virtual event Action<Handle> OnHandleDestroyedEvent; 
+        public virtual event Action<HandleGroup> OnInteractionStartEvent;
+        public virtual event Action<HandleGroup> OnInteractionEvent;
+        public virtual event Action<HandleGroup> OnInteractionEndEvent;
+        public virtual event Action<HandleGroup> OnHandleDestroyedEvent; 
 
         public Transform target;
         public HandleAxes axes = HandleAxes.XYZ;

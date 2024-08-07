@@ -10,27 +10,27 @@ namespace TransformHandles
         private Vector3 _axis;
         private Vector3 _startScale;
         
-        public void Initialize(Handle handle, Vector3 pAxis)
+        public void Initialize(HandleGroup handleGroup, Vector3 pAxis)
         {
-            ParentHandle = handle;
+            HandleGroup = handleGroup;
             _axis = pAxis;
             DefaultColor = defaultColor;
         }
 
-        public override void Interact(Vector3 pPreviousPosition)
+        public override void OnInteractionActive(Vector3 pPreviousPosition)
         {
             var mouseVector = (Input.mousePosition - pPreviousPosition);
             var d = (mouseVector.x + mouseVector.y) * Time.deltaTime * 2;
-            delta += d;
-            ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale,_axis) * delta;
+            Delta += d;
+            HandleGroup.target.localScale = _startScale + Vector3.Scale(_startScale,_axis) * Delta;
             
-            base.Interact(pPreviousPosition);
+            base.OnInteractionActive(pPreviousPosition);
         }
 
-        public override void StartInteraction(Vector3 pHitPoint)
+        public override void OnInteractionStarted(Vector3 pHitPoint)
         {
-            base.StartInteraction(pHitPoint);
-            _startScale = ParentHandle.target.localScale;
+            base.OnInteractionStarted(pHitPoint);
+            _startScale = HandleGroup.target.localScale;
         }
         
         public override void SetColor(Color color)
