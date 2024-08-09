@@ -9,11 +9,11 @@ namespace TransformHandles
     public abstract class HandleBase : MonoBehaviour
     {
         public event Action OnInteractionStartedEvent;
-        public event Action OnInteractionActiveEvent;
-        public event Action<float> OnInteractionEndedEvent;
+        public event Action OnInteractionEndedEvent;
+        public event Action<float> OnInteractionActiveEvent;
         
+        public Color DefaultColor;
         protected HandleGroup HandleGroup;
-        protected Color DefaultColor;
         
         /// <summary>
         /// The point in world space where the interaction with this handle began.
@@ -27,7 +27,7 @@ namespace TransformHandles
         /// This value is typically used to track the amount of change during an interaction,
         /// such as the distance moved for a position handle or the angle rotated for a rotation handle.
         /// </remarks>
-        public float Delta { get; set; }
+        public float delta { get; set; }
 
         public abstract void SetDefaultColor();
         public abstract void SetColor(Color color);
@@ -48,7 +48,7 @@ namespace TransformHandles
         /// <param name="previousPosition">The previous position of the interaction point.</param>
         public virtual void OnInteractionActive(Vector3 previousPosition)
         {
-            OnInteractionEndedEvent?.Invoke(Delta);
+            OnInteractionActiveEvent?.Invoke(delta);
         }
 
         /// <summary>
@@ -56,9 +56,9 @@ namespace TransformHandles
         /// </summary>
         public virtual void OnInteractionEnded()
         {
-            Delta = 0;
+            delta = 0;
             SetDefaultColor();
-            OnInteractionActiveEvent?.Invoke();
+            OnInteractionEndedEvent?.Invoke();
         }
 
         /// <summary>

@@ -1,11 +1,11 @@
 ﻿using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace TransformHandles
 {
-    public class PositionPlane : HandleBase
+    public class PositionPlaneHandle : HandleBase
     {
-        [SerializeField] private Color defaultColor;
-        [SerializeField] private MeshRenderer quadMeshRenderer;
+        [SerializeField] private MeshRenderer _quadMeshRenderer;
 
         private Camera _handleCamera;
 
@@ -26,11 +26,9 @@ namespace TransformHandles
             _axis2 = axis2;
             _perp = perp;
             
-            _handleCamera = HandleGroup.handleCamera;
-
-            DefaultColor = defaultColor;
+            _handleCamera = HandleGroup._handleCamera;
             
-            _quadGameObject = quadMeshRenderer.gameObject;
+            _quadGameObject = _quadMeshRenderer.gameObject;
             _cameraTransform = _handleCamera.transform;
             
             _quadGameObject.transform.localPosition = (_axis1 + _axis2) * 0.2f;
@@ -47,10 +45,10 @@ namespace TransformHandles
             var offset = hitPoint + _interactionOffset - _startPosition;
 
             var axis = _axis1 + _axis2;
-            var snapping = HandleGroup.positionSnap;
+            var snapping = HandleGroup._positionSnap;
             
             var snap = Vector3.Scale(snapping, axis).magnitude;
-            if (snap != 0 && HandleGroup.snappingType == SnappingType.Relative)
+            if (snap != 0 && HandleGroup._snappingType == SnappingType.Relative)
             {
                 if (snapping.x != 0) offset.x = Mathf.Round(offset.x / snapping.x) * snapping.x;
                 if (snapping.y != 0) offset.y = Mathf.Round(offset.y / snapping.y) * snapping.y;
@@ -59,25 +57,25 @@ namespace TransformHandles
 
             var position = _startPosition + offset;
             
-            if (snap != 0 && HandleGroup.snappingType == SnappingType.Absolute)
+            if (snap != 0 && HandleGroup._snappingType == SnappingType.Absolute)
             {
                 if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
                 if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
                 if (snapping.x != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
             }
 
-            HandleGroup.target.position = position;
+            HandleGroup._target.position = position;
 
             base.OnInteractionActive(pPreviousPosition);
         }
 
         public override void OnInteractionStarted(Vector3 pHitPoint)
         {
-            var rPerp = HandleGroup.space == Space.Self
-                ? HandleGroup.target.rotation * _perp
+            var rPerp = HandleGroup._space == Space.Self
+                ? HandleGroup._target.rotation * _perp
                 : _perp;
 
-            var position = HandleGroup.target.position;
+            var position = HandleGroup._target.position;
             _plane = new Plane(rPerp, position);
             
             var ray = _handleCamera.ScreenPointToRay(Input.mousePosition);
@@ -94,16 +92,16 @@ namespace TransformHandles
             if(_handleCamera == null) return;
             
             var axis1 = _axis1;
-            var rAxis1 = HandleGroup.space == Space.Self
-                ? HandleGroup.target.rotation * axis1
+            var rAxis1 = HandleGroup._space == Space.Self
+                ? HandleGroup._target.rotation * axis1
                 : axis1;
             var angle1 = Vector3.Angle(_cameraTransform.forward, rAxis1);
             if (angle1 < 90)
                 axis1 = -axis1;
             
             var axis2 = _axis2;
-            var rAxis2 = HandleGroup.space == Space.Self
-                ? HandleGroup.target.rotation * axis2
+            var rAxis2 = HandleGroup._space == Space.Self
+                ? HandleGroup._target.rotation * axis2
                 : axis2;
             var angle2 = Vector3.Angle(_cameraTransform.forward, rAxis2);
             if (angle2 < 90)
@@ -121,12 +119,12 @@ namespace TransformHandles
 
         public override void SetColor(Color color)
         {
-            quadMeshRenderer.material.color = color;
+            _quadMeshRenderer.material.color = color;
         }
         
         public override void SetDefaultColor()
         {
-            quadMeshRenderer.material.color = DefaultColor;
+            _quadMeshRenderer.material.color = DefaultColor;
         }
     }
 }

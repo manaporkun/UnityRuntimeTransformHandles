@@ -1,19 +1,20 @@
 using TransformHandles.Utils;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace TransformHandles
 {
     public class TubeColliderController : MonoBehaviour
     {
-        [SerializeField] private float height;
-        [SerializeField] private int sideCount;
-        [SerializeField] private float topRadius;
-        [SerializeField] private float bottomThickness;
-        [SerializeField] private float topThickness;
-        [SerializeField] private float bottomRadius;
+        [FormerlySerializedAs("height")] [SerializeField] private float _height;
+        [FormerlySerializedAs("sideCount")] [SerializeField] private int _sideCount;
+        [FormerlySerializedAs("topRadius")] [SerializeField] private float _topRadius;
+        [FormerlySerializedAs("bottomThickness")] [SerializeField] private float _bottomThickness;
+        [FormerlySerializedAs("topThickness")] [SerializeField] private float _topThickness;
+        [FormerlySerializedAs("bottomRadius")] [SerializeField] private float _bottomRadius;
 
-        [SerializeField] private bool save;
+        [FormerlySerializedAs("save")] [SerializeField] private bool _save;
 
         private MeshCollider _meshCollider;
         private MeshFilter _meshFilter;
@@ -39,7 +40,7 @@ namespace TransformHandles
 
         private void UpdateCollider()
         {
-            var newMesh = MeshUtils.CreateTube(height, sideCount, bottomRadius, bottomThickness, topRadius, topThickness);
+            var newMesh = MeshUtils.CreateTube(_height, _sideCount, _bottomRadius, _bottomThickness, _topRadius, _topThickness);
 			
             newMesh.name = "tube";
 			

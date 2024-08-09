@@ -1,64 +1,110 @@
-﻿using UnityEngine;
+﻿using TransformHandles.Utils;
+using UnityEngine;
 
 namespace TransformHandles
 {
-    public class PositionHandle : MonoBehaviour
+    public class PositionHandle : HandleBase
     {
-        public PositionAxis xAxis;
-        public PositionAxis yAxis;
-        public PositionAxis zAxis;
+        [SerializeField] private MeshRenderer _coneMeshRenderer;
+        [SerializeField] private MeshRenderer _lineMeshRenderer;
 
-        public PositionPlane xPlane;
-        public PositionPlane yPlane;
-        public PositionPlane zPlane;
+        private Camera _handleCamera;
+        
+        private Vector3 _startPosition;
+        private Vector3 _axis;
 
-        private HandleGroup _parentHandleGroup;
-
-        private bool _handleInitialized;
-
+        private Vector3 _interactionOffset;
+        private Ray _rAxisRay;
+        private GameObject _coneGameObject;
+        private GameObject _lineGameObject;
+        
+        private Transform _coneTransform;
+        private Transform _cameraTransform;
+        
         public void Initialize(HandleGroup handleGroup)
         {
-            if (_handleInitialized) return;
+            HandleGroup = handleGroup;
+            _handleCamera = HandleGroup._handleCamera;
+
+            _coneGameObject = _coneMeshRenderer.gameObject;
+            _lineGameObject = _lineMeshRenderer.gameObject;
             
-            _parentHandleGroup = handleGroup;
+            _coneTransform = _coneGameObject.transform;
+            _cameraTransform = _handleCamera.transform;
+            
+            _axis = _coneTransform.up;
+        }
 
-            if (_parentHandleGroup.axes is HandleAxes.X or HandleAxes.XY or HandleAxes.XZ or HandleAxes.XYZ)
+        public override void OnInteractionActive(Vector3 pPreviousPosition)
+        {
+            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+
+            var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
+            var hitPoint = _rAxisRay.GetPoint(closestT);
+            
+            var offset = hitPoint + _interactionOffset - _startPosition;
+            
+            var snapping = HandleGroup._positionSnap;
+            var   snap     = Vector3.Scale(snapping, _axis).magnitude;
+            if (snap != 0 && HandleGroup._snappingType == SnappingType.Relative)
             {
-                xAxis.gameObject.SetActive(true);
-                xAxis.Initialize(handleGroup);
+                offset = (Mathf.Round(offset.magnitude / snap) * snap) * offset.normalized; 
             }
 
-            if (_parentHandleGroup.axes is HandleAxes.Y or HandleAxes.XY or HandleAxes.YZ or HandleAxes.XYZ)
+            var position = _startPosition + offset;
+            
+            if (snap != 0 && HandleGroup._snappingType == SnappingType.Absolute)
             {
-                yAxis.gameObject.SetActive(true);
-                yAxis.Initialize(handleGroup);
-            }
-
-            if (_parentHandleGroup.axes is HandleAxes.Z or HandleAxes.XZ or HandleAxes.YZ or HandleAxes.XYZ)
-            {
-                zAxis.gameObject.SetActive(true);
-                zAxis.Initialize(handleGroup);
-            }
-
-            if (_parentHandleGroup.axes is HandleAxes.XY or HandleAxes.XYZ)
-            {
-                zPlane.gameObject.SetActive(true);
-                zPlane.Initialize(_parentHandleGroup, Vector3.forward, Vector3.up, -Vector3.right);
-            }
-
-            if (_parentHandleGroup.axes is HandleAxes.YZ or HandleAxes.XYZ)
-            {
-                xPlane.gameObject.SetActive(true);
-                xPlane.Initialize(_parentHandleGroup, Vector3.right, Vector3.forward, Vector3.up);
-            }
-
-            if (_parentHandleGroup.axes is HandleAxes.XZ or HandleAxes.XYZ)
-            {
-                yPlane.gameObject.SetActive(true);
-                yPlane.Initialize(_parentHandleGroup, Vector3.right, Vector3.up, Vector3.forward);
+                if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
+                if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
+                if (snapping.z != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
             }
             
-            _handleInitialized = true;
+            HandleGroup._target.position = position;
+
+            base.OnInteractionActive(pPreviousPosition);
+        }
+        
+        public override void OnInteractionStarted(Vector3 pHitPoint)
+        {
+            base.OnInteractionStarted(pHitPoint);
+            
+            _startPosition = HandleGroup._target.position;
+
+            var rAxis = HandleGroup._space == Space.Self
+                ? HandleGroup._target.rotation * _axis
+                : _axis;
+            
+            _rAxisRay = new Ray(_startPosition, rAxis);
+
+            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+
+            var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
+            var hitPoint = _rAxisRay.GetPoint(closestT);
+            
+            _interactionOffset = _startPosition - hitPoint;
+        }
+        
+        public override void SetColor(Color color)
+        {
+            _coneMeshRenderer.material.color = color;
+            _lineMeshRenderer.material.color = color;
+        }
+        
+        public override void SetDefaultColor()
+        {
+            _coneMeshRenderer.material.color = base.DefaultColor;
+            _lineMeshRenderer.material.color = base.DefaultColor;
+        }
+
+        private void LateUpdate()
+        {
+            if (_coneTransform == null || _cameraTransform == null) return;
+            
+            var dot = Vector3.Dot(_coneTransform.up, _cameraTransform.forward);
+            var notVisible = dot is < -.975f or > 0.975f;
+            if (_lineGameObject != null) _lineGameObject.SetActive(!notVisible);
+            if (_coneGameObject != null) _coneGameObject.SetActive(!notVisible);
         }
     }
 }

@@ -5,13 +5,13 @@ namespace TransformHandles
 {
     public class Ghost : MonoBehaviour
     {
-        private Transform GhostTransform => transform;
+        private Transform ghostTransform => transform;
         private TransformHandleManager _handleManager;
         private PosRotScale _initialProperties;
 
         public virtual void Initialize()
         {
-            _handleManager = TransformHandleManager.Instance;
+            _handleManager = TransformHandleManager.instance;
         }
 
         public virtual void Terminate()
@@ -21,19 +21,19 @@ namespace TransformHandles
 
         public void UpdateGhostTransform(PosRotScale average)
         {
-            average.ApplyToTransform(GhostTransform);
+            average.ApplyToTransform(ghostTransform);
         }
 
         public void ResetGhostTransform()
         {
-            GhostTransform.position = Vector3.zero;
-            GhostTransform.rotation = Quaternion.identity;
-            GhostTransform.localScale = Vector3.one;
+            ghostTransform.position = Vector3.zero;
+            ghostTransform.rotation = Quaternion.identity;
+            ghostTransform.localScale = Vector3.one;
         }
 
         public virtual void OnInteractionStart()
         {
-            _initialProperties = PosRotScale.FromTransform(GhostTransform);
+            _initialProperties = PosRotScale.FromTransform(ghostTransform);
         }
 
         public virtual void OnInteraction(HandleType handleType)
@@ -81,27 +81,27 @@ namespace TransformHandles
 
         private void UpdatePosition()
         {
-            var positionChange = GhostTransform.position - _initialProperties.Position;
+            var positionChange = ghostTransform.position - _initialProperties.Position;
             _handleManager.UpdateGroupPosition(this, positionChange);
         }
 
         private void UpdateRotation()
         {
-            var rotationChange = GhostTransform.rotation * Quaternion.Inverse(_initialProperties.Rotation);
+            var rotationChange = ghostTransform.rotation * Quaternion.Inverse(_initialProperties.Rotation);
             _handleManager.UpdateGroupRotation(this, rotationChange);
         }
 
         private void UpdateScale()
         {
-            var scaleChange= GhostTransform.localScale - _initialProperties.Scale;
+            var scaleChange= ghostTransform.localScale - _initialProperties.Scale;
             _handleManager.UpdateGroupScaleUpdate(this, scaleChange);
         }
         
         private void ResetInitialGhostTransformProperties()
         {
-            _initialProperties.Position = GhostTransform.position;
-            _initialProperties.Rotation = GhostTransform.rotation;
-            _initialProperties.Scale = GhostTransform.lossyScale;
+            _initialProperties.Position = ghostTransform.position;
+            _initialProperties.Rotation = ghostTransform.rotation;
+            _initialProperties.Scale = ghostTransform.lossyScale;
         }
     }
 }
