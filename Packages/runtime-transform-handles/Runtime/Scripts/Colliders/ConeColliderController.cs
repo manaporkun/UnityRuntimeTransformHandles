@@ -1,29 +1,30 @@
 ﻿using TransformHandles.Utils;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace TransformHandles
 {
 	public class ConeColliderController : MonoBehaviour
 	{
-		[SerializeField] private int sideCount = 15;
-		[SerializeField] private float topRadius = 0.02f;
-		[SerializeField] private int heightSegmentCount = 1;
+		[FormerlySerializedAs("sideCount")] [SerializeField] private int _sideCount = 15;
+		[FormerlySerializedAs("topRadius")] [SerializeField] private float _topRadius = 0.02f;
+		[FormerlySerializedAs("heightSegmentCount")] [SerializeField] private int _heightSegmentCount = 1;
 		
-		[SerializeField] private Transform colliderTransform;
+		[FormerlySerializedAs("colliderTransform")] [SerializeField] private Transform _colliderTransform;
 
-		[SerializeField] private float height;
-		[SerializeField] private float bottomRadius;
+		[FormerlySerializedAs("height")] [SerializeField] private float _height;
+		[FormerlySerializedAs("bottomRadius")] [SerializeField] private float _bottomRadius;
 
-		[SerializeField] private bool save;
+		[FormerlySerializedAs("save")] [SerializeField] private bool _save;
 
 		private MeshCollider _meshCollider;
 		private MeshFilter _meshFilter;
 
 		private void Awake()
 		{
-			_meshCollider = colliderTransform.GetComponent<MeshCollider>();
-			_meshFilter = colliderTransform.GetComponent<MeshFilter>();
+			_meshCollider = _colliderTransform.GetComponent<MeshCollider>();
+			_meshFilter = _colliderTransform.GetComponent<MeshFilter>();
 		}
 
 		private void Start()
@@ -42,9 +43,9 @@ namespace TransformHandles
 		private void UpdateCollider()
 		{
 			var newMesh = MeshUtils.CreateCone(
-				height, 
-				bottomRadius, 
-				topRadius, sideCount, heightSegmentCount);
+				_height, 
+				_bottomRadius, 
+				_topRadius, _sideCount, _heightSegmentCount);
 			
 			newMesh.name = "cone";
 			

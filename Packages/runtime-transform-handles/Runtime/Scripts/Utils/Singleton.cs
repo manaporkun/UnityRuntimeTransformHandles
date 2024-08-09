@@ -4,11 +4,11 @@ public class Singleton<T> : MonoBehaviour where T : Singleton<T>
 {
     private static T _instance;
 
-    public static T Instance
+    public static T instance
     {
         get
         {
-            if (ApplicationQuitManager.ApplicationQuitting)
+            if (ApplicationQuitManager.applicationQuitting)
             {
                 return null;
             }
@@ -53,10 +53,10 @@ public class Singleton<T> : MonoBehaviour where T : Singleton<T>
 
 public static class ApplicationQuitManager
 {
-    public static bool ApplicationQuitting { get; private set; }
+    public static bool applicationQuitting { get; private set; }
 
     public static void SetApplicationQuitting(bool quitting)
     {
-        ApplicationQuitting = quitting;
+        applicationQuitting = quitting;
     }
 }

@@ -3,28 +3,32 @@ using System.Collections.Generic;
 using TransformHandles.Utils;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 
 namespace TransformHandles
 {
     public class TransformHandleManager : Singleton<TransformHandleManager>
     {
-        public Camera mainCamera;
+        [FormerlySerializedAs("mainCamera")] public Camera _mainCamera;
         
+        [FormerlySerializedAs("transformHandlePrefab")]
         [Header("Prefabs")]
-        [SerializeField] private GameObject transformHandlePrefab;
-        [SerializeField] private GameObject ghostPrefab;
+        [SerializeField] private GameObject _transformHandlePrefab;
+        [FormerlySerializedAs("ghostPrefab")] [SerializeField] private GameObject _ghostPrefab;
         
+        [FormerlySerializedAs("layerMask")]
         [Header("Settings")]
-        [SerializeField] private LayerMask layerMask;
-        [SerializeField] private Color highlightColor = Color.white;
+        [SerializeField] private LayerMask _layerMask;
+        [FormerlySerializedAs("highlightColor")] [SerializeField] private Color _highlightColor = Color.white;
         
+        [FormerlySerializedAs("positionShortcut")]
         [Header("Shortcuts")]
-        [SerializeField] private KeyCode positionShortcut = KeyCode.W;
-        [SerializeField] private KeyCode rotationShortcut = KeyCode.E;
-        [SerializeField] private KeyCode scaleShortcut = KeyCode.R;
-        [SerializeField] private KeyCode allShortcut = KeyCode.A;
-        [SerializeField] private KeyCode spaceShortcut = KeyCode.X;
-        [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
+        [SerializeField] private KeyCode _positionShortcut = KeyCode.W;
+        [FormerlySerializedAs("rotationShortcut")] [SerializeField] private KeyCode _rotationShortcut = KeyCode.E;
+        [FormerlySerializedAs("scaleShortcut")] [SerializeField] private KeyCode _scaleShortcut = KeyCode.R;
+        [FormerlySerializedAs("allShortcut")] [SerializeField] private KeyCode _allShortcut = KeyCode.A;
+        [FormerlySerializedAs("spaceShortcut")] [SerializeField] private KeyCode _spaceShortcut = KeyCode.X;
+        [FormerlySerializedAs("pivotShortcut")] [SerializeField] private KeyCode _pivotShortcut = KeyCode.Z;
 
         private RaycastHit[] _rayHits;
         
@@ -68,7 +72,7 @@ namespace TransformHandles
         {
             if(_isInitialized) return;
             
-            mainCamera = mainCamera == null ? Camera.main : mainCamera;
+            _mainCamera = _mainCamera == null ? Camera.main : _mainCamera;
             
             _handleGroupMap = new Dictionary<HandleGroup, TransformGroup>();
             _ghostGroupMap = new Dictionary<Ghost, TransformGroup>();
@@ -84,7 +88,7 @@ namespace TransformHandles
             var ghost = CreateGhost();
             ghost.Initialize();
 
-            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<HandleGroup>();
+            var transformHandle = Instantiate(_transformHandlePrefab).GetComponent<HandleGroup>();
             transformHandle.Enable(ghost.transform);            
             
             var group = new TransformGroup(ghost, transformHandle);
@@ -107,7 +111,7 @@ namespace TransformHandles
             var ghost = CreateGhost();
             ghost.Initialize();
 
-            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<HandleGroup>();
+            var transformHandle = Instantiate(_transformHandlePrefab).GetComponent<HandleGroup>();
             transformHandle.Enable(ghost.transform);      
             
             var group = new TransformGroup(ghost, transformHandle);
@@ -158,11 +162,11 @@ namespace TransformHandles
             _handleGroupMap.Remove(handleGroup);
             handleGroup.Disable();
 
-            var groupGhost = group.GroupGhost;
+            var groupGhost = group.groupGhost;
             if (groupGhost != null)
             {
                 _ghostGroupMap.Remove(groupGhost);
-                group.GroupGhost.Terminate();
+                group.groupGhost.Terminate();
             }
             
             if (_handleGroupMap.Count == 0) _handleActive = false;
@@ -191,7 +195,7 @@ namespace TransformHandles
             if(!targetAdded) { Debug.LogWarning($"{target} is relative to the selected ones."); return false; }
             
             var averagePosRotScale = group.GetAveragePosRotScale();
-            group.GroupGhost.UpdateGhostTransform(averagePosRotScale);
+            group.groupGhost.UpdateGhostTransform(averagePosRotScale);
             
             _transformHashSet.Add(target);
 
@@ -210,7 +214,7 @@ namespace TransformHandles
             if (groupElementsRemoved) { DestroyHandle(handleGroup); return; }
             
             var averagePosRotScale = group.GetAveragePosRotScale();
-            group.GroupGhost.UpdateGhostTransform(averagePosRotScale);
+            group.groupGhost.UpdateGhostTransform(averagePosRotScale);
         }
         
         protected virtual void Update()
@@ -235,15 +239,15 @@ namespace TransformHandles
             var size = 0;
             try
             {
-                var ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-                size = Physics.RaycastNonAlloc(ray, _rayHits, 1000, layerMask);
+                var ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
+                size = Physics.RaycastNonAlloc(ray, _rayHits, 1000, _layerMask);
             }
             catch (MissingReferenceException)
             {
-                mainCamera = Camera.main;
+                _mainCamera = Camera.main;
                 Debug.Log("Camera is null, trying to find main camera");
 
-                if (mainCamera == null)
+                if (_mainCamera == null)
                 {
                     Debug.Log("Main camera is null, aborting");
                     Destroy(gameObject);
@@ -280,7 +284,7 @@ namespace TransformHandles
 
             if (handleBase != null && _draggingHandle == null)
             {
-                handleBase.SetColor(highlightColor);
+                handleBase.SetColor(_highlightColor);
             }
 
             _previousAxis = handleBase;
@@ -313,7 +317,7 @@ namespace TransformHandles
         
         protected virtual void KeyboardInput()
         {
-            if (Input.GetKeyDown(positionShortcut))
+            if (Input.GetKeyDown(_positionShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -321,7 +325,7 @@ namespace TransformHandles
                 }
             }
             
-            if (Input.GetKeyDown(rotationShortcut))
+            if (Input.GetKeyDown(_rotationShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -329,7 +333,7 @@ namespace TransformHandles
                 }
             }
             
-            if (Input.GetKeyDown(scaleShortcut))
+            if (Input.GetKeyDown(_scaleShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -337,7 +341,7 @@ namespace TransformHandles
                 }
             }
             
-            if (Input.GetKeyDown(allShortcut))
+            if (Input.GetKeyDown(_allShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -345,15 +349,15 @@ namespace TransformHandles
                 }
             }
 
-            if (Input.GetKeyDown(spaceShortcut))
+            if (Input.GetKeyDown(_spaceShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
-                    ChangeHandleSpace(handle, handle.space == Space.World ? Space.Self : Space.World);
+                    ChangeHandleSpace(handle, handle._space == Space.World ? Space.Self : Space.World);
                 }
             }
 
-            if (Input.GetKeyDown(pivotShortcut))
+            if (Input.GetKeyDown(_pivotShortcut))
             {
                 foreach (var group in _handleGroupMap.Values)
                 {
@@ -365,7 +369,7 @@ namespace TransformHandles
         protected virtual void OnInteractionStart()
         {
             _interactedHandleGroup = _draggingHandle.GetComponentInParent<HandleGroup>();
-            _interactedGhost = _handleGroupMap[_interactedHandleGroup].GroupGhost;
+            _interactedGhost = _handleGroupMap[_interactedHandleGroup].groupGhost;
             _interactedGhost.OnInteractionStart();
             
             _interactedHandleGroup.InteractionStart();
@@ -373,7 +377,7 @@ namespace TransformHandles
 
         protected virtual void OnInteraction()
         {
-            _interactedGhost.OnInteraction(_interactedHandleGroup.type);
+            _interactedGhost.OnInteraction(_interactedHandleGroup._type);
             
             _interactedHandleGroup.InteractionStay();
         }
@@ -398,14 +402,14 @@ namespace TransformHandles
             handleGroup.ChangeHandleSpace(space);
             
             var group = _handleGroupMap[handleGroup];
-            group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
+            group.groupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
         }
 
         public void ChangeHandlePivot(TransformGroup group, bool originToCenter)
         {
             if(group == null) { Debug.LogError("Group is null"); return;}
             group.IsOriginOnCenter = originToCenter;
-            group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
+            group.groupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
         }
         
         public void UpdateGroupPosition(Ghost ghost, Vector3 positionChange)
@@ -429,23 +433,23 @@ namespace TransformHandles
     
     public class TransformGroup
     {
-        public Ghost GroupGhost {get; }
-        public HandleGroup GroupHandleGroup {get; }
+        public Ghost groupGhost {get; }
+        public HandleGroup groupHandleGroup {get; }
         
         public bool IsOriginOnCenter;
 
-        public HashSet<Transform> Transforms { get; }
-        public Dictionary<Transform, MeshRenderer> RenderersMap { get; }
-        public Dictionary<Transform, Bounds> BoundsMap { get; }
+        public HashSet<Transform> transforms { get; }
+        public Dictionary<Transform, MeshRenderer> renderersMap { get; }
+        public Dictionary<Transform, Bounds> boundsMap { get; }
 
         public TransformGroup(Ghost groupGhost, HandleGroup groupHandleGroup)
         {
-            GroupGhost = groupGhost;
-            GroupHandleGroup = groupHandleGroup;
+            this.groupGhost = groupGhost;
+            this.groupHandleGroup = groupHandleGroup;
             
-            Transforms = new HashSet<Transform>();
-            RenderersMap = new Dictionary<Transform, MeshRenderer>();
-            BoundsMap = new Dictionary<Transform, Bounds>();
+            transforms = new HashSet<Transform>();
+            renderersMap = new Dictionary<Transform, MeshRenderer>();
+            boundsMap = new Dictionary<Transform, Bounds>();
         }
 
         public bool AddTransform(Transform tElement)
@@ -454,34 +458,34 @@ namespace TransformHandles
             
             var meshRenderer = tElement.GetComponent<MeshRenderer>();
             
-            Transforms.Add(tElement);
-            RenderersMap.Add(tElement, meshRenderer);
-            BoundsMap.Add(tElement, meshRenderer != null ? meshRenderer.bounds : tElement.GetBounds());
+            transforms.Add(tElement);
+            renderersMap.Add(tElement, meshRenderer);
+            boundsMap.Add(tElement, meshRenderer != null ? meshRenderer.bounds : tElement.GetBounds());
             
             return true;
         }
         
         public bool RemoveTransform(Transform transform)
         {
-            Transforms.Remove(transform);
-            RenderersMap.Remove(transform);
-            BoundsMap.Remove(transform);
+            transforms.Remove(transform);
+            renderersMap.Remove(transform);
+            boundsMap.Remove(transform);
             
-            return Transforms.Count == 0;
+            return transforms.Count == 0;
         }
 
         public void UpdateBounds()
         {
-            foreach (var (tElement, meshRenderer) in RenderersMap)
+            foreach (var (tElement, meshRenderer) in renderersMap)
             {
                 var bounds = meshRenderer ? meshRenderer.bounds : tElement.GetBounds();
-                BoundsMap[tElement] = bounds;
+                boundsMap[tElement] = bounds;
             }
         }
         
         public void UpdatePositions(Vector3 positionChange)
         {
-            foreach (var tElement in RenderersMap.Keys)
+            foreach (var tElement in renderersMap.Keys)
             {
                 tElement.position += positionChange;
             }
@@ -489,12 +493,12 @@ namespace TransformHandles
 
         public void UpdateRotations(Quaternion rotationChange)
         {
-            var ghostPosition = GroupGhost.transform.position;
+            var ghostPosition = groupGhost.transform.position;
             var rotationAxis = rotationChange.normalized.eulerAngles;
             var rotationChangeMagnitude = rotationChange.eulerAngles.magnitude;
-            foreach (var tElement in RenderersMap.Keys)
+            foreach (var tElement in renderersMap.Keys)
             {
-                if (GroupHandleGroup.space == Space.Self)
+                if (groupHandleGroup._space == Space.Self)
                 {
                     tElement.position = rotationChange * (tElement.position - ghostPosition) + ghostPosition;
                     tElement.rotation = rotationChange * tElement.rotation;
@@ -508,7 +512,7 @@ namespace TransformHandles
 
         public void UpdateScales(Vector3 scaleChange)
         {
-            foreach (var (tElement, meshRenderer) in RenderersMap)
+            foreach (var (tElement, meshRenderer) in renderersMap)
             {
                 if (IsOriginOnCenter)
                 {
@@ -539,19 +543,19 @@ namespace TransformHandles
 
         private Vector3 GetCenterPoint(Transform tElement)
         {
-            return IsOriginOnCenter ? BoundsMap[tElement].center : tElement.position;
+            return IsOriginOnCenter ? boundsMap[tElement].center : tElement.position;
         }
         
         public PosRotScale GetAveragePosRotScale()
         {
-            var space = GroupHandleGroup.space;
+            var space = groupHandleGroup._space;
             
             var centerPositions = new List<Vector3>();
             var sumQuaternion = Quaternion.identity;
 
-            var transformsCount = Transforms.Count;
+            var transformsCount = transforms.Count;
 
-            foreach (var tElement in Transforms)
+            foreach (var tElement in transforms)
             {
                 var centerPoint = GetCenterPoint(tElement);
                 centerPositions.Add(centerPoint);
@@ -574,7 +578,7 @@ namespace TransformHandles
         
         private bool IsTargetRelativeToSelectedOnes(Transform newTarget)
         {
-            foreach (var transformInHash in Transforms)
+            foreach (var transformInHash in transforms)
             {
                 if (transformInHash.IsDeepParentOf(newTarget)) return true;
 

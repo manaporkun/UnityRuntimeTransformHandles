@@ -21,7 +21,7 @@ public class ObjSelector : MonoBehaviour
         _camera = Camera.main;
         if (_camera != null) _cameraMovement = _camera.GetComponent<CameraMovement>();
         
-        _manager = TransformHandleManager.Instance;
+        _manager = TransformHandleManager.instance;
         _handleDictionary = new Dictionary<Transform, HandleGroup>();
     }
 
