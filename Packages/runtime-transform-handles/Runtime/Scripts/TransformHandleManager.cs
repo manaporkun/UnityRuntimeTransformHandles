@@ -107,8 +107,8 @@ namespace TransformHandles
         public HandleGroup CreateHandleFromList(List<Transform> targets)
         {
             if(targets.Count == 0) { Debug.LogWarning("List is empty."); return null; }
-            
-            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
+
+            var ghost = CreateGhost();
             ghost.Initialize();
 
             var transformHandle = Instantiate(_transformHandlePrefab).GetComponent<HandleGroup>();
@@ -133,10 +133,27 @@ namespace TransformHandles
             
             return transformHandle;
         }
-
-        public void RemoveHandle(Handle handle)
+        
+        private Ghost CreateGhost()
         {
-            if(handle == null) { Debug.LogError("Handle is already null"); return;}
+            Ghost ghost;
+            
+            if (_ghostPrefab == null)
+            {
+                var ghostObject = new GameObject();
+                ghost = ghostObject.AddComponent<Ghost>();
+            }
+            else
+            {
+                ghost = Instantiate(_ghostPrefab).GetComponent<Ghost>();
+            }
+            
+            return ghost;
+        }
+
+        public void RemoveHandle(HandleGroup handleGroup)
+        {
+            if(handleGroup == null) { Debug.LogError("Handle is already null"); return;}
             if(_handleGroupMap == null) return;
             
             var group = _handleGroupMap[handleGroup];
