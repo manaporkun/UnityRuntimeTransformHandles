@@ -210,6 +210,15 @@ namespace TransformHandles
             MouseInput();
             KeyboardInput();
         }
+
+        private Vector3 getPos() {
+            if (Input.touchCount > 0) {
+                return Input.GetTouch(0).position;
+            } else {
+                return Input.mousePosition;
+            }
+        }
+
         
         protected virtual void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
         {
@@ -218,7 +227,7 @@ namespace TransformHandles
             var size = 0;
             try
             {
-                var ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                var ray = mainCamera.ScreenPointToRay(getPos());
                 size = Physics.RaycastNonAlloc(ray, _rayHits, 1000, layerMask);
             }
             catch (MissingReferenceException)
