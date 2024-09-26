@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace TransformHandles
 {
@@ -17,9 +17,18 @@ namespace TransformHandles
             DefaultColor = defaultColor;
         }
 
+        private Vector3 getPos() {
+            if (Input.touchCount > 0) {
+                return Input.GetTouch(0).position;
+            } else {
+                return Input.mousePosition;
+            }
+        }
+
+
         public override void Interact(Vector3 pPreviousPosition)
         {
-            var mouseVector = (Input.mousePosition - pPreviousPosition);
+            var mouseVector = (getPos() - pPreviousPosition);
             var d = (mouseVector.x + mouseVector.y) * Time.deltaTime * 2;
             delta += d;
             ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale,_axis) * delta;
