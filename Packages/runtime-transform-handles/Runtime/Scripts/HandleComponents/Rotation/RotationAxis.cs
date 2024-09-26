@@ -1,4 +1,4 @@
-﻿using TransformHandles.Utils;
+using TransformHandles.Utils;
 using UnityEngine;
 
 namespace TransformHandles
@@ -33,9 +33,18 @@ namespace TransformHandles
             _rotationHandleTransform = transform.GetComponentInParent<Handle>().transform;
         }
 
+        private Vector3 getPos() {
+            if (Input.touchCount > 0) {
+                return Input.GetTouch(0).position;
+            } else {
+                return Input.mousePosition;
+            }
+        }
+
         public override void Interact(Vector3 pPreviousPosition)
         {
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            
+            var cameraRay = _handleCamera.ScreenPointToRay(getPos());
             
             if (!_axisPlane.Raycast(cameraRay, out var hitT))
             {
