@@ -80,8 +80,8 @@ namespace TransformHandles
         public Handle CreateHandle(Transform target)
         {
             if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return null; }
-
-            var ghost = CreateGhost();
+            
+            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
             ghost.Initialize();
 
             var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
@@ -104,7 +104,7 @@ namespace TransformHandles
         {
             if(targets.Count == 0) { Debug.LogWarning("List is empty."); return null; }
             
-            var ghost = CreateGhost();
+            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
             ghost.Initialize();
 
             var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
@@ -128,23 +128,6 @@ namespace TransformHandles
             _handleActive = true;
             
             return transformHandle;
-        }
-
-        private Ghost CreateGhost()
-        {
-            Ghost ghost;
-            
-            if (ghostPrefab == null)
-            {
-                var ghostObject = new GameObject();
-                ghost = ghostObject.AddComponent<Ghost>();
-            }
-            else
-            {
-                ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
-            }
-            
-            return ghost;
         }
 
         public void RemoveHandle(Handle handle)
@@ -288,27 +271,56 @@ namespace TransformHandles
 
         protected virtual void MouseInput()
         {
-            if (Input.GetMouseButton(0) && _draggingHandle != null)
+            bool GetMouseButtonExpl(int i) {
+                if (Input.touchCount > i) {
+                    return true;
+                } else {
+                    return Input.GetMouseButton(i);
+                }
+            }
+            bool GetMouseButtonUpExpl(int i, TouchPhase touchphase) {
+                if (Input.touchCount > i) {
+                    return Input.GetTouch(i).phase == touchphase;
+                } else {
+                    return Input.GetMouseButtonUp(i);
+                }
+            }
+            bool GetMouseButtonDownExpl(int i, TouchPhase touchphase) {
+                if (Input.touchCount > i) {
+                    return Input.GetTouch(i).phase == touchphase;
+                } else {
+                    return Input.GetMouseButtonDown(i);
+                }
+            }
+            if (GetMouseButtonExpl(0) && _draggingHandle != null)
             {
                 _draggingHandle.Interact(_previousMousePosition);
                 OnInteraction();
             }
 
-            if (Input.GetMouseButtonDown(0) && _hoveredHandle != null)
+            if (GetMouseButtonDownExpl(0, TouchPhase.Began) && _hoveredHandle != null)
             {
                 _draggingHandle = _hoveredHandle;
                 _draggingHandle.StartInteraction(_handleHitPoint);
                 OnInteractionStart();
             }
 
-            if (Input.GetMouseButtonUp(0) && _draggingHandle != null)
+            if (GetMouseButtonUpExpl(0, TouchPhase.Ended) && _draggingHandle != null)
             {
                 _draggingHandle.EndInteraction();
                 _draggingHandle = null;
                 OnInteractionEnd();
             }
 
-            _previousMousePosition = Input.mousePosition;
+            if (Input.simulateMouseWithTouches) {
+                _previousMousePosition = Input.mousePosition;
+            } else {
+                if (Input.touchCount > 0) {
+                    _previousMousePosition = Input.GetTouch(0).position;
+                } else {
+                    _previousMousePosition = new Vector3(0, 0, 0);
+                }
+            }
         }
         
         protected virtual void KeyboardInput()
