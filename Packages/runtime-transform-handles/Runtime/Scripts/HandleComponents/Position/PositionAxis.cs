@@ -1,4 +1,4 @@
-﻿using TransformHandles.Utils;
+using TransformHandles.Utils;
 using UnityEngine;
 
 namespace TransformHandles
@@ -39,7 +39,8 @@ namespace TransformHandles
 
         public override void Interact(Vector3 pPreviousPosition)
         {
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+
+            var cameraRay = _handleCamera.ScreenPointToRay(getPos());
 
             var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var hitPoint = _rAxisRay.GetPoint(closestT);
@@ -66,7 +67,13 @@ namespace TransformHandles
 
             base.Interact(pPreviousPosition);
         }
-        
+        private Vector3 getPos() {
+            if (Input.touchCount > 0) {
+                return Input.GetTouch(0).position;
+            } else {
+                return Input.mousePosition;
+            }
+        }
         public override void StartInteraction(Vector3 pHitPoint)
         {
             base.StartInteraction(pHitPoint);
@@ -79,7 +86,7 @@ namespace TransformHandles
             
             _rAxisRay = new Ray(_startPosition, rAxis);
 
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            var cameraRay = _handleCamera.ScreenPointToRay(getPos());
 
             var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var hitPoint = _rAxisRay.GetPoint(closestT);
