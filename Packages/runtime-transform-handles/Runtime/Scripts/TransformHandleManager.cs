@@ -81,7 +81,7 @@ namespace TransformHandles
         {
             if (_transformHashSet.Contains(target)) { Debug.LogWarning($"{target} already has a handle."); return null; }
             
-            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
+            var ghost = CreateGhost();
             ghost.Initialize();
 
             var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
@@ -99,12 +99,29 @@ namespace TransformHandles
             
             return transformHandle;
         }
+
+        private Ghost CreateGhost()
+        {
+            Ghost ghost;
+            
+            if (ghostPrefab == null)
+            {
+                var ghostObject = new GameObject();
+                ghost = ghostObject.AddComponent<Ghost>();
+            }
+            else
+            {
+                ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
+            }
+            
+            return ghost;
+        }
         
         public Handle CreateHandleFromList(List<Transform> targets)
         {
             if(targets.Count == 0) { Debug.LogWarning("List is empty."); return null; }
             
-            var ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
+            var ghost = CreateGhost();
             ghost.Initialize();
 
             var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
