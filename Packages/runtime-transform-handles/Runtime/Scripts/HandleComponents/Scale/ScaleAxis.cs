@@ -1,4 +1,4 @@
-﻿using TransformHandles.Utils;
+using TransformHandles.Utils;
 using UnityEngine;
 
 namespace TransformHandles
@@ -34,9 +34,18 @@ namespace TransformHandles
             cubeMeshRenderer.transform.localPosition = _axis * (Size * (1 + delta));
         }
 
+        private Vector3 getPos() {
+            if (Input.touchCount > 0) {
+                return Input.GetTouch(0).position;
+            } else {
+                return Input.mousePosition;
+            }
+        }
+
+
         public override void Interact(Vector3 pPreviousPosition)
         {
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            var cameraRay = _handleCamera.ScreenPointToRay(getPos());
 
             var   closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var hitPoint = _rAxisRay.GetPoint(closestT);
@@ -79,7 +88,7 @@ namespace TransformHandles
             var position = ParentHandle.target.position;
             _rAxisRay = new Ray(position, rAxis);
             
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            var cameraRay = _handleCamera.ScreenPointToRay(getPos());
             
             var   closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var hitPoint = _rAxisRay.GetPoint(closestT);
