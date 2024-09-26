@@ -100,7 +100,7 @@ namespace TransformHandles
 
             _axisPlane = new Plane(_rotatedAxis, ParentHandle.target.position);
 
-            var     cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            var     cameraRay = _handleCamera.ScreenPointToRay(getPos());
             var startHitPoint = _axisPlane.Raycast(cameraRay, out var hitT) ?
                 cameraRay.GetPoint(hitT) : _axisPlane.ClosestPointOnPlane(pHitPoint);
             
