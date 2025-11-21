@@ -1,55 +1,43 @@
 using TransformHandles.Utils;
-using UnityEditor;
 using UnityEngine;
 
 namespace TransformHandles
 {
-    public class TubeColliderController : MonoBehaviour
+    /// <summary>
+    /// Generates and applies a tube mesh to the collider and filter components.
+    /// </summary>
+    public class TubeColliderController : ColliderControllerBase
     {
+        [Header("Tube Settings")]
         [SerializeField] private float height;
-        [SerializeField] private int sideCount;
+        [SerializeField] private float bottomRadius;
         [SerializeField] private float topRadius;
         [SerializeField] private float bottomThickness;
         [SerializeField] private float topThickness;
-        [SerializeField] private float bottomRadius;
+        [SerializeField] private int sideCount;
 
-        [SerializeField] private bool save;
-
-        private MeshCollider _meshCollider;
-        private MeshFilter _meshFilter;
-
-        private void Awake()
+        protected override void Awake()
         {
-            //_meshCollider = GetComponent<MeshCollider>();
-            _meshFilter = GetComponent<MeshFilter>();
-        }
-
-        private void Start()
-        {
-            UpdateCollider();
-        }
-
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.L))
+            // TubeColliderController uses local transform by default
+            if (colliderTransform == null)
             {
-                UpdateCollider();
+                colliderTransform = transform;
             }
+            base.Awake();
         }
 
-        private void UpdateCollider()
+        protected override void UpdateCollider()
         {
-            var newMesh = MeshUtils.CreateTube(height, sideCount, bottomRadius, bottomThickness, topRadius, topThickness);
-			
-            newMesh.name = "tube";
-			
-            _meshFilter.sharedMesh = newMesh;
-            //_meshCollider.sharedMesh = newMesh;
+            var mesh = MeshUtils.CreateTube(
+                height,
+                sideCount,
+                bottomRadius,
+                bottomThickness,
+                topRadius,
+                topThickness);
 
-            /*if (save)
-            {
-                AssetDatabase.CreateAsset(newMesh, "Assets/tube.asset");
-            }*/
+            mesh.name = "tube";
+            ApplyMesh(mesh);
         }
     }
 }
