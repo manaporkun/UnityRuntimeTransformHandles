@@ -1,57 +1,218 @@
-# Runtime Transform Handles for Unity 
+# Runtime Transform Handles for Unity
 
 ![Icon](https://i.imgur.com/NRdmzlQ.png)
 
+[![Unity 2019.4+](https://img.shields.io/badge/Unity-2019.4%2B-blue.svg)](https://unity.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)](Packages/runtime-transform-handles/package.json)
+
 ## About
 
-This project is based on https://github.com/pshtif/RuntimeTransformHandle. 
+This project is based on [RuntimeTransformHandle](https://github.com/pshtif/RuntimeTransformHandle) by pshtif.
 
-Unity Runtime Transform Handles is a powerful tool that allows developers to transform objects at runtime using a set of intuitive and professional gizmos. Ideal for building modding tools, runtime editors, or games that require object manipulation, this plugin adds multiple object selection, changeable origin points, better auto scale, multiple handles, and other features to the base project. Easy to use and extend, Unity Runtime Transform Handles is an invaluable tool for any developer looking to add object manipulation capabilities to their project.
+Unity Runtime Transform Handles is a powerful tool that allows developers to transform objects at runtime using a set of intuitive and professional gizmos. Ideal for building modding tools, runtime editors, or games that require object manipulation, this plugin adds multiple object selection, changeable origin points, better auto scale, multiple handles, and other features to the base project.
 
-### Video
+### Features
+
+- Position, Rotation, and Scale handles
+- Multiple object selection and manipulation
+- Changeable origin points (pivot/center)
+- World and Local coordinate space support
+- Configurable snapping for precise transformations
+- Auto-scaling handles based on camera distance
+- Customizable keyboard shortcuts
+- Event system for handle interactions
+
+### Video Demo
+
 [![Video](https://i.imgur.com/OSXsYXA.png)](https://www.youtube.com/watch?v=-6tpim397F0)
 
-## Install
+## Requirements
+
+- Unity **2019.4** or higher
+
+## Installation
+
+### Option 1: Package Manager (Recommended)
 
 1. Open the Package Manager from `Window > Package Manager`
-2. `"+" button > Add package from git URL`
-3. Enter the following
-   * https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles
+2. Click the `"+" button > Add package from git URL`
+3. Enter the following URL:
+   ```
+   https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles
+   ```
 
-Or, open `Packages/manifest.json` and add the following to the dependencies block.
+### Option 2: Manual Installation
+
+Open `Packages/manifest.json` and add the following to the dependencies block:
 
 ```json
 {
     "dependencies": {
-         "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles/"
+        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles/"
     }
 }
 ```
 
+## Quick Start
+
+### Basic Usage
+
+```csharp
+using TransformHandles;
+using UnityEngine;
+
+public class SimpleExample : MonoBehaviour
+{
+    private TransformHandleManager _manager;
+
+    void Start()
+    {
+        _manager = TransformHandleManager.Instance;
+    }
+
+    void CreateHandleForObject(Transform target)
+    {
+        // Create a handle for a single object
+        Handle handle = _manager.CreateHandle(target);
+
+        // Subscribe to events
+        handle.OnInteractionStartEvent += OnHandleStart;
+        handle.OnInteractionEndEvent += OnHandleEnd;
+    }
+
+    void OnHandleStart(Handle handle)
+    {
+        Debug.Log("Started manipulating: " + handle.target.name);
+    }
+
+    void OnHandleEnd(Handle handle)
+    {
+        Debug.Log("Finished manipulating: " + handle.target.name);
+    }
+}
+```
+
+### Multiple Object Selection
+
+```csharp
+// Create a handle for multiple objects
+List<Transform> targets = new List<Transform> { obj1, obj2, obj3 };
+Handle handle = _manager.CreateHandleFromList(targets);
+
+// Add more targets to an existing handle
+_manager.AddTarget(newTarget, handle);
+
+// Remove a target from a handle
+_manager.RemoveTarget(targetToRemove, handle);
+```
+
+### Changing Handle Properties
+
+```csharp
+// Change handle type
+TransformHandleManager.ChangeHandleType(handle, HandleType.Position);
+TransformHandleManager.ChangeHandleType(handle, HandleType.Rotation);
+TransformHandleManager.ChangeHandleType(handle, HandleType.Scale);
+TransformHandleManager.ChangeHandleType(handle, HandleType.All);
+
+// Change coordinate space
+_manager.ChangeHandleSpace(handle, Space.World);
+_manager.ChangeHandleSpace(handle, Space.Self);
+
+// Configure snapping
+handle.positionSnap = new Vector3(0.5f, 0.5f, 0.5f);
+handle.rotationSnap = 15f;
+handle.scaleSnap = new Vector3(0.1f, 0.1f, 0.1f);
+```
+
+## Default Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| W | Position mode |
+| E | Rotation mode |
+| R | Scale mode |
+| A | All modes (Position + Rotation + Scale) |
+| X | Toggle World/Local space |
+| Z | Toggle Pivot/Center origin |
+
 ## Main Components
 
-### ObjSelector.cs
+### TransformHandleManager
 
-It allows the user to select and manipulate objects in the scene using a TransformHandle system. And it shows basic usage of the handles.
+Central manager for all transform handles in the scene. Handles creation, destruction, and interaction with transform handles.
 
-### TransformHandleManager.cs
+**Key Methods:**
+- `CreateHandle(Transform target)` - Creates a handle for a single object
+- `CreateHandleFromList(List<Transform> targets)` - Creates a handle for multiple objects
+- `AddTarget(Transform target, Handle handle)` - Adds an object to an existing handle
+- `RemoveTarget(Transform target, Handle handle)` - Removes an object from a handle
+- `RemoveHandle(Handle handle)` - Removes a handle
+- `DestroyAllHandles()` - Destroys all handles
+- `ChangeHandleType(Handle handle, HandleType type)` - Changes the handle type
+- `ChangeHandleSpace(Handle handle, Space space)` - Changes the coordinate space
 
-TransformHandleManager handles the creation and manipulation of the transform handles. The Handle and Ghost classes are used to represent the visual components of the handles and the targets they manipulate.
+### Handle
 
-The CreateHandle and CreateHandleFromList methods are used to create new transform handles, and the DestroyHandle and DestroyAllHandles methods are used to destroy them. Targets can be added and removed from handles using the AddTarget and RemoveTarget methods.
+Main handle component that manages transform manipulation through position, rotation, and scale handles.
 
-TransformHandleManager uses Unity events to allow external scripts to react to handle creation, destruction, and interaction events.
+**Properties:**
+- `target` - The transform being manipulated
+- `type` - Current handle type (Position, Rotation, Scale, or combinations)
+- `space` - Coordinate space (Self or World)
+- `axes` - Active axes (X, Y, Z, or combinations)
+- `positionSnap`, `rotationSnap`, `scaleSnap` - Snapping values
+- `autoScale` - Enable/disable auto-scaling based on camera distance
 
-### Ghost.cs
+**Events:**
+- `OnInteractionStartEvent` - Fired when interaction begins
+- `OnInteractionEvent` - Fired during interaction
+- `OnInteractionEndEvent` - Fired when interaction ends
+- `OnHandleDestroyedEvent` - Fired when handle is destroyed
 
-"Ghost" is used to represent an empty transform object that is being manipulated by the user through a transform handle system. The Ghost transform is instantiated when a handle created and is responsible for updating its position, rotation, and scale based on the user's input.
+### Ghost
 
-### Handle.cs
+Represents an empty transform object that serves as the pivot point for handle manipulation. The Ghost transform is instantiated when a handle is created and updates its position, rotation, and scale based on user input.
 
-Handle component allows users to manipulate the position, rotation, and scale of a target object. The script contains several public properties and methods for customizing the behavior of the Transform Handle, such as the axes it operates on, the space it operates in (world or local), and snapping settings for each transform component.
+### TransformGroup
 
-### TransformGroup class
+Groups and transforms multiple Unity Transform objects together. Contains methods to add/remove transforms and update the group's position, rotation, and scale collectively.
 
-It is used to group and transform multiple Unity Transform objects together. The TransformGroup contains a HashSet of Transform objects that are grouped together, as well as several dictionaries that map Transform objects to MeshRenderer components and Bounds objects. The class has methods to add and remove Transform objects to the group, as well as methods to update the group's position, rotation, and scale.
+## Handle Types
 
+```csharp
+public enum HandleType
+{
+    Position,
+    Rotation,
+    Scale,
+    PositionRotation,
+    PositionScale,
+    RotationScale,
+    All
+}
+```
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Credits
+
+- Original project by [pshtif](https://github.com/pshtif/RuntimeTransformHandle)
+- Extended and maintained by [Orkun Manap](https://manap.dev)
+
+## Support
+
+If you encounter any issues or have questions, please [open an issue](https://github.com/manaporkun/UnityRuntimeTransformHandles/issues) on GitHub.
