@@ -98,7 +98,7 @@ public class ObjSelector : MonoBehaviour
         hitInfoTransform.tag = "Untagged";
         var rendererComponent = hitInfoTransform.gameObject.GetComponent<Renderer>();
         if (rendererComponent == null) rendererComponent = hitInfoTransform.GetComponentInChildren<Renderer>();
-        rendererComponent.material.color = unselectedColor;
+        if (rendererComponent != null) rendererComponent.material.color = unselectedColor;
     }
 
     private void SelectObject(Transform hitInfoTransform)
@@ -107,8 +107,8 @@ public class ObjSelector : MonoBehaviour
 
         hitInfoTransform.tag = "Selected";
         var rendererComponent = hitInfoTransform.gameObject.GetComponent<Renderer>();
-        if (rendererComponent == null) rendererComponent =  hitInfoTransform.GetComponentInChildren<Renderer>();
-        rendererComponent.material.color = selectedColor;
+        if (rendererComponent == null) rendererComponent = hitInfoTransform.GetComponentInChildren<Renderer>();
+        if (rendererComponent != null) rendererComponent.material.color = selectedColor;
     }
     
     private void CreateHandle(Transform hitTransform)
