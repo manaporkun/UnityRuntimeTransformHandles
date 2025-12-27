@@ -30,7 +30,8 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var mouseVector = Input.mousePosition - previousPosition;
+            var screenPosition = TransformHandleManager.GetPointerScreenPosition();
+            var mouseVector = screenPosition - previousPosition;
             var d = (mouseVector.x + mouseVector.y) * Time.deltaTime * MouseSensitivity;
             delta += d;
             ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * delta;

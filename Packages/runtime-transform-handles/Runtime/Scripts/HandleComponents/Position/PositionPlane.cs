@@ -53,8 +53,8 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var ray = _handleCamera.ScreenPointToRay(Input.mousePosition);
-
+            var screenPosition = TransformHandleManager.GetPointerScreenPosition();
+            var ray = _handleCamera.ScreenPointToRay(screenPosition);
             _plane.Raycast(ray, out var d);
 
             var hitPoint = ray.GetPoint(d);
@@ -94,8 +94,8 @@ namespace TransformHandles
             var position = ParentHandle.target.position;
             _plane = new Plane(rPerp, position);
 
-            var ray = _handleCamera.ScreenPointToRay(Input.mousePosition);
-
+            var screenPosition = TransformHandleManager.GetPointerScreenPosition();
+            var ray = _handleCamera.ScreenPointToRay(screenPosition);
             _plane.Raycast(ray, out var d);
 
             var rayHitPoint = ray.GetPoint(d);

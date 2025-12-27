@@ -28,10 +28,12 @@ namespace TransformHandles
 
         protected virtual void Update()
         {
+#if ENABLE_LEGACY_INPUT_MANAGER
             if (Input.GetKeyDown(updateKey))
             {
                 UpdateCollider();
             }
+#endif
         }
 
         /// <summary>
