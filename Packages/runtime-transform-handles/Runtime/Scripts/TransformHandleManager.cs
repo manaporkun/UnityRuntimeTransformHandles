@@ -13,7 +13,7 @@ namespace TransformHandles
     public class TransformHandleManager : Singleton<TransformHandleManager>
     {
         private const int MaxRaycastHits = 16;
-        private const float RaycastMaxDistance = 1000f;
+        private const float RaycastMaxDistance = Mathf.Infinity;
 
         /// <summary>The main camera used for raycasting.</summary>
         public Camera mainCamera;
@@ -348,7 +348,7 @@ namespace TransformHandles
             var size = 0;
             try
             {
-                var screenPosition = Pointer.current.position.ReadValue();
+                var screenPosition = GetPointerScreenPosition();
                 var ray = mainCamera.ScreenPointToRay(screenPosition);
                 size = Physics.RaycastNonAlloc(ray, _rayHits, RaycastMaxDistance, layerMask);
             }
