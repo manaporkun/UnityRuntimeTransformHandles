@@ -193,6 +193,8 @@ namespace TransformHandles
             return ghost;
         }
 
+        public TransformGroup GetHandleTransformGroup(Handle handle) => _handleGroupMap.GetValueOrDefault(handle);
+
         /// <summary>
         /// Removes a handle from the manager.
         /// </summary>

@@ -5,7 +5,6 @@ namespace TransformHandles
 {
     public class Ghost : MonoBehaviour
     {
-        private Transform GhostTransform => transform;
         private TransformHandleManager _handleManager;
         private PosRotScale _initialProperties;
 
@@ -21,25 +20,30 @@ namespace TransformHandles
 
         public void UpdateGhostTransform(PosRotScale average)
         {
-            GhostTransform.position = average.Position;
-            GhostTransform.rotation = average.Rotation;
-            GhostTransform.localScale = average.Scale;
+            transform.position = average.Position;
+            transform.rotation = average.Rotation;
+            transform.localScale = average.Scale;
+        }
+
+        public void UpdateGhostPosition(Vector3 position)
+        {
+            transform.position = position;
         }
 
         public void ResetGhostTransform()
         {
-            GhostTransform.position = Vector3.zero;
-            GhostTransform.rotation = Quaternion.identity;
-            GhostTransform.localScale = Vector3.one;
+            transform.position = Vector3.zero;
+            transform.rotation = Quaternion.identity;
+            transform.localScale = Vector3.one;
         }
 
         public virtual void OnInteractionStart()
         {
             _initialProperties = new PosRotScale()
             {
-                Position = GhostTransform.position,
-                Rotation = GhostTransform.rotation,
-                Scale = GhostTransform.lossyScale
+                Position = transform.position,
+                Rotation = transform.rotation,
+                Scale = transform.lossyScale
             };
         }
 
@@ -52,32 +56,26 @@ namespace TransformHandles
                     break;
                 case HandleType.Rotation:
                     UpdateRotation();
-                    
                     break;
                 case HandleType.Scale:
                     UpdateScale();
-                    
                     break;
                 case HandleType.PositionRotation:
                     UpdatePosition();
                     UpdateRotation();
-                    
                     break;
                 case HandleType.PositionScale:
                     UpdatePosition();
                     UpdateScale();
-
                     break;
                 case HandleType.RotationScale:
                     UpdateRotation();
                     UpdateScale();
-                    
                     break;
                 case HandleType.All:
                     UpdatePosition();
                     UpdateRotation();
                     UpdateScale();
-                    
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -88,27 +86,27 @@ namespace TransformHandles
 
         private void UpdatePosition()
         {
-            var positionChange = GhostTransform.position - _initialProperties.Position;
+            var positionChange = transform.position - _initialProperties.Position;
             _handleManager.UpdateGroupPosition(this, positionChange);
         }
 
         private void UpdateRotation()
         {
-            var rotationChange = GhostTransform.rotation * Quaternion.Inverse(_initialProperties.Rotation);
+            var rotationChange = transform.rotation * Quaternion.Inverse(_initialProperties.Rotation);
             _handleManager.UpdateGroupRotation(this, rotationChange);
         }
 
         private void UpdateScale()
         {
-            var scaleChange= GhostTransform.localScale - _initialProperties.Scale;
+            var scaleChange = transform.localScale - _initialProperties.Scale;
             _handleManager.UpdateGroupScaleUpdate(this, scaleChange);
         }
         
         private void ResetInitialGhostTransformProperties()
         {
-            _initialProperties.Position = GhostTransform.position;
-            _initialProperties.Rotation = GhostTransform.rotation;
-            _initialProperties.Scale = GhostTransform.lossyScale;
+            _initialProperties.Position = transform.position;
+            _initialProperties.Rotation = transform.rotation;
+            _initialProperties.Scale = transform.lossyScale;
         }
     }
 }
