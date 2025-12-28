@@ -12,6 +12,11 @@ namespace TransformHandles
         private const float DefaultAutoScaleSizeInPixels = 192f;
 
         [SerializeField] private float autoScaleSizeInPixels = DefaultAutoScaleSizeInPixels;
+        public float AutoScaleSizeInPixels
+        {
+            get => autoScaleSizeInPixels;
+            set => autoScaleSizeInPixels = value;
+        }
         [SerializeField] public bool autoScale;
 
         /// <summary>Event fired when handle interaction starts.</summary>
