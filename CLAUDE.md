@@ -59,7 +59,24 @@ Handles require a dedicated physics layer for raycasting:
 - Runtime: `TransformHandleManager.InitializeHandleLayer()` looks up by name, warns if missing
 - Editor: `Tools > Transform Handles > Setup Layer` creates the layer
 
-## Default Keyboard Shortcuts
+## Configuration
+
+### Settings ScriptableObject (Optional)
+
+Create a settings asset via `Assets > Create > Transform Handles > Settings` to:
+- Customize keyboard shortcuts
+- Enable/disable shortcuts entirely
+- Set default handle type, space, and axes for new handles
+- Configure highlight color
+
+Assign to `TransformHandleManager.Settings` in Inspector or via code:
+```csharp
+TransformHandleManager.Instance.Settings = mySettings;
+```
+
+If no settings asset is assigned, the manager uses its serialized field values (backwards compatible).
+
+### Default Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
