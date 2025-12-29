@@ -29,10 +29,10 @@ public class CameraMovement : MonoBehaviour
     private void UpdateRotation()
     {
         if(sensitivity == 0f) return;
-        _rotation.x += Input.GetAxis(XAxis) * sensitivity;
+        _rotation.x += InputWrapper.GetAxis(XAxis) * sensitivity;
         _rotation.x = Mathf.Clamp(_rotation.x, -xRotationLimit, xRotationLimit);
 
-        _rotation.y += Input.GetAxis(YAxis) * sensitivity;
+        _rotation.y += InputWrapper.GetAxis(YAxis) * sensitivity;
         _rotation.y = Mathf.Clamp(_rotation.y, -yRotationLimit, yRotationLimit);
 
         var xQuaternion = Quaternion.AngleAxis(_rotation.x, Vector3.up);
@@ -44,7 +44,7 @@ public class CameraMovement : MonoBehaviour
     private void UpdateCameraZoom()
     {
         if(zoomSpeed == 0f) return;
-        _fieldOfView -= Input.GetAxis("Mouse ScrollWheel") * zoomSpeed;
+        _fieldOfView -= InputWrapper.GetAxis("Mouse ScrollWheel") * zoomSpeed;
         _camera.fieldOfView = _fieldOfView;
         _camera.fieldOfView = Mathf.Clamp(_fieldOfView, 35f, 100f);
         _fieldOfView = _camera.fieldOfView;
