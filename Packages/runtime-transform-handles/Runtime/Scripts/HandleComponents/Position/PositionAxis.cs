@@ -49,7 +49,7 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
 
             var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var hitPoint = _rAxisRay.GetPoint(closestT);
@@ -88,7 +88,7 @@ namespace TransformHandles
 
             _rAxisRay = new Ray(_startPosition, rAxis);
 
-            var cameraRay = _handleCamera.ScreenPointToRay(Input.mousePosition);
+            var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
 
             var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
             var rayHitPoint = _rAxisRay.GetPoint(closestT);

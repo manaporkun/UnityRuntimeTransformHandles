@@ -1,0 +1,18 @@
+{
+    "name": "TransformHandles.Editor",
+    "rootNamespace": "TransformHandles.Editor",
+    "references": [
+        "GUID:0d339d55a04a3284ebb59a9263fbea79"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

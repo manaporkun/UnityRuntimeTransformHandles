@@ -1,3 +1,4 @@
+using TransformHandles.Utils;
 using UnityEngine;
 
 namespace TransformHandles
@@ -28,7 +29,7 @@ namespace TransformHandles
 
         protected virtual void Update()
         {
-            if (Input.GetKeyDown(updateKey))
+            if (InputWrapper.GetKeyDown(updateKey))
             {
                 UpdateCollider();
             }
