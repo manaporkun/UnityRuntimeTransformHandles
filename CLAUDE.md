@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Unity Runtime Transform Handles - A UPM package for runtime object manipulation through visual transform handles (position, rotation, scale). Supports both Legacy Input Manager and New Input System.
 
-**Package Location:** `Packages/runtime-transform-handles/`
+**Package Location:** `Packages/com.orkunmanap.runtime-transform-handles/`
 **Namespace:** `TransformHandles`, `TransformHandles.Utils`, `TransformHandles.Editor`
 **Unity Version:** 2019.4+
 
@@ -50,7 +50,7 @@ TransformGroup (Multi-object grouping)
 
 Uses `InputWrapper` (`Runtime/Scripts/Utils/InputWrapper.cs`) for dual input system support:
 - `ENABLE_INPUT_SYSTEM` preprocessor detects New Input System
-- Provides drop-in replacements: `InputWrapper.MousePosition`, `InputWrapper.GetMouseButton()`, `InputWrapper.GetKeyDown()`, etc.
+- Provides drop-in replacements: `InputWrapper.MousePosition`, `InputWrapper.GetMouseButton()`, `InputWrapper.GetKeyDown()`, `InputWrapper.GetAxis()`, etc.
 
 ## Layer Configuration
 
@@ -58,6 +58,21 @@ Handles require a dedicated physics layer for raycasting:
 - Default layer name: `"TransformHandle"`
 - Runtime: `TransformHandleManager.InitializeHandleLayer()` looks up by name, warns if missing
 - Editor: `Tools > Transform Handles > Setup Layer` creates the layer
+
+## Default Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| W | Position mode |
+| E | Rotation mode |
+| R | Scale mode |
+| A | All modes |
+| X | Toggle World/Local space |
+| Z | Toggle Pivot/Center origin |
+
+## Space Limitation
+
+Scale handles only support local space (`Space.Self`). When space is set to `World`, scale operations remain in local space.
 
 ## GitHub Actions
 
@@ -79,6 +94,7 @@ Handles require a dedicated physics layer for raycasting:
 - `HandleAxes`: X, Y, Z, XY, XZ, YZ, XYZ
 - `SnappingType`: Relative, Absolute
 - `Space`: Self (local), World (global)
+- `Origin`: Pivot, Center
 
 ## Commit Convention
 
