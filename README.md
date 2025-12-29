@@ -30,6 +30,7 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 ## Requirements
 
 - Unity **2019.4** or higher
+- Works with both **Legacy Input Manager** and **New Input System**
 
 ## Installation
 
@@ -39,7 +40,7 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 2. Click the `"+" button > Add package from git URL`
 3. Enter the following URL:
    ```
-   https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles
+   https://github.com/manaporkun/UnityRuntimeTransformHandles.git#upm
    ```
 
 ### Option 2: Manual Installation
@@ -49,10 +50,28 @@ Open `Packages/manifest.json` and add the following to the dependencies block:
 ```json
 {
     "dependencies": {
-        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git?path=/Packages/runtime-transform-handles/"
+        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git#upm"
     }
 }
 ```
+
+### Option 3: Specific Version
+
+To install a specific version, append the version tag:
+
+```json
+{
+    "dependencies": {
+        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git#v1.0.0"
+    }
+}
+```
+
+### Post-Installation Setup
+
+After installing the package, set up the required layer:
+1. Go to `Tools > Transform Handles > Setup Layer`
+2. This creates the "TransformHandle" layer needed for handle raycasting
 
 ## Quick Start
 
