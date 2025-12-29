@@ -24,17 +24,39 @@ namespace TransformHandles
         [SerializeField] private GameObject ghostPrefab;
 
         [Header("Settings")]
+        [Tooltip("Optional settings asset. If not assigned, uses the values below.")]
+        [SerializeField] private TransformHandleSettings settings;
         [SerializeField] private LayerMask layerMask;
         [SerializeField] private string handleLayerName = "TransformHandle";
         [SerializeField] private Color highlightColor = Color.white;
 
-        [Header("Shortcuts")]
+        [Header("Shortcuts (used when no Settings asset is assigned)")]
         [SerializeField] private KeyCode positionShortcut = KeyCode.W;
         [SerializeField] private KeyCode rotationShortcut = KeyCode.E;
         [SerializeField] private KeyCode scaleShortcut = KeyCode.R;
         [SerializeField] private KeyCode allShortcut = KeyCode.A;
         [SerializeField] private KeyCode spaceShortcut = KeyCode.X;
         [SerializeField] private KeyCode pivotShortcut = KeyCode.Z;
+
+        /// <summary>
+        /// Gets or sets the settings asset used by this manager.
+        /// When set, the settings asset values override the serialized field values.
+        /// </summary>
+        public TransformHandleSettings Settings
+        {
+            get => settings;
+            set => settings = value;
+        }
+
+        // Properties that check settings first, then fall back to serialized fields
+        private bool ShortcutsEnabled => settings == null || settings.EnableShortcuts;
+        private KeyCode PositionKey => settings != null ? settings.PositionKey : positionShortcut;
+        private KeyCode RotationKey => settings != null ? settings.RotationKey : rotationShortcut;
+        private KeyCode ScaleKey => settings != null ? settings.ScaleKey : scaleShortcut;
+        private KeyCode AllKey => settings != null ? settings.AllKey : allShortcut;
+        private KeyCode SpaceToggleKey => settings != null ? settings.SpaceToggleKey : spaceShortcut;
+        private KeyCode PivotToggleKey => settings != null ? settings.PivotToggleKey : pivotShortcut;
+        private Color HighlightColorValue => settings != null ? settings.HighlightColor : highlightColor;
 
         private RaycastHit[] _rayHits;
 
@@ -429,7 +451,7 @@ namespace TransformHandles
 
             if (handleBase != null && _draggingHandle == null)
             {
-                handleBase.SetColor(highlightColor);
+                handleBase.SetColor(HighlightColorValue);
             }
 
             _previousAxis = handleBase;
@@ -462,7 +484,9 @@ namespace TransformHandles
 
         protected virtual void KeyboardInput()
         {
-            if (GetKeyDown(positionShortcut))
+            if (!ShortcutsEnabled) return;
+
+            if (GetKeyDown(PositionKey))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -470,7 +494,7 @@ namespace TransformHandles
                 }
             }
 
-            if (GetKeyDown(rotationShortcut))
+            if (GetKeyDown(RotationKey))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -478,7 +502,7 @@ namespace TransformHandles
                 }
             }
 
-            if (GetKeyDown(scaleShortcut))
+            if (GetKeyDown(ScaleKey))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -486,7 +510,7 @@ namespace TransformHandles
                 }
             }
 
-            if (GetKeyDown(allShortcut))
+            if (GetKeyDown(AllKey))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -494,7 +518,7 @@ namespace TransformHandles
                 }
             }
 
-            if (GetKeyDown(spaceShortcut))
+            if (GetKeyDown(SpaceToggleKey))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -502,7 +526,7 @@ namespace TransformHandles
                 }
             }
 
-            if (GetKeyDown(pivotShortcut))
+            if (GetKeyDown(PivotToggleKey))
             {
                 foreach (var group in _handleGroupMap.Values)
                 {
