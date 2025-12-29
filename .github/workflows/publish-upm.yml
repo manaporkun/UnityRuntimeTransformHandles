@@ -23,7 +23,7 @@ jobs:
       - name: Get current version
         id: current
         run: |
-          VERSION=$(cat Packages/runtime-transform-handles/package.json | jq -r '.version')
+          VERSION=$(cat Packages/com.orkunmanap.runtime-transform-handles/package.json | jq -r '.version')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
@@ -58,7 +58,7 @@ jobs:
 
           # If no conventional commits but there are changes, default to patch
           if [ "$BUMP" = "none" ]; then
-            CHANGES=$(git diff $LATEST_TAG..HEAD --name-only 2>/dev/null | grep -E "Packages/runtime-transform-handles/" | wc -l)
+            CHANGES=$(git diff $LATEST_TAG..HEAD --name-only 2>/dev/null | grep -E "Packages/com.orkunmanap.runtime-transform-handles/" | wc -l)
             if [ "$CHANGES" -gt 0 ]; then
               BUMP="patch"
             fi
@@ -107,7 +107,7 @@ jobs:
         if: steps.version.outputs.skip != 'true'
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
-          PACKAGE_FILE="Packages/runtime-transform-handles/package.json"
+          PACKAGE_FILE="Packages/com.orkunmanap.runtime-transform-handles/package.json"
 
           # Update version in package.json
           jq ".version = \"$NEW_VERSION\"" $PACKAGE_FILE > tmp.json && mv tmp.json $PACKAGE_FILE
@@ -125,14 +125,14 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
 
-          git add Packages/runtime-transform-handles/package.json
+          git add Packages/com.orkunmanap.runtime-transform-handles/package.json
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
           git push origin main
 
       - name: Create/Update UPM branch
         if: steps.version.outputs.skip != 'true'
         run: |
-          PACKAGE_PATH="Packages/runtime-transform-handles"
+          PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
           UPM_BRANCH="upm"
 
           # Check if upm branch exists
