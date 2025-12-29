@@ -4,7 +4,8 @@
 
 [![Unity 2019.4+](https://img.shields.io/badge/Unity-2019.4%2B-blue.svg)](https://unity.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)](Packages/runtime-transform-handles/package.json)
+[![Latest Release](https://img.shields.io/github/v/release/manaporkun/UnityRuntimeTransformHandles?include_prereleases)](https://github.com/manaporkun/UnityRuntimeTransformHandles/releases)
+[![OpenUPM](https://img.shields.io/badge/OpenUPM-compatible-blue.svg)](https://openupm.com/)
 
 ## About
 
@@ -219,9 +220,14 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+3. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/):
+   - `feat: add new feature` (triggers minor version bump)
+   - `fix: resolve bug` (triggers patch version bump)
+   - `feat!: breaking change` (triggers major version bump)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+Releases are automated via GitHub Actions based on commit messages.
 
 ## License
 
