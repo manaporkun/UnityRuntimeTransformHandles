@@ -27,9 +27,9 @@ public class ObjSelector : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKey(KeyCode.LeftControl) && Input.GetMouseButtonDown(0))
+        if (InputWrapper.GetKey(KeyCode.LeftControl) && InputWrapper.GetMouseButtonDown(0))
         {
-            var ray = _camera.ScreenPointToRay(Input.mousePosition);
+            var ray = _camera.ScreenPointToRay(InputWrapper.MousePosition);
             if (Physics.Raycast(ray, out var hit, 1000f, layerMask))
             {
                 var hitTransform = hit.transform;
@@ -44,9 +44,9 @@ public class ObjSelector : MonoBehaviour
             }
         }
         // Add the object to handle if exists, else create a new handle
-        else if (Input.GetMouseButtonDown(0))
+        else if (InputWrapper.GetMouseButtonDown(0))
         {
-            var ray = _camera.ScreenPointToRay(Input.mousePosition);
+            var ray = _camera.ScreenPointToRay(InputWrapper.MousePosition);
             if (Physics.Raycast(ray, out var hit, 1000f, layerMask))
             {
                 var hitTransform = hit.transform;
@@ -62,9 +62,9 @@ public class ObjSelector : MonoBehaviour
             }
         }
         // Remove the object from handle
-        if (Input.GetMouseButtonDown(1))
+        if (InputWrapper.GetMouseButtonDown(1))
         {
-            var ray = _camera.ScreenPointToRay(Input.mousePosition);
+            var ray = _camera.ScreenPointToRay(InputWrapper.MousePosition);
             if (Physics.Raycast(ray, out var hit))
             {
                 var hitTransform = hit.transform;
@@ -80,9 +80,9 @@ public class ObjSelector : MonoBehaviour
         }
 
         // Create new handle for object
-        if (Input.GetMouseButton(2))
+        if (InputWrapper.GetMouseButton(2))
         {
-            var ray = _camera.ScreenPointToRay(Input.mousePosition);
+            var ray = _camera.ScreenPointToRay(InputWrapper.MousePosition);
             if (!Physics.Raycast(ray, out var hit, 1000f, layerMask)) return;
             if(_handleDictionary.ContainsKey(hit.transform)) return;
             var hitTransform = hit.transform;

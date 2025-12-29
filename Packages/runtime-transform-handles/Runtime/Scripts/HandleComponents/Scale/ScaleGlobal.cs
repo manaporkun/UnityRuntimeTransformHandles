@@ -1,3 +1,4 @@
+using TransformHandles.Utils;
 using UnityEngine;
 
 namespace TransformHandles
@@ -30,7 +31,7 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var mouseVector = Input.mousePosition - previousPosition;
+            var mouseVector = (Vector3)InputWrapper.MousePosition - previousPosition;
             var d = (mouseVector.x + mouseVector.y) * Time.deltaTime * MouseSensitivity;
             delta += d;
             ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * delta;

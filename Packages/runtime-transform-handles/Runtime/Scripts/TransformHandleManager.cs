@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TransformHandles.Utils;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using static TransformHandles.Utils.InputWrapper;
 
 namespace TransformHandles
 {
@@ -24,6 +25,7 @@ namespace TransformHandles
 
         [Header("Settings")]
         [SerializeField] private LayerMask layerMask;
+        [SerializeField] private string handleLayerName = "TransformHandle";
         [SerializeField] private Color highlightColor = Color.white;
 
         [Header("Shortcuts")]
@@ -52,6 +54,7 @@ namespace TransformHandles
 
         private bool _handleActive;
         private bool _isInitialized;
+        private int _handleLayer = -1;
 
         private void OnEnable()
         {
@@ -80,7 +83,44 @@ namespace TransformHandles
             _ghostGroupMap = new Dictionary<Ghost, TransformGroup>();
             _transformHashSet = new HashSet<Transform>();
 
+            InitializeHandleLayer();
+
             _isInitialized = true;
+        }
+
+        private void InitializeHandleLayer()
+        {
+            if (string.IsNullOrEmpty(handleLayerName))
+            {
+                _handleLayer = 0; // Default layer
+                return;
+            }
+
+            _handleLayer = LayerMask.NameToLayer(handleLayerName);
+
+            if (_handleLayer == -1)
+            {
+                Debug.LogWarning($"TransformHandles: Layer '{handleLayerName}' not found. Using default layer. " +
+                                 $"Please add a layer named '{handleLayerName}' in Edit > Project Settings > Tags and Layers, " +
+                                 $"or change the 'Handle Layer Name' in the TransformHandleManager.");
+                _handleLayer = 0;
+            }
+            else
+            {
+                // Update the layerMask to include the handle layer
+                layerMask |= (1 << _handleLayer);
+            }
+        }
+
+        private void SetLayerRecursively(GameObject obj, int layer)
+        {
+            if (obj == null) return;
+
+            obj.layer = layer;
+            foreach (Transform child in obj.transform)
+            {
+                SetLayerRecursively(child.gameObject, layer);
+            }
         }
 
         /// <summary>
@@ -112,6 +152,7 @@ namespace TransformHandles
             ghost.Initialize();
 
             var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            SetLayerRecursively(transformHandle.gameObject, _handleLayer);
             transformHandle.Enable(ghost.transform);
 
             var group = new TransformGroup(ghost, transformHandle);
@@ -154,6 +195,7 @@ namespace TransformHandles
             ghost.Initialize();
 
             var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            SetLayerRecursively(transformHandle.gameObject, _handleLayer);
             transformHandle.Enable(ghost.transform);
 
             var group = new TransformGroup(ghost, transformHandle);
@@ -343,7 +385,7 @@ namespace TransformHandles
             var size = 0;
             try
             {
-                var ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+                var ray = mainCamera.ScreenPointToRay(MousePosition);
                 size = Physics.RaycastNonAlloc(ray, _rayHits, RaycastMaxDistance, layerMask);
             }
             catch (MissingReferenceException)
@@ -395,32 +437,32 @@ namespace TransformHandles
 
         protected virtual void MouseInput()
         {
-            if (Input.GetMouseButton(0) && _draggingHandle != null)
+            if (GetMouseButton(0) && _draggingHandle != null)
             {
                 _draggingHandle.Interact(_previousMousePosition);
                 OnInteraction();
             }
 
-            if (Input.GetMouseButtonDown(0) && _hoveredHandle != null)
+            if (GetMouseButtonDown(0) && _hoveredHandle != null)
             {
                 _draggingHandle = _hoveredHandle;
                 _draggingHandle.StartInteraction(_handleHitPoint);
                 OnInteractionStart();
             }
 
-            if (Input.GetMouseButtonUp(0) && _draggingHandle != null)
+            if (GetMouseButtonUp(0) && _draggingHandle != null)
             {
                 _draggingHandle.EndInteraction();
                 _draggingHandle = null;
                 OnInteractionEnd();
             }
 
-            _previousMousePosition = Input.mousePosition;
+            _previousMousePosition = MousePosition;
         }
 
         protected virtual void KeyboardInput()
         {
-            if (Input.GetKeyDown(positionShortcut))
+            if (GetKeyDown(positionShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -428,7 +470,7 @@ namespace TransformHandles
                 }
             }
 
-            if (Input.GetKeyDown(rotationShortcut))
+            if (GetKeyDown(rotationShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -436,7 +478,7 @@ namespace TransformHandles
                 }
             }
 
-            if (Input.GetKeyDown(scaleShortcut))
+            if (GetKeyDown(scaleShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -444,7 +486,7 @@ namespace TransformHandles
                 }
             }
 
-            if (Input.GetKeyDown(allShortcut))
+            if (GetKeyDown(allShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -452,7 +494,7 @@ namespace TransformHandles
                 }
             }
 
-            if (Input.GetKeyDown(spaceShortcut))
+            if (GetKeyDown(spaceShortcut))
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
@@ -460,7 +502,7 @@ namespace TransformHandles
                 }
             }
 
-            if (Input.GetKeyDown(pivotShortcut))
+            if (GetKeyDown(pivotShortcut))
             {
                 foreach (var group in _handleGroupMap.Values)
                 {
