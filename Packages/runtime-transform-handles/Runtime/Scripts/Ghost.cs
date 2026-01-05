@@ -30,6 +30,21 @@ namespace TransformHandles
             transform.position = position;
         }
 
+        public void UpdateGhostRotation(Quaternion rotation)
+        {
+            transform.rotation = rotation;
+        }
+
+        public void UpdateGhostRotation(Vector3 eulerAngles)
+        {
+            transform.rotation = Quaternion.Euler(eulerAngles);
+        }
+        
+        public void UpdateGhostScale(Vector3 scale)
+        {
+            transform.localScale = scale;
+        }
+
         public void ResetGhostTransform()
         {
             transform.position = Vector3.zero;
