@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unity Runtime Transform Handles | Web Demo</title>
+    <meta
+      name="description"
+      content="Interactive WebGL demo for Unity Runtime Transform Handles with shortcuts, features, and package installation docs."
+    />
+    <base href="./" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="viewer" aria-label="Unity WebGL Viewer">
+        <div class="unity-shell" id="unity-shell">
+          <div class="frame-overlay">Initializing WebGL</div>
+          <iframe
+            id="unity-frame"
+            title="Unity Runtime Transform Handles WebGL Demo"
+            src="./unity/"
+            loading="lazy"
+            allow="fullscreen"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </section>
+
+      <aside class="docs" aria-label="Project details">
+        <section class="hero card">
+          <p class="eyebrow">Runtime Transform Handles</p>
+          <h1>Unity runtime gizmo system with WebGL demo.</h1>
+          <p>
+            This page prioritizes the playable build on the left and keeps the
+            project docs on the right for quick evaluation.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>About</h2>
+          <p>
+            Based on the original RuntimeTransformHandle project by pshtif, this
+            package extends runtime manipulation with multiple selection,
+            configurable snapping, origin modes, and improved auto-scaling.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>Core Features</h2>
+          <ul>
+            <li>Position, rotation, and scale handles</li>
+            <li>Multiple object selection and manipulation</li>
+            <li>Pivot and center origin modes</li>
+            <li>World and local coordinate spaces</li>
+            <li>Keyboard shortcuts and interaction events</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Default Shortcuts</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>W</td><td>Position mode</td></tr>
+              <tr><td>E</td><td>Rotation mode</td></tr>
+              <tr><td>R</td><td>Scale mode</td></tr>
+              <tr><td>A</td><td>All modes</td></tr>
+              <tr><td>X</td><td>Toggle World/Local</td></tr>
+              <tr><td>Z</td><td>Toggle Pivot/Center</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <h2>Install via Package Manager</h2>
+          <p>Add this Git URL in Unity Package Manager:</p>
+          <pre><code>https://github.com/manaporkun/UnityRuntimeTransformHandles.git#upm</code></pre>
+          <p>
+            Full source and documentation:
+            <a
+              href="https://github.com/manaporkun/UnityRuntimeTransformHandles"
+              target="_blank"
+              rel="noreferrer"
+              >GitHub repository</a
+            >
+          </p>
+        </section>
+      </aside>
+    </main>
+
+    <script src="./main.js"></script>
+  </body>
+</html>

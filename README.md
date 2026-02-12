@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/manaporkun/UnityRuntimeTransformHandles?include_prereleases)](https://github.com/manaporkun/UnityRuntimeTransformHandles/releases)
 [![OpenUPM](https://img.shields.io/badge/OpenUPM-compatible-blue.svg)](https://openupm.com/)
+[![WebGL Build](https://github.com/manaporkun/UnityRuntimeTransformHandles/actions/workflows/webgl-pages.yml/badge.svg)](https://github.com/manaporkun/UnityRuntimeTransformHandles/actions/workflows/webgl-pages.yml)
 
 ## About
 
@@ -28,10 +29,76 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 
 [![Video](https://i.imgur.com/OSXsYXA.png)](https://www.youtube.com/watch?v=-6tpim397F0)
 
+### Browser Demo (WebGL)
+
+After deployment, the showcase website (with embedded Unity demo) will be available at:
+
+`https://<your-github-username>.github.io/<repo-name>/`
+
+The showcase page is built from `web/` and is optimized for trying the build quickly:
+- Unity WebGL player on the left
+- README-based usage/docs panel on the right
+
+Direct Unity build URL:
+
+`https://<your-github-username>.github.io/<repo-name>/unity/`
+
 ## Requirements
 
 - Unity **2019.4** or higher
 - Works with both **Legacy Input Manager** and **New Input System**
+
+## WebGL Deployment (GitHub Pages)
+
+This repo includes `.github/workflows/webgl-pages.yml` to:
+
+1. Build Unity WebGL output
+2. Publish a custom website from `web/`
+3. Embed the Unity output under `/unity/` on the same Pages site
+
+### One-time Setup
+
+1. Add repository secret `UNITY_LICENSE` (Unity license file content for CI).
+   For setup details, use the [GameCI activation guide](https://game.ci/docs/github/activation/).
+2. In GitHub, open `Settings > Pages` and ensure the source is set to `GitHub Actions`.
+3. In Unity Build Settings, verify the scenes you want to publish are enabled.
+
+### Deploy
+
+1. Push to `main`, or run the `Build and Deploy WebGL` workflow manually from `Actions`.
+2. Wait for the `deploy` job to finish.
+3. Open `https://<your-github-username>.github.io/<repo-name>/` (showcase page).
+4. Open `https://<your-github-username>.github.io/<repo-name>/unity/` for the raw Unity page.
+
+### Local Build (Optional)
+
+You can also generate the same build locally:
+
+1. Unity menu: `Tools > Build > WebGL (GitHub Pages)`
+2. CLI:
+   ```bash
+   /Applications/Unity/Hub/Editor/6000.3.8f1/Unity.app/Contents/MacOS/Unity \
+     -batchmode -quit \
+     -projectPath "$(pwd)" \
+     -executeMethod BuildScript.BuildWebGLForPages
+   ```
+
+Build output goes to `Build/WebGL`.
+
+### Local Website Preview (Optional)
+
+To preview the webpage + embedded Unity build from this repo:
+
+```bash
+mkdir -p site-dist/unity
+cp -R web/. site-dist/
+cp -R Build/WebGL/. site-dist/unity/
+python3 -m http.server 4173 --bind 127.0.0.1 --directory site-dist
+```
+
+Then open:
+- `http://127.0.0.1:4173/`
+- `http://127.0.0.1:4173/unity/`
 
 ## Installation
 
