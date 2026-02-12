@@ -32,13 +32,35 @@ jobs:
         with:
           lfs: true
 
+      - name: Validate Unity activation configuration
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+        run: |
+          if [ -n "$UNITY_LICENSING_SERVER" ]; then
+            echo "Using UNITY_LICENSING_SERVER activation."
+            exit 0
+          fi
+
+          if [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ] && { [ -n "$UNITY_SERIAL" ] || [ -n "$UNITY_LICENSE" ]; }; then
+            echo "Using credential-based Unity activation."
+            exit 0
+          fi
+
+          echo "::error::Invalid Unity activation config. Set UNITY_LICENSING_SERVER or set UNITY_EMAIL + UNITY_PASSWORD + (UNITY_SERIAL or UNITY_LICENSE) as repository secrets."
+          exit 1
+
       - name: Build WebGL project
         uses: game-ci/unity-builder@v4
         env:
-          UNITY_EMAIL: ""
-          UNITY_PASSWORD: ""
-          UNITY_SERIAL: ""
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
         with:
           unityVersion: auto
           targetPlatform: WebGL
