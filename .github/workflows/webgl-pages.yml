@@ -80,9 +80,6 @@ jobs:
             exit 1
           fi
 
-      - name: Add .nojekyll marker
-        run: touch "${{ steps.webgl-output.outputs.path }}/.nojekyll"
-
       - name: Prepare showcase site artifact
         run: |
           rm -rf site-dist
