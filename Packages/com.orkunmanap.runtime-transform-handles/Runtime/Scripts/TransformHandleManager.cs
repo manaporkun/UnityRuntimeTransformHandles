@@ -280,6 +280,11 @@ namespace TransformHandles
             _handleGroupMap.Remove(handle);
             handle.Disable();
 
+            foreach (var target in group.Transforms)
+            {
+                _transformHashSet.Remove(target);
+            }
+
             var groupGhost = group.GroupGhost;
             if (groupGhost != null)
             {
