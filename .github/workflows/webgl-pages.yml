@@ -35,6 +35,9 @@ jobs:
       - name: Build WebGL project
         uses: game-ci/unity-builder@v4
         env:
+          UNITY_EMAIL: ""
+          UNITY_PASSWORD: ""
+          UNITY_SERIAL: ""
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           unityVersion: auto
