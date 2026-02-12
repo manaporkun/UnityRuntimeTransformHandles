@@ -6,22 +6,28 @@ public class CameraMovement : MonoBehaviour
     [Range(0f, 90f)] [SerializeField] private float yRotationLimit = 60f;
     [Range(0f, 90f)] [SerializeField] private float xRotationLimit = 60f;
     [SerializeField] private float zoomSpeed = 10f;
+    [SerializeField] private bool disableInWebBuild = true;
 
     private Camera _camera;
     private Vector2 _rotation = Vector2.zero;
     private const string XAxis = "Mouse X";
     private const string YAxis = "Mouse Y";
     private float _fieldOfView;
+    private bool _movementDisabled;
 
     private void Awake()
     {
         _rotation = transform.localRotation.eulerAngles;
         _camera = GetComponent<Camera>();
         _fieldOfView = _camera.fieldOfView;
+
+        _movementDisabled = disableInWebBuild && Application.platform == RuntimePlatform.WebGLPlayer;
     }
 
     private void Update()
     {
+        if (_movementDisabled) return;
+
         UpdateRotation();
         UpdateCameraZoom();
     }
