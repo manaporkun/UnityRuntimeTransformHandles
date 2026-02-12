@@ -66,15 +66,29 @@ jobs:
           targetPlatform: WebGL
           buildMethod: BuildScript.BuildWebGLForPages
 
+      - name: Resolve WebGL output path
+        id: webgl-output
+        run: |
+          if [ -d Build/WebGL ]; then
+            echo "path=Build/WebGL" >> "$GITHUB_OUTPUT"
+          elif [ -d build/WebGL ]; then
+            echo "path=build/WebGL" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::WebGL output not found in Build/WebGL or build/WebGL."
+            echo "Directory snapshot:"
+            find . -maxdepth 3 -type d | sort
+            exit 1
+          fi
+
       - name: Add .nojekyll marker
-        run: touch Build/WebGL/.nojekyll
+        run: touch "${{ steps.webgl-output.outputs.path }}/.nojekyll"
 
       - name: Prepare showcase site artifact
         run: |
           rm -rf site-dist
           mkdir -p site-dist/unity
           cp -R web/. site-dist/
-          cp -R Build/WebGL/. site-dist/unity/
+          cp -R "${{ steps.webgl-output.outputs.path }}/." site-dist/unity/
           touch site-dist/.nojekyll
 
       - name: Configure GitHub Pages
