@@ -137,7 +137,7 @@ public class ObjSelector : MonoBehaviour
 
     private void OnHandleInteractionStart(Handle handle)
     {
-        _cameraMovement.enabled = false;
+        if (_cameraMovement != null) _cameraMovement.enabled = false;
     }
 
     private static void OnHandleInteraction(Handle handle)
@@ -147,7 +147,7 @@ public class ObjSelector : MonoBehaviour
     
     private void OnHandleInteractionEnd(Handle handle)
     {
-        _cameraMovement.enabled = true;
+        if (_cameraMovement != null) _cameraMovement.enabled = true;
     }
     
     private void OnHandleDestroyed(Handle handle)
