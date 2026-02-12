@@ -2,6 +2,8 @@ using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
+using UnityEngine.InputSystem.EnhancedTouch;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 #endif
 
 namespace TransformHandles.Utils
@@ -9,89 +11,246 @@ namespace TransformHandles.Utils
     /// <summary>
     /// Input abstraction layer that supports both Unity's legacy Input system and the new Input System.
     /// Automatically detects which system is available and uses the appropriate API.
+    /// Also provides touch input support for mobile devices.
     /// </summary>
     public static class InputWrapper
-{
-    /// <summary>
-    /// Gets the current mouse position in screen coordinates.
-    /// </summary>
-    public static Vector2 MousePosition
     {
-        get
+        private static bool _touchInitialized;
+
+        /// <summary>
+        /// Returns true if touch input is available on the current device.
+        /// </summary>
+        public static bool IsTouchSupported
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Touchscreen.current != null;
+#else
+                return Input.touchSupported;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// Returns the number of active touches.
+        /// </summary>
+        public static int TouchCount
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                EnsureTouchInitialized();
+                return Touch.activeTouches.Count;
+#else
+                return Input.touchCount;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// Returns true if there is at least one active touch.
+        /// </summary>
+        public static bool HasActiveTouch => TouchCount > 0;
+
+        /// <summary>
+        /// Gets the position of the primary touch (first finger), or Vector2.zero if no touch.
+        /// </summary>
+        public static Vector2 TouchPosition
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                EnsureTouchInitialized();
+                if (Touch.activeTouches.Count > 0)
+                    return Touch.activeTouches[0].screenPosition;
+                return Vector2.zero;
+#else
+                if (Input.touchCount > 0)
+                    return Input.GetTouch(0).position;
+                return Vector2.zero;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// Gets the current pointer position (mouse or touch) in screen coordinates.
+        /// Prioritizes touch input on touch devices when a touch is active.
+        /// </summary>
+        public static Vector2 PointerPosition
+        {
+            get
+            {
+                if (HasActiveTouch)
+                    return TouchPosition;
+                return MousePosition;
+            }
+        }
+
+        /// <summary>
+        /// Gets the current mouse position in screen coordinates.
+        /// For unified input (mouse + touch), use PointerPosition instead.
+        /// </summary>
+        public static Vector2 MousePosition
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                // Check touch first on mobile
+                EnsureTouchInitialized();
+                if (Touch.activeTouches.Count > 0)
+                    return Touch.activeTouches[0].screenPosition;
+
+                return Mouse.current?.position.ReadValue() ?? Vector2.zero;
+#else
+                // Check touch first on mobile
+                if (Input.touchCount > 0)
+                    return Input.GetTouch(0).position;
+
+                return Input.mousePosition;
+#endif
+            }
+        }
+
+#if ENABLE_INPUT_SYSTEM
+        private static void EnsureTouchInitialized()
+        {
+            if (_touchInitialized) return;
+            if (!EnhancedTouchSupport.enabled)
+            {
+                EnhancedTouchSupport.Enable();
+            }
+            _touchInitialized = true;
+        }
+#endif
+
+        /// <summary>
+        /// Returns true during the frame the user pressed the given mouse button.
+        /// For button 0 (left click), also returns true when a touch begins.
+        /// </summary>
+        /// <param name="button">0 = left (or touch), 1 = right, 2 = middle</param>
+        public static bool GetMouseButtonDown(int button)
         {
 #if ENABLE_INPUT_SYSTEM
-            return Mouse.current?.position.ReadValue() ?? Vector2.zero;
+            // Check touch first for button 0
+            if (button == 0)
+            {
+                EnsureTouchInitialized();
+                foreach (var touch in Touch.activeTouches)
+                {
+                    if (touch.phase == UnityEngine.InputSystem.TouchPhase.Began)
+                        return true;
+                }
+            }
+
+            var mouse = Mouse.current;
+            if (mouse == null) return false;
+
+            return button switch
+            {
+                0 => mouse.leftButton.wasPressedThisFrame,
+                1 => mouse.rightButton.wasPressedThisFrame,
+                2 => mouse.middleButton.wasPressedThisFrame,
+                _ => false
+            };
 #else
-            return Input.mousePosition;
+            // Check touch first for button 0
+            if (button == 0 && Input.touchCount > 0)
+            {
+                var touch = Input.GetTouch(0);
+                if (touch.phase == TouchPhase.Began)
+                    return true;
+            }
+
+            return Input.GetMouseButtonDown(button);
 #endif
         }
-    }
 
-    /// <summary>
-    /// Returns true during the frame the user pressed the given mouse button.
-    /// </summary>
-    /// <param name="button">0 = left, 1 = right, 2 = middle</param>
-    public static bool GetMouseButtonDown(int button)
-    {
-#if ENABLE_INPUT_SYSTEM
-        var mouse = Mouse.current;
-        if (mouse == null) return false;
-
-        return button switch
+        /// <summary>
+        /// Returns true while the user holds down the given mouse button.
+        /// For button 0 (left click), also returns true while a touch is active.
+        /// </summary>
+        /// <param name="button">0 = left (or touch), 1 = right, 2 = middle</param>
+        public static bool GetMouseButton(int button)
         {
-            0 => mouse.leftButton.wasPressedThisFrame,
-            1 => mouse.rightButton.wasPressedThisFrame,
-            2 => mouse.middleButton.wasPressedThisFrame,
-            _ => false
-        };
-#else
-        return Input.GetMouseButtonDown(button);
-#endif
-    }
-
-    /// <summary>
-    /// Returns true while the user holds down the given mouse button.
-    /// </summary>
-    /// <param name="button">0 = left, 1 = right, 2 = middle</param>
-    public static bool GetMouseButton(int button)
-    {
 #if ENABLE_INPUT_SYSTEM
-        var mouse = Mouse.current;
-        if (mouse == null) return false;
+            // Check touch first for button 0
+            if (button == 0)
+            {
+                EnsureTouchInitialized();
+                foreach (var touch in Touch.activeTouches)
+                {
+                    if (touch.phase == UnityEngine.InputSystem.TouchPhase.Moved ||
+                        touch.phase == UnityEngine.InputSystem.TouchPhase.Stationary)
+                        return true;
+                }
+            }
 
-        return button switch
-        {
-            0 => mouse.leftButton.isPressed,
-            1 => mouse.rightButton.isPressed,
-            2 => mouse.middleButton.isPressed,
-            _ => false
-        };
+            var mouse = Mouse.current;
+            if (mouse == null) return false;
+
+            return button switch
+            {
+                0 => mouse.leftButton.isPressed,
+                1 => mouse.rightButton.isPressed,
+                2 => mouse.middleButton.isPressed,
+                _ => false
+            };
 #else
-        return Input.GetMouseButton(button);
-#endif
-    }
+            // Check touch first for button 0
+            if (button == 0 && Input.touchCount > 0)
+            {
+                var touch = Input.GetTouch(0);
+                if (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary)
+                    return true;
+            }
 
-    /// <summary>
-    /// Returns true during the frame the user releases the given mouse button.
-    /// </summary>
-    /// <param name="button">0 = left, 1 = right, 2 = middle</param>
-    public static bool GetMouseButtonUp(int button)
-    {
+            return Input.GetMouseButton(button);
+#endif
+        }
+
+        /// <summary>
+        /// Returns true during the frame the user releases the given mouse button.
+        /// For button 0 (left click), also returns true when a touch ends.
+        /// </summary>
+        /// <param name="button">0 = left (or touch), 1 = right, 2 = middle</param>
+        public static bool GetMouseButtonUp(int button)
+        {
 #if ENABLE_INPUT_SYSTEM
-        var mouse = Mouse.current;
-        if (mouse == null) return false;
+            // Check touch first for button 0
+            if (button == 0)
+            {
+                EnsureTouchInitialized();
+                foreach (var touch in Touch.activeTouches)
+                {
+                    if (touch.phase == UnityEngine.InputSystem.TouchPhase.Ended ||
+                        touch.phase == UnityEngine.InputSystem.TouchPhase.Canceled)
+                        return true;
+                }
+            }
 
-        return button switch
-        {
-            0 => mouse.leftButton.wasReleasedThisFrame,
-            1 => mouse.rightButton.wasReleasedThisFrame,
-            2 => mouse.middleButton.wasReleasedThisFrame,
-            _ => false
-        };
+            var mouse = Mouse.current;
+            if (mouse == null) return false;
+
+            return button switch
+            {
+                0 => mouse.leftButton.wasReleasedThisFrame,
+                1 => mouse.rightButton.wasReleasedThisFrame,
+                2 => mouse.middleButton.wasReleasedThisFrame,
+                _ => false
+            };
 #else
-        return Input.GetMouseButtonUp(button);
+            // Check touch first for button 0
+            if (button == 0 && Input.touchCount > 0)
+            {
+                var touch = Input.GetTouch(0);
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                    return true;
+            }
+
+            return Input.GetMouseButtonUp(button);
 #endif
-    }
+        }
 
     /// <summary>
     /// Returns true while the user holds down the specified key.

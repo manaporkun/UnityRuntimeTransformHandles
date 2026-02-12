@@ -1,8 +1,46 @@
 using System;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace TransformHandles
 {
+    /// <summary>
+    /// UnityEvent that passes the Handle as a parameter.
+    /// Use this for Inspector-configurable event handling.
+    /// </summary>
+    [Serializable]
+    public class HandleUnityEvent : UnityEvent<Handle> { }
+
+    /// <summary>
+    /// Defines the visual appearance of a handle including axis colors and scale.
+    /// </summary>
+    [Serializable]
+    public struct HandleAppearance
+    {
+        /// <summary>Color for the X axis.</summary>
+        public Color xAxisColor;
+        /// <summary>Color for the Y axis.</summary>
+        public Color yAxisColor;
+        /// <summary>Color for the Z axis.</summary>
+        public Color zAxisColor;
+        /// <summary>Color for the global/center handle.</summary>
+        public Color globalColor;
+        /// <summary>Scale multiplier for the handle.</summary>
+        public float scale;
+
+        /// <summary>
+        /// Creates a default appearance with standard axis colors.
+        /// </summary>
+        public static HandleAppearance Default => new HandleAppearance
+        {
+            xAxisColor = new Color(1f, 0.2f, 0.2f, 1f),
+            yAxisColor = new Color(0.2f, 1f, 0.2f, 1f),
+            zAxisColor = new Color(0.2f, 0.6f, 1f, 1f),
+            globalColor = new Color(1f, 0.6f, 0f, 1f),
+            scale = 1f
+        };
+    }
+
     /// <summary>
     /// Main handle component that manages transform manipulation through position, rotation, and scale handles.
     /// Provides unified control for manipulating transforms in 3D space.
@@ -11,8 +49,12 @@ namespace TransformHandles
     {
         private const float DefaultAutoScaleSizeInPixels = 192f;
 
+        [Header("Auto Scale")]
         [SerializeField] private float autoScaleSizeInPixels = DefaultAutoScaleSizeInPixels;
         [SerializeField] public bool autoScale;
+
+        [Header("Appearance")]
+        [SerializeField] private float handleScaleMultiplier = 1f;
 
         /// <summary>Event fired when handle interaction starts.</summary>
         public virtual event Action<Handle> OnInteractionStartEvent;
@@ -22,6 +64,25 @@ namespace TransformHandles
         public virtual event Action<Handle> OnInteractionEndEvent;
         /// <summary>Event fired when handle is destroyed.</summary>
         public virtual event Action<Handle> OnHandleDestroyedEvent;
+
+        [Header("Unity Events (Inspector)")]
+        [Tooltip("Fired when handle interaction starts. Configure in Inspector.")]
+        [SerializeField] private HandleUnityEvent onInteractionStart = new HandleUnityEvent();
+        [Tooltip("Fired during handle interaction. Configure in Inspector.")]
+        [SerializeField] private HandleUnityEvent onInteraction = new HandleUnityEvent();
+        [Tooltip("Fired when handle interaction ends. Configure in Inspector.")]
+        [SerializeField] private HandleUnityEvent onInteractionEnd = new HandleUnityEvent();
+        [Tooltip("Fired when handle is destroyed. Configure in Inspector.")]
+        [SerializeField] private HandleUnityEvent onHandleDestroyed = new HandleUnityEvent();
+
+        /// <summary>UnityEvent fired when handle interaction starts. Configure in Inspector.</summary>
+        public HandleUnityEvent OnInteractionStartUnityEvent => onInteractionStart;
+        /// <summary>UnityEvent fired during handle interaction. Configure in Inspector.</summary>
+        public HandleUnityEvent OnInteractionUnityEvent => onInteraction;
+        /// <summary>UnityEvent fired when handle interaction ends. Configure in Inspector.</summary>
+        public HandleUnityEvent OnInteractionEndUnityEvent => onInteractionEnd;
+        /// <summary>UnityEvent fired when handle is destroyed. Configure in Inspector.</summary>
+        public HandleUnityEvent OnHandleDestroyedUnityEvent => onHandleDestroyed;
 
         /// <summary>The target transform being manipulated.</summary>
         public Transform target;
@@ -71,12 +132,21 @@ namespace TransformHandles
 
         protected void OnDestroy()
         {
+            // Invoke destroyed events before cleanup
+            OnHandleDestroyedEvent?.Invoke(this);
+            onHandleDestroyed?.Invoke(this);
+
             // Clear event subscribers to prevent memory leaks
             OnInteractionStartEvent = null;
             OnInteractionEvent = null;
             OnInteractionEndEvent = null;
-            OnHandleDestroyedEvent?.Invoke(this);
             OnHandleDestroyedEvent = null;
+
+            // Clear UnityEvent listeners
+            onInteractionStart?.RemoveAllListeners();
+            onInteraction?.RemoveAllListeners();
+            onInteractionEnd?.RemoveAllListeners();
+            onHandleDestroyed?.RemoveAllListeners();
 
             if (Manager == null) return;
             Manager.RemoveHandle(this);
@@ -117,6 +187,7 @@ namespace TransformHandles
         public virtual void InteractionStart()
         {
             OnInteractionStartEvent?.Invoke(this);
+            onInteractionStart?.Invoke(this);
         }
 
         /// <summary>
@@ -125,6 +196,7 @@ namespace TransformHandles
         public virtual void InteractionStay()
         {
             OnInteractionEvent?.Invoke(this);
+            onInteraction?.Invoke(this);
         }
 
         /// <summary>
@@ -133,6 +205,7 @@ namespace TransformHandles
         public virtual void InteractionEnd()
         {
             OnInteractionEndEvent?.Invoke(this);
+            onInteractionEnd?.Invoke(this);
         }
 
         /// <summary>
@@ -251,5 +324,62 @@ namespace TransformHandles
             if (ScaleHandle != null && ScaleHandle.gameObject.activeSelf)
                 ScaleHandle.gameObject.SetActive(false);
         }
+
+        #region Appearance Customization
+
+        /// <summary>
+        /// Gets or sets the scale multiplier for this handle.
+        /// Values greater than 1 make the handle larger, less than 1 make it smaller.
+        /// </summary>
+        public float ScaleMultiplier
+        {
+            get => handleScaleMultiplier;
+            set
+            {
+                handleScaleMultiplier = Mathf.Clamp(value, 0.1f, 10f);
+                ApplyScale();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the auto-scale size in pixels.
+        /// Used when autoScale is enabled to maintain consistent screen size.
+        /// </summary>
+        public float AutoScaleSizeInPixels
+        {
+            get => autoScaleSizeInPixels;
+            set => autoScaleSizeInPixels = Mathf.Max(1f, value);
+        }
+
+        /// <summary>
+        /// Sets the handle scale using a multiplier.
+        /// </summary>
+        /// <param name="scale">The scale multiplier (1.0 = default size).</param>
+        public void SetScale(float scale)
+        {
+            ScaleMultiplier = scale;
+        }
+
+        /// <summary>
+        /// Applies the current appearance settings from a TransformHandleSettings asset.
+        /// </summary>
+        /// <param name="settings">The settings to apply.</param>
+        public void ApplySettings(TransformHandleSettings settings)
+        {
+            if (settings == null) return;
+
+            handleScaleMultiplier = settings.HandleScale;
+            ApplyScale();
+        }
+
+        /// <summary>
+        /// Applies the scale multiplier to the handle transform.
+        /// </summary>
+        private void ApplyScale()
+        {
+            transform.localScale = Vector3.one * handleScaleMultiplier;
+        }
+
+        #endregion
     }
 }

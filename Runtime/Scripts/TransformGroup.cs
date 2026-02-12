@@ -10,15 +10,32 @@ namespace TransformHandles
     /// </summary>
     public class TransformGroup
     {
+        /// <summary>Gets the ghost (pivot point) associated with this group.</summary>
         public Ghost GroupGhost { get; }
+
+        /// <summary>Gets the handle that controls this group.</summary>
         public Handle GroupHandle { get; }
 
+        /// <summary>
+        /// When true, transformations are centered on the combined bounds center.
+        /// When false, transformations use the object pivots.
+        /// </summary>
         public bool IsOriginOnCenter;
 
+        /// <summary>Gets the set of transforms in this group.</summary>
         public HashSet<Transform> Transforms { get; }
+
+        /// <summary>Gets the mapping of transforms to their mesh renderers (if any).</summary>
         public Dictionary<Transform, MeshRenderer> RenderersMap { get; }
+
+        /// <summary>Gets the mapping of transforms to their cached bounds.</summary>
         public Dictionary<Transform, Bounds> BoundsMap { get; }
 
+        /// <summary>
+        /// Creates a new transform group with the specified ghost and handle.
+        /// </summary>
+        /// <param name="groupGhost">The ghost (pivot point) for this group.</param>
+        /// <param name="groupHandle">The handle that controls this group.</param>
         public TransformGroup(Ghost groupGhost, Handle groupHandle)
         {
             GroupGhost = groupGhost;
