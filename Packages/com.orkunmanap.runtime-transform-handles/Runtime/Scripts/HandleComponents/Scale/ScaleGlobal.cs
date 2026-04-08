@@ -15,6 +15,7 @@ namespace TransformHandles
 
         private Vector3 _axis;
         private Vector3 _startScale;
+        private Material _cubeMaterial;
 
         /// <summary>
         /// Initializes the global scale component.
@@ -26,6 +27,7 @@ namespace TransformHandles
             ParentHandle = handle;
             _axis = axis;
             DefaultColor = defaultColor;
+            _cubeMaterial = cubeMeshRenderer.material;
         }
 
         /// <inheritdoc/>
@@ -49,13 +51,13 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            cubeMeshRenderer.material.color = color;
+            _cubeMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            cubeMeshRenderer.material.color = DefaultColor;
+            _cubeMaterial.color = DefaultColor;
         }
     }
 }
