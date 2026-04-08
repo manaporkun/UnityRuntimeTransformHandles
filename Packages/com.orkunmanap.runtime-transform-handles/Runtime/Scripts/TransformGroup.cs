@@ -47,13 +47,17 @@ namespace TransformHandles
         }
 
         /// <summary>
-        /// Adds a transform to the group if it's not already relative to selected transforms.
+        /// Adds a transform to the group if it's not null and not already relative to selected transforms.
         /// </summary>
         /// <param name="target">The transform to add.</param>
-        /// <returns>True if the transform was added successfully, false otherwise.</returns>
+        /// <returns>True if the transform was added successfully, false if target is null or relative to existing transforms.</returns>
         public bool AddTransform(Transform target)
         {
-            if (target == null) return false;
+            if (target == null)
+            {
+                Debug.LogWarning("Cannot add null transform to group.");
+                return false;
+            }
             if (IsTargetRelativeToSelectedOnes(target)) return false;
 
             var meshRenderer = target.GetComponent<MeshRenderer>();
