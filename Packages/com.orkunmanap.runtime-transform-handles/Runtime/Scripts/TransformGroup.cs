@@ -53,6 +53,7 @@ namespace TransformHandles
         /// <returns>True if the transform was added successfully, false otherwise.</returns>
         public bool AddTransform(Transform target)
         {
+            if (target == null) return false;
             if (IsTargetRelativeToSelectedOnes(target)) return false;
 
             var meshRenderer = target.GetComponent<MeshRenderer>();
@@ -168,24 +169,26 @@ namespace TransformHandles
             var space = GroupHandle.space;
             var averagePosRotScale = new PosRotScale();
 
-            var centerPositions = new List<Vector3>();
-            var sumQuaternion = Quaternion.identity;
             var transformsCount = Transforms.Count;
+            if (transformsCount == 0)
+            {
+                averagePosRotScale.Position = Vector3.zero;
+                averagePosRotScale.Rotation = Quaternion.identity;
+                averagePosRotScale.Scale = Vector3.one;
+                return averagePosRotScale;
+            }
+
+            var sumQuaternion = Quaternion.identity;
+            var averagePosition = Vector3.zero;
 
             foreach (var target in Transforms)
             {
-                var centerPoint = GetCenterPoint(target);
-                centerPositions.Add(centerPoint);
+                averagePosition += GetCenterPoint(target);
 
                 if (space == Space.World) continue;
                 sumQuaternion *= target.rotation;
             }
 
-            var averagePosition = Vector3.zero;
-            foreach (var centerPosition in centerPositions)
-            {
-                averagePosition += centerPosition;
-            }
             averagePosition /= transformsCount;
 
             averagePosRotScale.Position = averagePosition;
