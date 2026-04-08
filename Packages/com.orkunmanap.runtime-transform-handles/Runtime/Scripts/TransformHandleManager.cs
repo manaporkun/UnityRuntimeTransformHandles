@@ -410,8 +410,6 @@ namespace TransformHandles
 
         protected virtual void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
         {
-            System.Array.Clear(_rayHits, 0, _rayHits.Length);
-
             var size = 0;
             try
             {
@@ -561,10 +559,13 @@ namespace TransformHandles
 
         protected virtual void OnInteractionEnd()
         {
-            if (_interactedHandle == null || !_handleGroupMap.TryGetValue(_interactedHandle, out var group))
-                return;
+            if (_interactedHandle == null) return;
 
-            group.UpdateBounds();
+            if (_handleGroupMap.TryGetValue(_interactedHandle, out var group))
+            {
+                group.UpdateBounds();
+            }
+
             _interactedHandle.InteractionEnd();
         }
 
