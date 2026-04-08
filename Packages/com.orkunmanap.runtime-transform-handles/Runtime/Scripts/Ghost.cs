@@ -60,7 +60,7 @@ namespace TransformHandles
             {
                 Position = GhostTransform.position,
                 Rotation = GhostTransform.rotation,
-                Scale = GhostTransform.lossyScale
+                Scale = GhostTransform.localScale
             };
         }
 
@@ -136,7 +136,7 @@ namespace TransformHandles
         {
             _initialProperties.Position = GhostTransform.position;
             _initialProperties.Rotation = GhostTransform.rotation;
-            _initialProperties.Scale = GhostTransform.lossyScale;
+            _initialProperties.Scale = GhostTransform.localScale;
         }
     }
 }
