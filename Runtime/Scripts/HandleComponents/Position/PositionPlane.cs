@@ -26,6 +26,7 @@ namespace TransformHandles
 
         private GameObject _quadGameObject;
         private Transform _cameraTransform;
+        private Material _quadMaterial;
 
         /// <summary>
         /// Initializes the position plane component.
@@ -47,6 +48,7 @@ namespace TransformHandles
 
             _quadGameObject = quadMeshRenderer.gameObject;
             _cameraTransform = _handleCamera.transform;
+            _quadMaterial = quadMeshRenderer.material;
 
             _quadGameObject.transform.localPosition = (_axis1 + _axis2) * PlaneVisualOffset;
         }
@@ -133,13 +135,13 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            quadMeshRenderer.material.color = color;
+            _quadMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            quadMeshRenderer.material.color = DefaultColor;
+            _quadMaterial.color = DefaultColor;
         }
     }
 }
