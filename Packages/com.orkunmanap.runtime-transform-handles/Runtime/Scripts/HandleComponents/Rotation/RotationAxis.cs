@@ -24,6 +24,7 @@ namespace TransformHandles
         private Quaternion _startRotation;
 
         private Transform _rotationHandleTransform;
+        private Material _torusMaterial;
 
         /// <summary>
         /// Initializes the rotation axis component.
@@ -39,6 +40,7 @@ namespace TransformHandles
             _handleCamera = ParentHandle.handleCamera;
 
             _rotationHandleTransform = transform.GetComponentInParent<Handle>().transform;
+            _torusMaterial = torusMeshRenderer.material;
         }
 
         /// <inheritdoc/>
@@ -122,13 +124,13 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            torusMeshRenderer.material.color = color;
+            _torusMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            torusMeshRenderer.material.color = DefaultColor;
+            _torusMaterial.color = DefaultColor;
         }
     }
 }

@@ -27,6 +27,9 @@ namespace TransformHandles
         private Transform _coneTransform;
         private Transform _cameraTransform;
 
+        private Material _coneMaterial;
+        private Material _lineMaterial;
+
         /// <summary>
         /// Initializes the position axis component.
         /// </summary>
@@ -41,6 +44,9 @@ namespace TransformHandles
 
             _coneTransform = _coneGameObject.transform;
             _cameraTransform = _handleCamera.transform;
+
+            _coneMaterial = coneMeshRenderer.material;
+            _lineMaterial = lineMeshRenderer.material;
 
             _axis = _coneTransform.up;
             DefaultColor = defaultColor;
@@ -99,15 +105,15 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            coneMeshRenderer.material.color = color;
-            lineMeshRenderer.material.color = color;
+            _coneMaterial.color = color;
+            _lineMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            coneMeshRenderer.material.color = DefaultColor;
-            lineMeshRenderer.material.color = DefaultColor;
+            _coneMaterial.color = DefaultColor;
+            _lineMaterial.color = DefaultColor;
         }
 
         private void LateUpdate()
