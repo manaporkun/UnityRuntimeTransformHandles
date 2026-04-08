@@ -9,9 +9,7 @@
 
 ## About
 
-This project is based on [RuntimeTransformHandle](https://github.com/pshtif/RuntimeTransformHandle) by pshtif.
-
-Unity Runtime Transform Handles is a powerful tool that allows developers to transform objects at runtime using a set of intuitive and professional gizmos. Ideal for building modding tools, runtime editors, or games that require object manipulation, this plugin adds multiple object selection, changeable origin points, better auto scale, multiple handles, and other features to the base project.
+Unity Runtime Transform Handles is a powerful tool that allows developers to transform objects at runtime using a set of intuitive and professional gizmos. Ideal for building modding tools, runtime editors, or games that require object manipulation, this plugin provides multiple object selection, changeable origin points, auto-scaling handles, configurable snapping, and a full event system.
 
 ### Features
 
@@ -281,8 +279,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Credits
 
-- Original project by [pshtif](https://github.com/pshtif/RuntimeTransformHandle)
-- Extended and maintained by [Orkun Manap](https://manap.dev)
+- Created and maintained by [Orkun Manap](https://manap.dev)
 
 ## Support
 
