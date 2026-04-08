@@ -58,3 +58,12 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
+# JetBrains Rider
+.idea/
+
+# Unity user-specific settings
+/[Uu]serSettings/
+
+# Web demo build output
+/web/
+
