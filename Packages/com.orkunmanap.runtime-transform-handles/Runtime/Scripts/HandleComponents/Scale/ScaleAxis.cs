@@ -22,6 +22,9 @@ namespace TransformHandles
         private float _interactionDistance;
         private Ray _rAxisRay;
 
+        private Material _cubeMaterial;
+        private Material _lineMaterial;
+
         /// <summary>
         /// Initializes the scale axis component.
         /// </summary>
@@ -34,6 +37,9 @@ namespace TransformHandles
             DefaultColor = defaultColor;
 
             _handleCamera = ParentHandle.handleCamera;
+
+            _cubeMaterial = cubeMeshRenderer.material;
+            _lineMaterial = lineMeshRenderer.material;
         }
 
         protected void Update()
@@ -98,15 +104,15 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            cubeMeshRenderer.material.color = color;
-            lineMeshRenderer.material.color = color;
+            _cubeMaterial.color = color;
+            _lineMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            cubeMeshRenderer.material.color = DefaultColor;
-            lineMeshRenderer.material.color = DefaultColor;
+            _cubeMaterial.color = DefaultColor;
+            _lineMaterial.color = DefaultColor;
         }
     }
 }

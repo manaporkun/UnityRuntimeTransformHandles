@@ -60,7 +60,7 @@ namespace TransformHandles
             {
                 Position = GhostTransform.position,
                 Rotation = GhostTransform.rotation,
-                Scale = GhostTransform.lossyScale
+                Scale = GhostTransform.localScale
             };
         }
 
@@ -113,19 +113,22 @@ namespace TransformHandles
 
         private void UpdatePosition()
         {
+            if (_handleManager == null) return;
             var positionChange = GhostTransform.position - _initialProperties.Position;
             _handleManager.UpdateGroupPosition(this, positionChange);
         }
 
         private void UpdateRotation()
         {
+            if (_handleManager == null) return;
             var rotationChange = GhostTransform.rotation * Quaternion.Inverse(_initialProperties.Rotation);
             _handleManager.UpdateGroupRotation(this, rotationChange);
         }
 
         private void UpdateScale()
         {
-            var scaleChange= GhostTransform.localScale - _initialProperties.Scale;
+            if (_handleManager == null) return;
+            var scaleChange = GhostTransform.localScale - _initialProperties.Scale;
             _handleManager.UpdateGroupScaleUpdate(this, scaleChange);
         }
         
@@ -133,7 +136,7 @@ namespace TransformHandles
         {
             _initialProperties.Position = GhostTransform.position;
             _initialProperties.Rotation = GhostTransform.rotation;
-            _initialProperties.Scale = GhostTransform.lossyScale;
+            _initialProperties.Scale = GhostTransform.localScale;
         }
     }
 }
