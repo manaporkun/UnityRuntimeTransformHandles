@@ -9,8 +9,6 @@ on:
       - Assets/**
       - Packages/**
       - ProjectSettings/**
-      - web/**
-      - README.md
       - .github/workflows/webgl-pages.yml
 
 permissions:
@@ -27,6 +25,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Free disk space
+        run: |
+          echo "=== Disk usage before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force 2>/dev/null || true
+          echo "=== Disk usage after cleanup ==="
+          df -h /
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -80,12 +90,10 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare showcase site artifact
+      - name: Prepare Pages artifact
         run: |
           rm -rf site-dist
-          mkdir -p site-dist/unity
-          cp -R web/. site-dist/
-          cp -R "${{ steps.webgl-output.outputs.path }}/." site-dist/unity/
+          cp -R "${{ steps.webgl-output.outputs.path }}" site-dist
           touch site-dist/.nojekyll
 
       - name: Configure GitHub Pages
