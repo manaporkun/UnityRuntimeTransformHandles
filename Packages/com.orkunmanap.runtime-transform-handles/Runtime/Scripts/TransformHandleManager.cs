@@ -59,6 +59,7 @@ namespace TransformHandles
         private Color HighlightColorValue => settings != null ? settings.HighlightColor : highlightColor;
 
         private RaycastHit[] _rayHits;
+        private static readonly RaycastHitDistanceComparer _rayHitComparer = new RaycastHitDistanceComparer();
 
         private Vector3 _previousMousePosition;
         private Vector3 _handleHitPoint;
@@ -106,6 +107,8 @@ namespace TransformHandles
             _transformHashSet = new HashSet<Transform>();
 
             InitializeHandleLayer();
+
+            _rayHits = new RaycastHit[MaxRaycastHits];
 
             _isInitialized = true;
         }
@@ -407,7 +410,7 @@ namespace TransformHandles
 
         protected virtual void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
         {
-            _rayHits = new RaycastHit[MaxRaycastHits];
+            System.Array.Clear(_rayHits, 0, _rayHits.Length);
 
             var size = 0;
             try
@@ -433,13 +436,14 @@ namespace TransformHandles
                 return;
             }
 
-            Array.Sort(_rayHits, (x, y) => x.distance.CompareTo(y.distance));
+            Array.Sort(_rayHits, 0, size, _rayHitComparer);
 
-            foreach (var hit in _rayHits)
+            for (var i = 0; i < size; i++)
             {
+                var hit = _rayHits[i];
                 var hitCollider = hit.collider;
                 if (hitCollider == null) continue;
-                handle = hit.collider.gameObject.GetComponentInParent<HandleBase>();
+                handle = hitCollider.gameObject.GetComponentInParent<HandleBase>();
 
                 if (handle == null) continue;
                 hitPoint = hit.point;
@@ -557,9 +561,10 @@ namespace TransformHandles
 
         protected virtual void OnInteractionEnd()
         {
-            var group = _handleGroupMap[_interactedHandle];
-            group.UpdateBounds();
+            if (_interactedHandle == null || !_handleGroupMap.TryGetValue(_interactedHandle, out var group))
+                return;
 
+            group.UpdateBounds();
             _interactedHandle.InteractionEnd();
         }
 
@@ -643,6 +648,14 @@ namespace TransformHandles
             {
                 group.UpdateScales(scaleChange);
             }
+        }
+    }
+
+    internal class RaycastHitDistanceComparer : System.Collections.Generic.IComparer<RaycastHit>
+    {
+        public int Compare(RaycastHit x, RaycastHit y)
+        {
+            return x.distance.CompareTo(y.distance);
         }
     }
 }
