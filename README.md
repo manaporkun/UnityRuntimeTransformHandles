@@ -21,21 +21,18 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 - World and Local coordinate space support
 - Configurable snapping for precise transformations
 - Auto-scaling handles based on camera distance
-- Customizable keyboard shortcuts
+- Customizable keyboard shortcuts via Settings asset
 - Event system for handle interactions
+- Works with both Legacy Input Manager and New Input System out of the box
 
 ### Video Demo
 
 [![Video](https://i.imgur.com/OSXsYXA.png)](https://www.youtube.com/watch?v=-6tpim397F0)
 
-### Browser Demo (WebGL)
-
-Hosted demo link: `TBD`
-
 ## Requirements
 
 - Unity **2019.4** or higher
-- Works with both **Legacy Input Manager** and **New Input System**
+- Works with both **Legacy Input Manager** and **New Input System** (auto-detected via `ENABLE_INPUT_SYSTEM` preprocessor)
 
 ## Installation
 
@@ -67,7 +64,7 @@ To install a specific version, append the version tag:
 ```json
 {
     "dependencies": {
-        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git#v1.0.0"
+        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git#v1.16.0"
     }
 }
 ```
@@ -150,6 +147,19 @@ handle.rotationSnap = 15f;
 handle.scaleSnap = new Vector3(0.1f, 0.1f, 0.1f);
 ```
 
+### Settings Asset (Optional)
+
+Create a settings asset to customize shortcuts, defaults, and highlight color:
+
+1. `Assets > Create > Transform Handles > Settings`
+2. Assign to `TransformHandleManager.Settings` in Inspector or via code:
+
+```csharp
+TransformHandleManager.Instance.Settings = mySettings;
+```
+
+If no settings asset is assigned, the manager uses its serialized field values.
+
 ## Default Keyboard Shortcuts
 
 | Key | Action |
@@ -160,6 +170,34 @@ handle.scaleSnap = new Vector3(0.1f, 0.1f, 0.1f);
 | A | All modes (Position + Rotation + Scale) |
 | X | Toggle World/Local space |
 | Z | Toggle Pivot/Center origin |
+
+## Package Structure
+
+```
+Packages/com.orkunmanap.runtime-transform-handles/
+├── Editor/
+│   └── TransformHandleLayerSetup.cs        # Layer setup menu item
+├── Runtime/
+│   ├── Materials/                           # Handle materials
+│   ├── Models/                              # Mesh assets (cone, torus, tube)
+│   ├── Prefabs/                             # Handle and Ghost prefabs
+│   ├── Scripts/
+│   │   ├── Colliders/                       # Runtime mesh collider controllers
+│   │   ├── Enums/                           # HandleType, HandleAxes, SnappingType, Origin
+│   │   ├── HandleComponents/
+│   │   │   ├── HandleBase.cs                # Abstract base for axis components
+│   │   │   ├── Position/                    # PositionHandle, PositionAxis, PositionPlane
+│   │   │   ├── Rotation/                    # RotationHandle, RotationAxis
+│   │   │   └── Scale/                       # ScaleHandle, ScaleAxis, ScaleGlobal
+│   │   ├── Utils/                           # InputWrapper, MathUtils, MeshUtils, Singleton
+│   │   ├── Ghost.cs                         # Pivot point for manipulation
+│   │   ├── Handle.cs                        # Per-target handle controller
+│   │   ├── TransformGroup.cs                # Multi-object grouping
+│   │   ├── TransformHandleManager.cs        # Central singleton manager
+│   │   └── TransformHandleSettings.cs       # ScriptableObject settings
+│   └── Shader/                              # Handle and origin shaders
+└── package.json
+```
 
 ## Main Components
 
