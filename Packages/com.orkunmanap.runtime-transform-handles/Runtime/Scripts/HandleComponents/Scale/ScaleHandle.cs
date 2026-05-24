@@ -14,39 +14,44 @@ namespace TransformHandles
         public ScaleGlobal globalScale;
 
         private Handle _parentHandle;
-        private bool _handleInitialized;
         private bool _globalScaleSubscribed;
 
         /// <summary>
         /// Initializes the scale handle with all its axes.
+        /// Re-runnable so <see cref="Handle.ChangeAxes"/> can filter visible axes after creation.
         /// </summary>
         /// <param name="handle">The parent handle.</param>
         public void Initialize(Handle handle)
         {
-            if (_handleInitialized) return;
-
             _parentHandle = handle;
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.X))
-                xAxis.Initialize(_parentHandle, Vector3.right);
+            var hasX = _parentHandle.axes.HasAxis(HandleAxes.X);
+            var hasY = _parentHandle.axes.HasAxis(HandleAxes.Y);
+            var hasZ = _parentHandle.axes.HasAxis(HandleAxes.Z);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Y))
-                yAxis.Initialize(_parentHandle, Vector3.up);
+            xAxis.gameObject.SetActive(hasX);
+            if (hasX) xAxis.Initialize(_parentHandle, Vector3.right);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Z))
-                zAxis.Initialize(_parentHandle, Vector3.forward);
+            yAxis.gameObject.SetActive(hasY);
+            if (hasY) yAxis.Initialize(_parentHandle, Vector3.up);
 
-            if (_parentHandle.axes.IsMultiAxis())
+            zAxis.gameObject.SetActive(hasZ);
+            if (hasZ) zAxis.Initialize(_parentHandle, Vector3.forward);
+
+            var multiAxis = _parentHandle.axes.IsMultiAxis();
+            globalScale.gameObject.SetActive(multiAxis);
+            if (multiAxis)
             {
                 globalScale.Initialize(_parentHandle, HandleBase.GetVectorFromAxes(_parentHandle.axes));
 
-                globalScale.InteractionStart += OnGlobalInteractionStart;
-                globalScale.InteractionUpdate += OnGlobalInteractionUpdate;
-                globalScale.InteractionEnd += OnGlobalInteractionEnd;
-                _globalScaleSubscribed = true;
+                if (!_globalScaleSubscribed)
+                {
+                    globalScale.InteractionStart += OnGlobalInteractionStart;
+                    globalScale.InteractionUpdate += OnGlobalInteractionUpdate;
+                    globalScale.InteractionEnd += OnGlobalInteractionEnd;
+                    _globalScaleSubscribed = true;
+                }
             }
-
-            _handleInitialized = true;
         }
 
         private void OnDestroy()
