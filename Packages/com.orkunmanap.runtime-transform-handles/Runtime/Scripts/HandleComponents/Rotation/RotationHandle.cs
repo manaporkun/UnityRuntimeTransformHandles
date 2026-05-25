@@ -13,38 +13,28 @@ namespace TransformHandles
 
         private Handle _parentHandle;
 
-        private bool _handleInitialized;
-
         /// <summary>
         /// Initializes the rotation handle with all its axes.
+        /// Re-runnable so <see cref="Handle.ChangeAxes"/> can filter visible rings after creation.
         /// </summary>
         /// <param name="handle">The parent handle.</param>
         public void Initialize(Handle handle)
         {
-            if (_handleInitialized) return;
-
             _parentHandle = handle;
             transform.SetParent(_parentHandle.transform, false);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.X))
-            {
-                xAxis.gameObject.SetActive(true);
-                xAxis.Initialize(_parentHandle, Vector3.right);
-            }
+            var hasX = handle.axes.HasAxis(HandleAxes.X);
+            var hasY = handle.axes.HasAxis(HandleAxes.Y);
+            var hasZ = handle.axes.HasAxis(HandleAxes.Z);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Y))
-            {
-                yAxis.gameObject.SetActive(true);
-                yAxis.Initialize(_parentHandle, Vector3.up);
-            }
+            xAxis.gameObject.SetActive(hasX);
+            if (hasX) xAxis.Initialize(handle, Vector3.right);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Z))
-            {
-                zAxis.gameObject.SetActive(true);
-                zAxis.Initialize(_parentHandle, Vector3.forward);
-            }
+            yAxis.gameObject.SetActive(hasY);
+            if (hasY) yAxis.Initialize(handle, Vector3.up);
 
-            _handleInitialized = true;
+            zAxis.gameObject.SetActive(hasZ);
+            if (hasZ) zAxis.Initialize(handle, Vector3.forward);
         }
     }
 }

@@ -14,39 +14,44 @@ namespace TransformHandles
         public ScaleGlobal globalScale;
 
         private Handle _parentHandle;
-        private bool _handleInitialized;
         private bool _globalScaleSubscribed;
 
         /// <summary>
         /// Initializes the scale handle with all its axes.
+        /// Re-runnable so <see cref="Handle.ChangeAxes"/> can filter visible axes after creation.
         /// </summary>
         /// <param name="handle">The parent handle.</param>
         public void Initialize(Handle handle)
         {
-            if (_handleInitialized) return;
-
             _parentHandle = handle;
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.X))
-                xAxis.Initialize(_parentHandle, Vector3.right);
+            var hasX = handle.axes.HasAxis(HandleAxes.X);
+            var hasY = handle.axes.HasAxis(HandleAxes.Y);
+            var hasZ = handle.axes.HasAxis(HandleAxes.Z);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Y))
-                yAxis.Initialize(_parentHandle, Vector3.up);
+            xAxis.gameObject.SetActive(hasX);
+            if (hasX) xAxis.Initialize(handle, Vector3.right);
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Z))
-                zAxis.Initialize(_parentHandle, Vector3.forward);
+            yAxis.gameObject.SetActive(hasY);
+            if (hasY) yAxis.Initialize(handle, Vector3.up);
 
-            if (_parentHandle.axes.IsMultiAxis())
+            zAxis.gameObject.SetActive(hasZ);
+            if (hasZ) zAxis.Initialize(handle, Vector3.forward);
+
+            var multiAxis = handle.axes.IsMultiAxis();
+            globalScale.gameObject.SetActive(multiAxis);
+            if (multiAxis)
             {
-                globalScale.Initialize(_parentHandle, HandleBase.GetVectorFromAxes(_parentHandle.axes));
+                globalScale.Initialize(handle, HandleBase.GetVectorFromAxes(handle.axes));
 
-                globalScale.InteractionStart += OnGlobalInteractionStart;
-                globalScale.InteractionUpdate += OnGlobalInteractionUpdate;
-                globalScale.InteractionEnd += OnGlobalInteractionEnd;
-                _globalScaleSubscribed = true;
+                if (!_globalScaleSubscribed)
+                {
+                    globalScale.InteractionStart += OnGlobalInteractionStart;
+                    globalScale.InteractionUpdate += OnGlobalInteractionUpdate;
+                    globalScale.InteractionEnd += OnGlobalInteractionEnd;
+                    _globalScaleSubscribed = true;
+                }
             }
-
-            _handleInitialized = true;
         }
 
         private void OnDestroy()
@@ -62,28 +67,37 @@ namespace TransformHandles
 
         private void OnGlobalInteractionStart()
         {
-            xAxis.SetColor(Color.yellow);
-            yAxis.SetColor(Color.yellow);
-            zAxis.SetColor(Color.yellow);
+            if (_parentHandle.axes.HasAxis(HandleAxes.X)) xAxis.SetColor(Color.yellow);
+            if (_parentHandle.axes.HasAxis(HandleAxes.Y)) yAxis.SetColor(Color.yellow);
+            if (_parentHandle.axes.HasAxis(HandleAxes.Z)) zAxis.SetColor(Color.yellow);
         }
 
         private void OnGlobalInteractionUpdate(float scaleDelta)
         {
-            xAxis.delta = scaleDelta;
-            yAxis.delta = scaleDelta;
-            zAxis.delta = scaleDelta;
+            if (_parentHandle.axes.HasAxis(HandleAxes.X)) xAxis.delta = scaleDelta;
+            if (_parentHandle.axes.HasAxis(HandleAxes.Y)) yAxis.delta = scaleDelta;
+            if (_parentHandle.axes.HasAxis(HandleAxes.Z)) zAxis.delta = scaleDelta;
         }
 
         private void OnGlobalInteractionEnd()
         {
-            xAxis.SetDefaultColor();
-            xAxis.delta = 0;
+            if (_parentHandle.axes.HasAxis(HandleAxes.X))
+            {
+                xAxis.SetDefaultColor();
+                xAxis.delta = 0;
+            }
 
-            yAxis.SetDefaultColor();
-            yAxis.delta = 0;
+            if (_parentHandle.axes.HasAxis(HandleAxes.Y))
+            {
+                yAxis.SetDefaultColor();
+                yAxis.delta = 0;
+            }
 
-            zAxis.SetDefaultColor();
-            zAxis.delta = 0;
+            if (_parentHandle.axes.HasAxis(HandleAxes.Z))
+            {
+                zAxis.SetDefaultColor();
+                zAxis.delta = 0;
+            }
         }
     }
 }
