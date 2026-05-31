@@ -2,6 +2,13 @@
 
 This package does not bundle any third-party source code.
 
+## Dependencies
+
+- **com.unity.render-pipelines.universal** (Universal Render Pipeline) — A required dependency so
+  the handle shaders' URP SubShader includes resolve in every project. Distributed by Unity
+  Technologies under the Unity Companion License / Unity Package Distribution Terms; **not**
+  redistributed with this package.
+
 ## Optional dependencies
 
 - **com.unity.inputsystem** (Unity Input System) — Used only when present in the project and

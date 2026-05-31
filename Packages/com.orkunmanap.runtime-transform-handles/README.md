@@ -9,8 +9,11 @@ in-game object manipulation.
 
 - Unity **2021.3** or higher.
 - **Render pipeline:** Built-in and Universal Render Pipeline (URP) are supported — the handle
-  shaders ship a URP SubShader that auto-selects under URP. HDRP is **not** supported out of the
-  box (no HDRP SubShader/Shader Graph variant is provided).
+  shaders ship both a Built-in and a URP SubShader (auto-selected per active pipeline). URP
+  (`com.unity.render-pipelines.universal`) is a package **dependency** so the URP SubShader's
+  shader includes always resolve; Built-in projects still render via the Built-in SubShader
+  (the URP package being installed does not make URP the active pipeline). HDRP is **not**
+  supported out of the box (no HDRP SubShader/Shader Graph variant is provided).
 - **Input:** Works with the legacy Input Manager out of the box. The New Input System is an
   optional dependency: when `com.unity.inputsystem` is present and enabled in Player Settings, the
   package uses it automatically (via the `TH_INPUTSYSTEM` define); otherwise it falls back to the
