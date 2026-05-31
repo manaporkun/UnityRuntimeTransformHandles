@@ -45,8 +45,10 @@ namespace TransformHandles
             _coneTransform = _coneGameObject.transform;
             _cameraTransform = _handleCamera.transform;
 
-            _coneMaterial = coneMeshRenderer.material;
-            _lineMaterial = lineMeshRenderer.material;
+            // Instantiate materials once; Initialize is re-runnable via Handle.ChangeAxes
+            // and MeshRenderer.material allocates a new instance on every access.
+            if (_coneMaterial == null) _coneMaterial = coneMeshRenderer.material;
+            if (_lineMaterial == null) _lineMaterial = lineMeshRenderer.material;
 
             _axis = _coneTransform.up;
             DefaultColor = defaultColor;

@@ -38,8 +38,10 @@ namespace TransformHandles
 
             _handleCamera = ParentHandle.handleCamera;
 
-            _cubeMaterial = cubeMeshRenderer.material;
-            _lineMaterial = lineMeshRenderer.material;
+            // Instantiate materials once; Initialize is re-runnable via Handle.ChangeAxes
+            // and MeshRenderer.material allocates a new instance on every access.
+            if (_cubeMaterial == null) _cubeMaterial = cubeMeshRenderer.material;
+            if (_lineMaterial == null) _lineMaterial = lineMeshRenderer.material;
         }
 
         protected void Update()
