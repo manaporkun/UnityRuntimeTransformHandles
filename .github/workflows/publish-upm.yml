@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write
+  checks: write
+  pull-requests: write
 
 jobs:
   # UPM-spec gate: manifest + required files + asmdef sanity. No Unity license needed,
