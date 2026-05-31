@@ -327,7 +327,10 @@ public class HandleDemo : MonoBehaviour
         GUILayout.Label($"{label}: <b>{value}</b>");
         var names = System.Enum.GetNames(typeof(T));
         var current = System.Array.IndexOf(names, value.ToString());
-        var picked = GUILayout.SelectionGrid(current, names, 4);
+        // Fewer, wider columns when names are long so they don't clip (e.g. PositionRotation).
+        var maxLen = names.Max(n => n.Length);
+        var cols = maxLen <= 6 ? 4 : maxLen <= 10 ? 3 : 2;
+        var picked = GUILayout.SelectionGrid(current, names, cols);
         if (picked != current)
         {
             value = (T)System.Enum.Parse(typeof(T), names[picked]);
