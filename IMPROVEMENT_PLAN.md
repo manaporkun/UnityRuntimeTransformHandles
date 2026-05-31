@@ -133,8 +133,9 @@ Pick **one**:
 
 **Breaking:** No.
 
-### [ ] P2-2 · Add UPM package validation to CI
-- [ ] Run Validation Suite / `upm-ci package test` as a job gating `publish` (`needs:`). (Many gaps are warnings, not hard fails — it enforces the floor going forward.)
+### [x] P2-2 · Add UPM package validation to CI
+- [x] Added a license-free `validate` job to `publish-upm.yml` that lints the manifest (required fields, semver, `name`/`unity` form), required in-package docs, `samples[]` paths, and every asmdef's JSON. `publish` now `needs: [validate, test]`. Runs on every PR. **Verified the rules pass against the current package locally; workflow YAML lint-clean.**
+- [ ] (Optional future) swap in Unity's full Package Validation Suite via the editor — heavier (needs license); the structural lint enforces the floor for now.
 
 **Breaking:** No.
 
