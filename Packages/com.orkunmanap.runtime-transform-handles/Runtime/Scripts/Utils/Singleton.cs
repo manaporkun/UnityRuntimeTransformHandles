@@ -21,6 +21,18 @@ public class Singleton<T> : MonoBehaviour where T : Singleton<T>
 #endif
 
             if (_instance != null) return _instance;
+
+            // Prefer a configured prefab from Resources (named after the type) so
+            // serialized references (e.g. handle/ghost prefabs) are wired up. Falls
+            // back to a bare GameObject when no such prefab exists.
+            var prefab = Resources.Load<T>(typeof(T).Name);
+            if (prefab != null)
+            {
+                _instance = Instantiate(prefab);
+                _instance.name = typeof(T).Name;
+                return _instance;
+            }
+
             var obj = new GameObject(typeof(T).Name);
             _instance = obj.AddComponent<T>();
 
