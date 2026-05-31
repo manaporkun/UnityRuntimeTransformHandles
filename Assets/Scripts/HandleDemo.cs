@@ -79,7 +79,7 @@ public class HandleDemo : MonoBehaviour
             _targets.Add(cube.transform);
         }
 
-        if (!Object.FindObjectOfType<Light>())
+        if (!Object.FindAnyObjectByType<Light>())
         {
             var lightGo = new GameObject("Demo Light");
             var l = lightGo.AddComponent<Light>();
