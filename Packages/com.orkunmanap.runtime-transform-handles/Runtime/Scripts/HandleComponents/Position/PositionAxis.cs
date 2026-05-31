@@ -50,7 +50,13 @@ namespace TransformHandles
             if (_coneMaterial == null) _coneMaterial = coneMeshRenderer.material;
             if (_lineMaterial == null) _lineMaterial = lineMeshRenderer.material;
 
-            _axis = _coneTransform.up;
+            // Capture the axis in the handle-local frame so it stays canonical regardless of the
+            // handle's current world rotation. Using the world-space cone.up directly meant that
+            // re-running Initialize (Handle.ChangeAxes/ChangeHandleType) while the handle was already
+            // rotated in Self space stored an already-rotated axis, which GetRotatedAxis then rotated
+            // a second time -> the drag axis no longer matched the gizmo. Normalized for the
+            // unit-direction precondition of MathUtils.ClosestPointOnRay.
+            _axis = ParentHandle.transform.InverseTransformDirection(_coneTransform.up).normalized;
             DefaultColor = defaultColor;
         }
 
