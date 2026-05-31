@@ -51,6 +51,11 @@ public class HandleDemo : MonoBehaviour
     private Vector2 _logScroll;
     private float _camYaw, _camPitch = 15f, _camDist = 12f;
 
+    // Cached HUD styles (default IMGUI skin is tiny and low-contrast over a bright skybox).
+    private GUIStyle _panelStyle;
+    private Texture2D _panelTex;
+    private bool _uiInit;
+
     private void Awake()
     {
         _camera = Camera.main;
@@ -247,10 +252,36 @@ public class HandleDemo : MonoBehaviour
 
     // ----- HUD -------------------------------------------------------------------------------
 
+    private void EnsureUi()
+    {
+        if (_uiInit) return;
+        _uiInit = true;
+
+        _panelTex = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
+        _panelTex.SetPixel(0, 0, new Color(0.07f, 0.07f, 0.09f, 0.94f));
+        _panelTex.Apply();
+
+        _panelStyle = new GUIStyle { padding = new RectOffset(14, 14, 14, 14) };
+        _panelStyle.normal.background = _panelTex;
+
+        // Bump the shared skin so labels/buttons/toggles/sliders are legible.
+        var s = GUI.skin;
+        s.label.fontSize = 14;
+        s.label.richText = true;
+        s.label.normal.textColor = Color.white;
+        s.button.fontSize = 14;
+        foreach (var st in new[] { s.toggle.normal, s.toggle.onNormal, s.toggle.hover,
+                                   s.toggle.onHover, s.toggle.active, s.toggle.onActive })
+            st.textColor = Color.white;
+        s.toggle.fontSize = 14;
+    }
+
     private void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10, 10, 320, Screen.height - 20), GUI.skin.box);
-        GUILayout.Label("<b>Transform Handles — Demo</b>");
+        EnsureUi();
+
+        GUILayout.BeginArea(new Rect(10, 10, 360, Screen.height - 20), _panelStyle);
+        GUILayout.Label("<size=17><b>Transform Handles — Demo</b></size>");
         GUILayout.Label($"Targets: {_targets.Count}   Selected: {_targetToHandle.Count}   " +
                         $"Active: {(_activeHandle ? "yes" : "none")}");
         GUILayout.Label("LMB select · Shift+LMB add · RMB drop · MMB orbit · wheel zoom");
