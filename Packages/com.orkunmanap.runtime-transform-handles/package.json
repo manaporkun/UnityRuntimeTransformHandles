@@ -23,7 +23,9 @@
   "license": "MIT",
   "unity": "2021.3",
   "unityRelease": "0f1",
-  "dependencies": {},
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "12.1.0"
+  },
   "samples": [
     {
       "displayName": "Runtime Transform Handles Demo",

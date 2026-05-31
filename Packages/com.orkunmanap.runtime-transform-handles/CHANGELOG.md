@@ -31,6 +31,9 @@ This release contains **source-breaking** changes and is intended to ship as **2
 ### Added
 - URP (Universal Render Pipeline) SubShader for `HandleShader` and `Origin` shaders so
   handles render correctly under URP instead of falling back to the magenta error shader.
+- `com.unity.render-pipelines.universal` as a dependency so the URP SubShader's `Core.hlsl`
+  include always resolves (a Built-in-only project without URP would otherwise hit a
+  missing-include shader error). Built-in rendering is unaffected.
 - `versionDefines` entry mapping `com.unity.inputsystem` to the package-private `TH_INPUTSYSTEM`
   symbol, making the New Input System an optional dependency.
 - In-package `README.md`, `LICENSE.md`, `CHANGELOG.md`, and `Third Party Notices.md`.
