@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using TransformHandles;
+using TransformHandles.Utils;
 using UnityEngine;
 
 /// <summary>
@@ -52,9 +53,13 @@ public class HandleDemo : MonoBehaviour
     private float _camYaw, _camPitch = 15f, _camDist = 12f;
 
     // Cached HUD styles (default IMGUI skin is tiny and low-contrast over a bright skybox).
+    private GUISkin _skin;
     private GUIStyle _panelStyle;
     private Texture2D _panelTex;
     private bool _uiInit;
+
+    // Raycast mask that excludes the handle-gizmo layer so picking ignores gizmo colliders.
+    private int _pickMask = ~0;
 
     private void Awake()
     {
@@ -70,6 +75,9 @@ public class HandleDemo : MonoBehaviour
 
         // Build a runtime settings asset (no .asset file needed) to demo Settings injection.
         _settings = TransformHandleSettings.CreateDefault();
+
+        var handleLayer = LayerMask.NameToLayer("TransformHandle");
+        _pickMask = handleLayer >= 0 ? ~(1 << handleLayer) : ~0;
     }
 
     private void Start()
@@ -121,7 +129,7 @@ public class HandleDemo : MonoBehaviour
     {
         target = null;
         var ray = _camera.ScreenPointToRay(InputWrapper.MousePosition);
-        if (!Physics.Raycast(ray, out var hit, 1000f)) return false;
+        if (!Physics.Raycast(ray, out var hit, 1000f, _pickMask)) return false;
         if (!hit.transform.GetComponent<DemoTarget>()) return false;
         target = hit.transform;
         return true;
@@ -187,7 +195,7 @@ public class HandleDemo : MonoBehaviour
         if (_activeHandle == null) return;
         TransformHandleManager.ChangeHandleType(_activeHandle, _type);
         _manager.ChangeHandleSpace(_activeHandle, _space);
-        _activeHandle.ChangeAxes(_axes);
+        _activeHandle.axes = _axes;
         ApplySnapping();
         _activeHandle.autoScale = _autoScale;
         _activeHandle.SetScale(_scaleMultiplier);
@@ -264,21 +272,32 @@ public class HandleDemo : MonoBehaviour
         _panelStyle = new GUIStyle { padding = new RectOffset(14, 14, 14, 14) };
         _panelStyle.normal.background = _panelTex;
 
-        // Bump the shared skin so labels/buttons/toggles/sliders are legible.
-        var s = GUI.skin;
-        s.label.fontSize = 14;
-        s.label.richText = true;
-        s.label.normal.textColor = Color.white;
-        s.button.fontSize = 14;
-        foreach (var st in new[] { s.toggle.normal, s.toggle.onNormal, s.toggle.hover,
-                                   s.toggle.onHover, s.toggle.active, s.toggle.onActive })
+        // Work on a private clone of the skin so the demo never mutates the shared global
+        // GUI.skin (which would persist for every other OnGUI consumer in the session).
+        _skin = Instantiate(GUI.skin);
+        _skin.hideFlags = HideFlags.HideAndDontSave;
+        _skin.label.fontSize = 14;
+        _skin.label.richText = true;
+        _skin.label.normal.textColor = Color.white;
+        _skin.button.fontSize = 14;
+        foreach (var st in new[] { _skin.toggle.normal, _skin.toggle.onNormal, _skin.toggle.hover,
+                                   _skin.toggle.onHover, _skin.toggle.active, _skin.toggle.onActive })
             st.textColor = Color.white;
-        s.toggle.fontSize = 14;
+        _skin.toggle.fontSize = 14;
+    }
+
+    private void OnDestroy()
+    {
+        if (_panelTex != null) Destroy(_panelTex);
+        if (_skin != null) Destroy(_skin);
     }
 
     private void OnGUI()
     {
         EnsureUi();
+
+        var prevSkin = GUI.skin;
+        GUI.skin = _skin;
 
         GUILayout.BeginArea(new Rect(10, 10, 360, Screen.height - 20), _panelStyle);
         GUILayout.Label("<size=17><b>Transform Handles — Demo</b></size>");
@@ -289,7 +308,7 @@ public class HandleDemo : MonoBehaviour
         GUILayout.Space(6);
 
         EnumRow("Type", ref _type, () => { if (_activeHandle != null) TransformHandleManager.ChangeHandleType(_activeHandle, _type); });
-        EnumRow("Axes", ref _axes, () => _activeHandle?.ChangeAxes(_axes));
+        EnumRow("Axes", ref _axes, () => { if (_activeHandle != null) _activeHandle.axes = _axes; });
         EnumRow("Space", ref _space, () => { if (_activeHandle != null) _manager.ChangeHandleSpace(_activeHandle, _space); });
         EnumRow("Snap mode", ref _snapType, ApplySnapping);
 
@@ -320,6 +339,8 @@ public class HandleDemo : MonoBehaviour
         GUILayout.EndScrollView();
 
         GUILayout.EndArea();
+
+        GUI.skin = prevSkin;
     }
 
     private void EnumRow<T>(string label, ref T value, System.Action onChange) where T : System.Enum
