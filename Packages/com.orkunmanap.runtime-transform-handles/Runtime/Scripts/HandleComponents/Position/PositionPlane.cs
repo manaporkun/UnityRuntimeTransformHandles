@@ -84,9 +84,11 @@ namespace TransformHandles
 
             if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
             {
-                position.x = SnapUtils.Snap(position.x, snapping.x);
-                position.y = SnapUtils.Snap(position.y, snapping.y);
-                position.z = SnapUtils.Snap(position.z, snapping.z);
+                // Only snap the two in-plane axes; snapping the perpendicular axis jumped the
+                // object off the drag plane. (>0.5 ignores float residuals on the perp axis.)
+                if (Mathf.Abs(axis.x) > 0.5f) position.x = SnapUtils.Snap(position.x, snapping.x);
+                if (Mathf.Abs(axis.y) > 0.5f) position.y = SnapUtils.Snap(position.y, snapping.y);
+                if (Mathf.Abs(axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
             ParentHandle.target.position = position;

@@ -75,9 +75,12 @@ namespace TransformHandles
 
             if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
             {
-                position.x = SnapUtils.Snap(position.x, snapping.x);
-                position.y = SnapUtils.Snap(position.y, snapping.y);
-                position.z = SnapUtils.Snap(position.z, snapping.z);
+                // Only snap the axis this handle controls. Snapping all three yanked the
+                // perpendicular axes onto the grid, so dragging X jumped the object in Y/Z.
+                // (>0.5 threshold ignores ~1e-7 residuals from the cone's 90-degree rotations.)
+                if (Mathf.Abs(_axis.x) > 0.5f) position.x = SnapUtils.Snap(position.x, snapping.x);
+                if (Mathf.Abs(_axis.y) > 0.5f) position.y = SnapUtils.Snap(position.y, snapping.y);
+                if (Mathf.Abs(_axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
             ParentHandle.target.position = position;
