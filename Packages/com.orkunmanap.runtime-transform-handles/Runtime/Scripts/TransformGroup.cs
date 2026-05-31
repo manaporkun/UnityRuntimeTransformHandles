@@ -23,13 +23,13 @@ namespace TransformHandles
         public bool IsOriginOnCenter;
 
         /// <summary>Gets the set of transforms in this group.</summary>
-        public HashSet<Transform> Transforms { get; }
+        internal HashSet<Transform> Transforms { get; }
 
         /// <summary>Gets the mapping of transforms to their mesh renderers (if any).</summary>
-        public Dictionary<Transform, MeshRenderer> RenderersMap { get; }
+        internal Dictionary<Transform, MeshRenderer> RenderersMap { get; }
 
         /// <summary>Gets the mapping of transforms to their cached bounds.</summary>
-        public Dictionary<Transform, Bounds> BoundsMap { get; }
+        internal Dictionary<Transform, Bounds> BoundsMap { get; }
 
         /// <summary>
         /// Creates a new transform group with the specified ghost and handle.
@@ -86,7 +86,7 @@ namespace TransformHandles
         /// <summary>
         /// Updates the bounds for all transforms in the group.
         /// </summary>
-        public void UpdateBounds()
+        internal void UpdateBounds()
         {
             foreach (var (target, meshRenderer) in RenderersMap)
             {
@@ -99,7 +99,7 @@ namespace TransformHandles
         /// Updates the position of all transforms in the group.
         /// </summary>
         /// <param name="positionChange">The position change to apply.</param>
-        public void UpdatePositions(Vector3 positionChange)
+        internal void UpdatePositions(Vector3 positionChange)
         {
             foreach (var target in RenderersMap.Keys)
             {
@@ -111,7 +111,7 @@ namespace TransformHandles
         /// Updates the rotation of all transforms in the group.
         /// </summary>
         /// <param name="rotationChange">The rotation change to apply.</param>
-        public void UpdateRotations(Quaternion rotationChange)
+        internal void UpdateRotations(Quaternion rotationChange)
         {
             var ghostPosition = GroupGhost.transform.position;
 
@@ -141,7 +141,7 @@ namespace TransformHandles
         /// Updates the scale of all transforms in the group.
         /// </summary>
         /// <param name="scaleChange">The scale change to apply.</param>
-        public void UpdateScales(Vector3 scaleChange)
+        internal void UpdateScales(Vector3 scaleChange)
         {
             foreach (var (target, meshRenderer) in RenderersMap)
             {

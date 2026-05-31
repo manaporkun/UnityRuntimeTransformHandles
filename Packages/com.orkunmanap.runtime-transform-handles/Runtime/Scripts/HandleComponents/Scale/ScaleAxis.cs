@@ -72,12 +72,12 @@ namespace TransformHandles
             {
                 if (ParentHandle.snappingType == SnappingType.Relative)
                 {
-                    axisScaleDelta = Mathf.Round(axisScaleDelta / snap) * snap;
+                    axisScaleDelta = SnapUtils.Snap(axisScaleDelta, snap);
                 }
                 else
                 {
                     var axisStartScale = Mathf.Abs(Vector3.Dot(_startScale, _axis));
-                    axisScaleDelta = Mathf.Round((axisScaleDelta + axisStartScale) / snap) * snap - axisStartScale;
+                    axisScaleDelta = SnapUtils.Snap(axisScaleDelta + axisStartScale, snap) - axisStartScale;
                 }
             }
 
