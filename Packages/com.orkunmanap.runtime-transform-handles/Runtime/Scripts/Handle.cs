@@ -1,6 +1,8 @@
 using System;
+using TransformHandles.Utils;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 
 namespace TransformHandles
 {
@@ -84,26 +86,63 @@ namespace TransformHandles
         /// <summary>UnityEvent fired when handle is destroyed. Configure in Inspector.</summary>
         public HandleUnityEvent OnHandleDestroyedUnityEvent => onHandleDestroyed;
 
-        /// <summary>The target transform being manipulated.</summary>
-        public Transform target;
-        /// <summary>Active axes for the handle.</summary>
-        public HandleAxes axes = HandleAxes.XYZ;
-        /// <summary>Coordinate space for transformations (Self or World).</summary>
-        public Space space = Space.Self;
-        /// <summary>Current handle type (Position, Rotation, Scale, or combinations).</summary>
-        public HandleType type = HandleType.Position;
+        /// <summary>The target transform being manipulated. Read-only; set via <see cref="Enable"/>.</summary>
+        public Transform target { get; private set; }
+
+        [SerializeField, FormerlySerializedAs("axes")] private HandleAxes _axes = HandleAxes.XYZ;
+        /// <summary>Active axes for the handle. Assigning rebuilds the child handles.</summary>
+        public HandleAxes axes
+        {
+            get => _axes;
+            set
+            {
+                if (_axes == value) return;
+                _axes = value;
+                Clear();
+                CreateHandles();
+            }
+        }
+
+        [SerializeField, FormerlySerializedAs("space")] private Space _space = Space.Self;
+        /// <summary>Coordinate space for transformations. Scale handles are always <see cref="Space.Self"/>.</summary>
+        public Space space
+        {
+            get => _space;
+            set => _space = type == HandleType.Scale ? Space.Self : (value == Space.Self ? Space.Self : Space.World);
+        }
+
+        [SerializeField, FormerlySerializedAs("type")] private HandleType _type = HandleType.Position;
+        /// <summary>Current handle type (Position, Rotation, Scale, or combinations). Assigning rebuilds the child handles.</summary>
+        public HandleType type
+        {
+            get => _type;
+            set
+            {
+                if (_type == value) return;
+                _type = value;
+                Clear();
+                CreateHandles();
+            }
+        }
+
+        [SerializeField, FormerlySerializedAs("snappingType")] private SnappingType _snappingType = SnappingType.Relative;
         /// <summary>Snapping behavior type (Relative or Absolute).</summary>
-        public SnappingType snappingType = SnappingType.Relative;
+        public SnappingType snappingType { get => _snappingType; set => _snappingType = value; }
 
+        [SerializeField, FormerlySerializedAs("positionSnap")] private Vector3 _positionSnap = Vector3.zero;
         /// <summary>Position snapping values for each axis.</summary>
-        public Vector3 positionSnap = Vector3.zero;
-        /// <summary>Rotation snapping value in degrees.</summary>
-        public float rotationSnap;
-        /// <summary>Scale snapping values for each axis.</summary>
-        public Vector3 scaleSnap = Vector3.zero;
+        public Vector3 positionSnap { get => _positionSnap; set => _positionSnap = value; }
 
-        /// <summary>Camera used for raycasting and screen-to-world conversions.</summary>
-        public Camera handleCamera;
+        [SerializeField, FormerlySerializedAs("rotationSnap")] private float _rotationSnap;
+        /// <summary>Rotation snapping value in degrees.</summary>
+        public float rotationSnap { get => _rotationSnap; set => _rotationSnap = value; }
+
+        [SerializeField, FormerlySerializedAs("scaleSnap")] private Vector3 _scaleSnap = Vector3.zero;
+        /// <summary>Scale snapping values for each axis.</summary>
+        public Vector3 scaleSnap { get => _scaleSnap; set => _scaleSnap = value; }
+
+        /// <summary>Camera used for raycasting and screen-to-world conversions. Read-only; set when the handle is enabled.</summary>
+        public Camera handleCamera { get; private set; }
 
         private PositionHandle PositionHandle { get; set; }
         private RotationHandle RotationHandle { get; set; }
@@ -212,36 +251,30 @@ namespace TransformHandles
         /// Changes the handle type (Position, Rotation, Scale, or combinations).
         /// </summary>
         /// <param name="handleType">The new handle type.</param>
+        [Obsolete("Assign the 'type' property instead; its setter rebuilds the child handles.")]
         public virtual void ChangeHandleType(HandleType handleType)
         {
             type = handleType;
-
-            Clear();
-            CreateHandles();
         }
 
         /// <summary>
         /// Changes the coordinate space for transformations.
         /// </summary>
         /// <param name="newSpace">The new coordinate space.</param>
+        [Obsolete("Assign the 'space' property instead; its setter applies the Scale-is-always-Self clamp.")]
         public virtual void ChangeHandleSpace(Space newSpace)
         {
-            if (type == HandleType.Scale)
-                space = Space.Self;
-            else
-                space = newSpace == Space.Self ? Space.Self : Space.World;
+            space = newSpace;
         }
 
         /// <summary>
         /// Changes the active axes for the handle.
         /// </summary>
         /// <param name="handleAxes">The new axes configuration.</param>
+        [Obsolete("Assign the 'axes' property instead; its setter rebuilds the child handles.")]
         public virtual void ChangeAxes(HandleAxes handleAxes)
         {
             axes = handleAxes;
-
-            Clear();
-            CreateHandles();
         }
 
         protected virtual void UpdateHandleTransformation()

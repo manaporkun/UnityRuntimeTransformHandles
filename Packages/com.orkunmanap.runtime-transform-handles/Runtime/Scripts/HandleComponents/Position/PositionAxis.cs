@@ -68,16 +68,16 @@ namespace TransformHandles
             var snap = Vector3.Scale(snapping, _axis).magnitude;
             if (snap != 0 && ParentHandle.snappingType == SnappingType.Relative)
             {
-                offset = (Mathf.Round(offset.magnitude / snap) * snap) * offset.normalized;
+                offset = SnapUtils.Snap(offset.magnitude, snap) * offset.normalized;
             }
 
             var position = _startPosition + offset;
 
             if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
             {
-                if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
-                if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
-                if (snapping.z != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
+                position.x = SnapUtils.Snap(position.x, snapping.x);
+                position.y = SnapUtils.Snap(position.y, snapping.y);
+                position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
             ParentHandle.target.position = position;
@@ -118,12 +118,18 @@ namespace TransformHandles
             if (_lineMaterial.color != DefaultColor) _lineMaterial.color = DefaultColor;
         }
 
+        private bool _lastVisible;
+        private bool _visibilitySet;
+
         private void LateUpdate()
         {
             var dot = Vector3.Dot(_coneTransform.up, _cameraTransform.forward);
-            var notVisible = dot < -AxisVisibilityDotThreshold || dot > AxisVisibilityDotThreshold;
-            _lineGameObject.SetActive(!notVisible);
-            _coneGameObject.SetActive(!notVisible);
+            var visible = dot >= -AxisVisibilityDotThreshold && dot <= AxisVisibilityDotThreshold;
+            if (_visibilitySet && visible == _lastVisible) return;
+            _lastVisible = visible;
+            _visibilitySet = true;
+            _lineGameObject.SetActive(visible);
+            _coneGameObject.SetActive(visible);
         }
     }
 }

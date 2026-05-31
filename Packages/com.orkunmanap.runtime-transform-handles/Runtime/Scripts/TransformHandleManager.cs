@@ -78,6 +78,7 @@ namespace TransformHandles
         private bool _handleActive;
         private bool _isInitialized;
         private int _handleLayer = -1;
+        private bool _cameraMissingLogged;
 
         private void OnEnable()
         {
@@ -155,15 +156,11 @@ namespace TransformHandles
         /// <returns>The created handle, or null if the target already has a handle.</returns>
         public Handle CreateHandle(Transform target)
         {
-            if (target == null)
-            {
-                Debug.LogError("Target transform is null");
-                return null;
-            }
+            if (target == null) throw new ArgumentNullException(nameof(target));
 
             if (_transformHashSet.Contains(target))
             {
-                Debug.LogWarning($"{target} already has a handle.");
+                Debug.LogWarning($"TransformHandles: {target} already has a handle.");
                 return null;
             }
 
@@ -188,6 +185,8 @@ namespace TransformHandles
             var success = AddTarget(target, transformHandle);
             if (!success)
             {
+                // Tear down maps + ghost before destroying the GameObject so no orphan state leaks.
+                RemoveHandle(transformHandle);
                 DestroyHandle(transformHandle);
                 return null;
             }
@@ -204,11 +203,8 @@ namespace TransformHandles
         /// <returns>The created handle, or null if any target already has a handle.</returns>
         public Handle CreateHandleFromList(List<Transform> targets)
         {
-            if (targets == null || targets.Count == 0)
-            {
-                Debug.LogWarning("List is empty or null.");
-                return null;
-            }
+            if (targets == null) throw new ArgumentNullException(nameof(targets));
+            if (targets.Count == 0) throw new ArgumentException("Target list is empty.", nameof(targets));
 
             var ghost = CreateGhost();
             if (ghost == null)
@@ -231,7 +227,10 @@ namespace TransformHandles
             {
                 if (_transformHashSet.Contains(target))
                 {
-                    Debug.LogWarning($"{target} already has a handle.");
+                    Debug.LogWarning($"TransformHandles: {target} already has a handle.");
+                    // Tear down maps + ghost (and roll back already-added targets) before
+                    // destroying the GameObject so no orphan state leaks.
+                    RemoveHandle(transformHandle);
                     DestroyHandle(transformHandle);
                     return null;
                 }
@@ -266,17 +265,14 @@ namespace TransformHandles
         /// <param name="handle">The handle to remove.</param>
         public void RemoveHandle(Handle handle)
         {
-            if (handle == null)
-            {
-                Debug.LogError("Handle is already null");
-                return;
-            }
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
 
             if (_handleGroupMap == null) return;
 
             if (!_handleGroupMap.TryGetValue(handle, out var group))
             {
-                Debug.LogError("Handle not found in group map");
+                // Already unmanaged: a create-path bail removes the handle, then DestroyImmediate
+                // re-fires Handle.OnDestroy -> RemoveHandle. Idempotent no-op, not an error.
                 return;
             }
 
@@ -308,10 +304,20 @@ namespace TransformHandles
         /// </summary>
         public void DestroyAllHandles()
         {
-            foreach (var handle in _handleGroupMap.Keys)
+            if (_handleGroupMap == null) return;
+
+            // Snapshot the keys: DestroyHandle -> Handle.OnDestroy -> RemoveHandle mutates the
+            // map, so iterating the live key collection throws InvalidOperationException.
+            var handles = new List<Handle>(_handleGroupMap.Keys);
+            foreach (var handle in handles)
             {
                 DestroyHandle(handle);
             }
+
+            _handleGroupMap.Clear();
+            _ghostGroupMap.Clear();
+            _transformHashSet.Clear();
+            _handleActive = false;
         }
 
         /// <summary>
@@ -322,28 +328,21 @@ namespace TransformHandles
         /// <returns>True if the target was added successfully.</returns>
         public bool AddTarget(Transform target, Handle handle)
         {
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
+
             if (_transformHashSet.Contains(target))
             {
-                Debug.LogWarning($"{target} already has a handle.");
-                return false;
-            }
-
-            if (handle == null)
-            {
-                Debug.LogError("Handle is null");
+                Debug.LogWarning($"TransformHandles: {target} already has a handle.");
                 return false;
             }
 
             if (!_handleGroupMap.TryGetValue(handle, out var group))
-            {
-                Debug.LogError("Handle not found in group map");
-                return false;
-            }
+                throw new InvalidOperationException("Handle is not managed by this TransformHandleManager.");
 
             var targetAdded = group.AddTransform(target);
             if (!targetAdded)
             {
-                Debug.LogWarning($"{target} is relative to the selected ones.");
+                Debug.LogWarning($"TransformHandles: {target} is relative to the selected ones.");
                 return false;
             }
 
@@ -362,25 +361,18 @@ namespace TransformHandles
         /// <param name="handle">The handle to remove the target from.</param>
         public void RemoveTarget(Transform target, Handle handle)
         {
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
+
             if (!_transformHashSet.Contains(target))
             {
-                Debug.LogWarning($"{target} doesn't have a handle.");
-                return;
-            }
-
-            if (handle == null)
-            {
-                Debug.LogError("Handle is null");
+                Debug.LogWarning($"TransformHandles: {target} doesn't have a handle.");
                 return;
             }
 
             _transformHashSet.Remove(target);
 
             if (!_handleGroupMap.TryGetValue(handle, out var group))
-            {
-                Debug.LogError("Handle not found in group map");
-                return;
-            }
+                throw new InvalidOperationException("Handle is not managed by this TransformHandleManager.");
 
             var groupElementsRemoved = group.RemoveTransform(target);
             if (groupElementsRemoved)
@@ -422,11 +414,20 @@ namespace TransformHandles
                 mainCamera = Camera.main;
                 if (mainCamera == null)
                 {
-                    Debug.Log("Main camera is null, aborting");
-                    Destroy(gameObject);
+                    // No camera this frame (scene load, camera swap, etc.) is a recoverable
+                    // transient. Skip raycasting and survive instead of self-destructing the
+                    // DontDestroyOnLoad singleton. Assign 'mainCamera' to recover explicitly.
+                    if (!_cameraMissingLogged)
+                    {
+                        Debug.LogWarning("TransformHandles: No main camera found; handle raycasting " +
+                                         "is paused until a camera is available. Assign 'mainCamera' to recover.");
+                        _cameraMissingLogged = true;
+                    }
                     return;
                 }
             }
+
+            _cameraMissingLogged = false;
 
             var ray = mainCamera.ScreenPointToRay(MousePosition);
             var size = Physics.RaycastNonAlloc(ray, _rayHits, RaycastMaxDistance, layerMask);
@@ -578,12 +579,8 @@ namespace TransformHandles
         /// <param name="type">The new handle type.</param>
         public static void ChangeHandleType(Handle handle, HandleType type)
         {
-            if (handle == null)
-            {
-                Debug.LogError("Handle is null");
-                return;
-            }
-            handle.ChangeHandleType(type);
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
+            handle.type = type;
         }
 
         /// <summary>
@@ -593,12 +590,8 @@ namespace TransformHandles
         /// <param name="space">The new coordinate space.</param>
         public void ChangeHandleSpace(Handle handle, Space space)
         {
-            if (handle == null)
-            {
-                Debug.LogError("Handle is null");
-                return;
-            }
-            handle.ChangeHandleSpace(space);
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
+            handle.space = space;
 
             var group = _handleGroupMap[handle];
             group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
@@ -611,11 +604,7 @@ namespace TransformHandles
         /// <param name="originToCenter">Whether to set the origin to the center of bounds.</param>
         public void ChangeHandlePivot(TransformGroup group, bool originToCenter)
         {
-            if (group == null)
-            {
-                Debug.LogError("Group is null");
-                return;
-            }
+            if (group == null) throw new ArgumentNullException(nameof(group));
             group.IsOriginOnCenter = originToCenter;
             group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
         }

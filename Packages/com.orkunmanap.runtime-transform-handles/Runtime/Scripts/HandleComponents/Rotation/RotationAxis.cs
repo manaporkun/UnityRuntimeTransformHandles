@@ -67,7 +67,7 @@ namespace TransformHandles
 
             if (ParentHandle.rotationSnap != 0)
             {
-                angleDegrees = Mathf.Round(angleDegrees / ParentHandle.rotationSnap) * ParentHandle.rotationSnap;
+                angleDegrees = SnapUtils.Snap(angleDegrees, ParentHandle.rotationSnap);
                 angleRadians = angleDegrees * Mathf.Deg2Rad;
             }
 
