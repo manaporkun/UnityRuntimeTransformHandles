@@ -248,10 +248,10 @@ namespace TransformHandles
         {
             if (!target) return;
 
-            transform.position = target.transform.position;
+            transform.position = target.position;
             if (space == Space.Self || type == HandleType.Scale)
             {
-                transform.rotation = target.transform.rotation;
+                transform.rotation = target.rotation;
             }
             else
             {

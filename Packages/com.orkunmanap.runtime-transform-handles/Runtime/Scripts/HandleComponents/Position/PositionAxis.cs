@@ -107,15 +107,15 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            _coneMaterial.color = color;
-            _lineMaterial.color = color;
+            if (_coneMaterial.color != color) _coneMaterial.color = color;
+            if (_lineMaterial.color != color) _lineMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            _coneMaterial.color = DefaultColor;
-            _lineMaterial.color = DefaultColor;
+            if (_coneMaterial.color != DefaultColor) _coneMaterial.color = DefaultColor;
+            if (_lineMaterial.color != DefaultColor) _lineMaterial.color = DefaultColor;
         }
 
         private void LateUpdate()

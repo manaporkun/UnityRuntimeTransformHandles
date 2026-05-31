@@ -138,13 +138,13 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            _quadMaterial.color = color;
+            if (_quadMaterial.color != color) _quadMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            _quadMaterial.color = DefaultColor;
+            if (_quadMaterial.color != DefaultColor) _quadMaterial.color = DefaultColor;
         }
     }
 }

@@ -114,17 +114,23 @@ namespace TransformHandles
         public void UpdateRotations(Quaternion rotationChange)
         {
             var ghostPosition = GroupGhost.transform.position;
-            var rotationAxis = rotationChange.normalized.eulerAngles;
-            var rotationChangeMagnitude = rotationChange.eulerAngles.magnitude;
 
-            foreach (var target in RenderersMap.Keys)
+            if (GroupHandle.space == Space.Self)
             {
-                if (GroupHandle.space == Space.Self)
+                foreach (var target in RenderersMap.Keys)
                 {
                     target.position = rotationChange * (target.position - ghostPosition) + ghostPosition;
                     target.rotation = rotationChange * target.rotation;
                 }
-                else
+            }
+            else
+            {
+                // eulerAngles conversions are only needed for the world-space RotateAround path;
+                // computing them up front wasted two quaternion->euler conversions every frame in Self space.
+                var rotationAxis = rotationChange.normalized.eulerAngles;
+                var rotationChangeMagnitude = rotationChange.eulerAngles.magnitude;
+
+                foreach (var target in RenderersMap.Keys)
                 {
                     target.RotateAround(ghostPosition, rotationAxis, rotationChangeMagnitude);
                 }

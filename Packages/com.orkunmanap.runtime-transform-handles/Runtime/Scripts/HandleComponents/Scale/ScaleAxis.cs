@@ -20,6 +20,7 @@ namespace TransformHandles
         private Vector3 _startScale;
 
         private float _interactionDistance;
+        private float _lastDelta = float.NaN;
         private Ray _rAxisRay;
 
         private Material _cubeMaterial;
@@ -46,6 +47,10 @@ namespace TransformHandles
 
         protected void Update()
         {
+            // Skip redundant transform writes when delta hasn't changed (e.g. idle handle, delta == 0).
+            if (delta == _lastDelta) return;
+            _lastDelta = delta;
+
             lineMeshRenderer.transform.localScale = new Vector3(1, 1 + delta, 1);
             cubeMeshRenderer.transform.localPosition = _axis * (ScaleCubeSize * (1 + delta));
         }
@@ -106,15 +111,15 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            _cubeMaterial.color = color;
-            _lineMaterial.color = color;
+            if (_cubeMaterial.color != color) _cubeMaterial.color = color;
+            if (_lineMaterial.color != color) _lineMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            _cubeMaterial.color = DefaultColor;
-            _lineMaterial.color = DefaultColor;
+            if (_cubeMaterial.color != DefaultColor) _cubeMaterial.color = DefaultColor;
+            if (_lineMaterial.color != DefaultColor) _lineMaterial.color = DefaultColor;
         }
     }
 }

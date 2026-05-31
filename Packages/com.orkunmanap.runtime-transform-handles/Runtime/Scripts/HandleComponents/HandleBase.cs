@@ -17,7 +17,7 @@ namespace TransformHandles
         public event Action<float> InteractionUpdate;
 
         /// <summary>The parent handle that owns this component.</summary>
-        protected Handle ParentHandle;
+        public Handle ParentHandle { get; protected set; }
 
         /// <summary>The default color of this handle component.</summary>
         protected Color DefaultColor;
@@ -44,7 +44,7 @@ namespace TransformHandles
         /// </summary>
         public virtual void SetDefaultColor()
         {
-            if (Material != null)
+            if (Material != null && Material.color != DefaultColor)
                 Material.color = DefaultColor;
         }
 
@@ -54,7 +54,7 @@ namespace TransformHandles
         /// <param name="color">The color to apply.</param>
         public virtual void SetColor(Color color)
         {
-            if (Material != null)
+            if (Material != null && Material.color != color)
                 Material.color = color;
         }
 

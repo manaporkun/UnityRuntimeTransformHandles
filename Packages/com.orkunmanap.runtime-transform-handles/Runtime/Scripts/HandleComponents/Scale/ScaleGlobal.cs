@@ -54,13 +54,13 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            _cubeMaterial.color = color;
+            if (_cubeMaterial.color != color) _cubeMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            _cubeMaterial.color = DefaultColor;
+            if (_cubeMaterial.color != DefaultColor) _cubeMaterial.color = DefaultColor;
         }
     }
 }
