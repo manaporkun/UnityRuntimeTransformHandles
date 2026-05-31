@@ -27,7 +27,10 @@ namespace TransformHandles
             ParentHandle = handle;
             _axis = axis;
             DefaultColor = defaultColor;
-            _cubeMaterial = cubeMeshRenderer.material;
+
+            // Instantiate the material once; Initialize is re-runnable via Handle.ChangeAxes
+            // and MeshRenderer.material allocates a new instance on every access.
+            if (_cubeMaterial == null) _cubeMaterial = cubeMeshRenderer.material;
         }
 
         /// <inheritdoc/>
