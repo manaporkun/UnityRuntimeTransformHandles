@@ -50,7 +50,13 @@ namespace TransformHandles
             if (_coneMaterial == null) _coneMaterial = coneMeshRenderer.material;
             if (_lineMaterial == null) _lineMaterial = lineMeshRenderer.material;
 
-            _axis = _coneTransform.up;
+            // Capture the axis in the handle-local frame so it stays canonical regardless of the
+            // handle's current world rotation. Using the world-space cone.up directly meant that
+            // re-running Initialize (Handle.ChangeAxes/ChangeHandleType) while the handle was already
+            // rotated in Self space stored an already-rotated axis, which GetRotatedAxis then rotated
+            // a second time -> the drag axis no longer matched the gizmo. Normalized for the
+            // unit-direction precondition of MathUtils.ClosestPointOnRay.
+            _axis = ParentHandle.transform.InverseTransformDirection(_coneTransform.up).normalized;
             DefaultColor = defaultColor;
         }
 
@@ -68,16 +74,19 @@ namespace TransformHandles
             var snap = Vector3.Scale(snapping, _axis).magnitude;
             if (snap != 0 && ParentHandle.snappingType == SnappingType.Relative)
             {
-                offset = (Mathf.Round(offset.magnitude / snap) * snap) * offset.normalized;
+                offset = SnapUtils.Snap(offset.magnitude, snap) * offset.normalized;
             }
 
             var position = _startPosition + offset;
 
             if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
             {
-                if (snapping.x != 0) position.x = Mathf.Round(position.x / snapping.x) * snapping.x;
-                if (snapping.y != 0) position.y = Mathf.Round(position.y / snapping.y) * snapping.y;
-                if (snapping.z != 0) position.z = Mathf.Round(position.z / snapping.z) * snapping.z;
+                // Only snap the axis this handle controls. Snapping all three yanked the
+                // perpendicular axes onto the grid, so dragging X jumped the object in Y/Z.
+                // (>0.5 threshold ignores ~1e-7 residuals from the cone's 90-degree rotations.)
+                if (Mathf.Abs(_axis.x) > 0.5f) position.x = SnapUtils.Snap(position.x, snapping.x);
+                if (Mathf.Abs(_axis.y) > 0.5f) position.y = SnapUtils.Snap(position.y, snapping.y);
+                if (Mathf.Abs(_axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
             ParentHandle.target.position = position;
@@ -107,23 +116,29 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            _coneMaterial.color = color;
-            _lineMaterial.color = color;
+            if (_coneMaterial.color != color) _coneMaterial.color = color;
+            if (_lineMaterial.color != color) _lineMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            _coneMaterial.color = DefaultColor;
-            _lineMaterial.color = DefaultColor;
+            if (_coneMaterial.color != DefaultColor) _coneMaterial.color = DefaultColor;
+            if (_lineMaterial.color != DefaultColor) _lineMaterial.color = DefaultColor;
         }
+
+        private bool _lastVisible;
+        private bool _visibilitySet;
 
         private void LateUpdate()
         {
             var dot = Vector3.Dot(_coneTransform.up, _cameraTransform.forward);
-            var notVisible = dot < -AxisVisibilityDotThreshold || dot > AxisVisibilityDotThreshold;
-            _lineGameObject.SetActive(!notVisible);
-            _coneGameObject.SetActive(!notVisible);
+            var visible = dot >= -AxisVisibilityDotThreshold && dot <= AxisVisibilityDotThreshold;
+            if (_visibilitySet && visible == _lastVisible) return;
+            _lastVisible = visible;
+            _visibilitySet = true;
+            _lineGameObject.SetActive(visible);
+            _coneGameObject.SetActive(visible);
         }
     }
 }

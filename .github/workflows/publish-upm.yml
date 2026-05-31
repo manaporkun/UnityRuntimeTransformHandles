@@ -4,13 +4,117 @@ on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
+  checks: write
+  pull-requests: write
 
 jobs:
+  # UPM-spec gate: manifest + required files + asmdef sanity. No Unity license needed,
+  # so it runs fast on every PR and enforces the package floor going forward.
+  validate:
+    name: Validate package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate manifest & structure
+        run: |
+          set -uo pipefail
+          PKG="Packages/com.orkunmanap.runtime-transform-handles"
+          MANIFEST="$PKG/package.json"
+          fail=0
+          err(){ echo "::error::$1"; fail=1; }
+
+          if [ ! -f "$MANIFEST" ]; then echo "::error::package.json missing"; exit 1; fi
+          jq empty "$MANIFEST" 2>/dev/null || err "package.json is not valid JSON"
+
+          for k in name version displayName description unity; do
+            v=$(jq -r --arg k "$k" '.[$k] // empty' "$MANIFEST")
+            [ -n "$v" ] || err "package.json missing '$k'"
+          done
+
+          NAME=$(jq -r '.name // ""' "$MANIFEST")
+          echo "$NAME" | grep -qE '^[a-z0-9]+(\.[a-z0-9-]+)+$' || err "invalid package name '$NAME'"
+
+          VER=$(jq -r '.version // ""' "$MANIFEST")
+          echo "$VER" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+].+)?$' || err "version '$VER' not semver"
+
+          UNITY=$(jq -r '.unity // ""' "$MANIFEST")
+          echo "$UNITY" | grep -qE '^[0-9]{4}\.[0-9]+$' || err "unity '$UNITY' not in YYYY.N form"
+
+          for f in README.md LICENSE.md CHANGELOG.md "Third Party Notices.md"; do
+            [ -f "$PKG/$f" ] || err "missing in-package file: $f"
+          done
+
+          # Every registered sample path must exist.
+          while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            [ -d "$PKG/$p" ] || err "samples[] path not found: $p"
+          done < <(jq -r '.samples[]?.path' "$MANIFEST")
+
+          # Every asmdef (incl. hidden samples) must be valid JSON with a name.
+          while IFS= read -r -d '' a; do
+            jq -e '.name' "$a" >/dev/null 2>&1 || err "asmdef invalid or unnamed: $a"
+          done < <(find "$PKG" -name '*.asmdef' -print0)
+
+          if [ "$fail" -ne 0 ]; then echo "Package validation FAILED"; exit 1; fi
+          echo "Package validation passed."
+
+  # Gate: the package must compile and its EditMode + PlayMode tests must pass
+  # before anything is published. Runs on pull_request too so breakage is caught
+  # before it reaches main.
+  test:
+    name: Tests (EditMode + PlayMode)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      - name: Run tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+        with:
+          unityVersion: 6000.3.16f1
+          testMode: all
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts
+          if-no-files-found: ignore
+
   publish:
+    # Only publish on a real push to main (or manual dispatch), and only after validate + tests pass.
+    needs: [validate, test]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -30,36 +134,31 @@ jobs:
       - name: Determine version bump
         id: bump
         run: |
-          # Get the latest tag
+          # Latest tag (fallback to v0.0.0 for the first release).
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
 
-          # Get commits since last tag
-          COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"%s" 2>/dev/null || git log --pretty=format:"%s")
+          # Read FULL commit messages (%B) so `BREAKING CHANGE:` body/footer lines are seen,
+          # not just subjects.
+          COMMITS=$(git log $LATEST_TAG..HEAD --format=%B 2>/dev/null || git log --format=%B)
 
           echo "Commits since $LATEST_TAG:"
           echo "$COMMITS"
 
-          # Determine bump type based on conventional commits
+          # Strict Conventional Commits only — no bare ^break/^feature/^bugfix aliases
+          # (they mis-bump), and no catch-all "any change -> patch" fallback.
           BUMP="none"
 
-          if echo "$COMMITS" | grep -qiE "^.*(BREAKING CHANGE|!):|^break"; then
+          if echo "$COMMITS" | grep -qE "^BREAKING CHANGE:" \
+             || echo "$COMMITS" | grep -qiE "^[a-z]+(\(.+\))?!:"; then
             BUMP="major"
-          elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:|^feature"; then
+          elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:"; then
             BUMP="minor"
-          elif echo "$COMMITS" | grep -qiE "^fix(\(.+\))?:|^bugfix|^perf(\(.+\))?:|^refactor(\(.+\))?:"; then
+          elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor)(\(.+\))?:"; then
             BUMP="patch"
-          elif echo "$COMMITS" | grep -qiE "^docs(\(.+\))?:|^style(\(.+\))?:|^chore(\(.+\))?:|^ci(\(.+\))?:|^test(\(.+\))?:"; then
-            # For docs/style/chore commits, only bump if there are actual code changes
+          elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
+            # Housekeeping types only bump when actual code/manifest changed.
             if git diff $LATEST_TAG..HEAD --name-only 2>/dev/null | grep -qE "\.cs$|package\.json$"; then
-              BUMP="patch"
-            fi
-          fi
-
-          # If no conventional commits but there are changes, default to patch
-          if [ "$BUMP" = "none" ]; then
-            CHANGES=$(git diff $LATEST_TAG..HEAD --name-only 2>/dev/null | grep -E "Packages/com.orkunmanap.runtime-transform-handles/" | wc -l)
-            if [ "$CHANGES" -gt 0 ]; then
               BUMP="patch"
             fi
           fi
@@ -80,7 +179,6 @@ jobs:
             exit 0
           fi
 
-          # Parse version
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
           case $BUMP in
@@ -109,11 +207,44 @@ jobs:
           NEW_VERSION="${{ steps.version.outputs.version }}"
           PACKAGE_FILE="Packages/com.orkunmanap.runtime-transform-handles/package.json"
 
-          # Update version in package.json
           jq ".version = \"$NEW_VERSION\"" $PACKAGE_FILE > tmp.json && mv tmp.json $PACKAGE_FILE
 
           echo "Updated package.json to version $NEW_VERSION"
           cat $PACKAGE_FILE
+
+      - name: Prepend release notes into in-package CHANGELOG
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+          CHANGELOG="Packages/com.orkunmanap.runtime-transform-handles/CHANGELOG.md"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LATEST_TAG" ]; then
+            ENTRIES=$(git log --pretty=format:"- %s" HEAD)
+          else
+            ENTRIES=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s")
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          {
+            echo "## [$NEW_VERSION] - $DATE"
+            echo ""
+            echo "$ENTRIES"
+            echo ""
+          } > /tmp/new_entry.md
+
+          if [ -f "$CHANGELOG" ]; then
+            # Insert the new section just before the first existing "## [" heading.
+            awk 'BEGIN{ins=0}
+                 /^## \[/ && ins==0 {while((getline line < "/tmp/new_entry.md")>0) print line; ins=1}
+                 {print}
+                 END{if(ins==0){while((getline line < "/tmp/new_entry.md")>0) print line}}' \
+                "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
+          else
+            cp /tmp/new_entry.md "$CHANGELOG"
+          fi
+
+          echo "Updated $CHANGELOG"
 
       - name: Configure Git
         run: |
@@ -124,8 +255,9 @@ jobs:
         if: steps.version.outputs.skip != 'true'
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
+          PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
 
-          git add Packages/com.orkunmanap.runtime-transform-handles/package.json
+          git add "$PACKAGE_PATH/package.json" "$PACKAGE_PATH/CHANGELOG.md"
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
           git push origin main
 
@@ -135,16 +267,13 @@ jobs:
           PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
           UPM_BRANCH="upm"
 
-          # Check if upm branch exists
           if git ls-remote --heads origin $UPM_BRANCH | grep -q $UPM_BRANCH; then
             echo "UPM branch exists, updating..."
             git checkout $UPM_BRANCH
             git pull origin $UPM_BRANCH
 
-            # Remove old files (except .git)
             find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
 
-            # Copy package contents
             git checkout main -- "$PACKAGE_PATH"
             mv "$PACKAGE_PATH"/* .
             rm -rf Packages
@@ -152,17 +281,14 @@ jobs:
             echo "Creating new UPM branch..."
             git checkout --orphan $UPM_BRANCH
 
-            # Remove all files
             git rm -rf . || true
             git clean -fd
 
-            # Copy package contents from main
             git checkout main -- "$PACKAGE_PATH"
             mv "$PACKAGE_PATH"/* .
             rm -rf Packages
           fi
 
-          # Stage and commit
           git add -A
 
           if git diff --cached --quiet; then
@@ -180,7 +306,6 @@ jobs:
 
           git checkout upm
 
-          # Create and push tag
           git tag -a $VERSION -m "Release $VERSION"
           git push origin $VERSION
 
@@ -198,7 +323,6 @@ jobs:
             COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s")
           fi
 
-          # Create changelog
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

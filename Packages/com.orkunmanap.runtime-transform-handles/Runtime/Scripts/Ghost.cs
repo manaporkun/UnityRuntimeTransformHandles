@@ -25,7 +25,7 @@ namespace TransformHandles
         /// <summary>
         /// Terminates and destroys this ghost object.
         /// </summary>
-        public virtual void Terminate()
+        internal virtual void Terminate()
         {
             DestroyImmediate(gameObject);
         }
@@ -34,7 +34,7 @@ namespace TransformHandles
         /// Updates the ghost's transform to match the given position, rotation, and scale.
         /// </summary>
         /// <param name="average">The average position, rotation, and scale to apply.</param>
-        public void UpdateGhostTransform(PosRotScale average)
+        internal void UpdateGhostTransform(PosRotScale average)
         {
             GhostTransform.position = average.Position;
             GhostTransform.rotation = average.Rotation;
@@ -44,7 +44,7 @@ namespace TransformHandles
         /// <summary>
         /// Resets the ghost's transform to default values (zero position, identity rotation, unit scale).
         /// </summary>
-        public void ResetGhostTransform()
+        internal void ResetGhostTransform()
         {
             GhostTransform.position = Vector3.zero;
             GhostTransform.rotation = Quaternion.identity;
@@ -54,7 +54,7 @@ namespace TransformHandles
         /// <summary>
         /// Called when interaction starts. Stores the initial transform state for delta calculations.
         /// </summary>
-        public virtual void OnInteractionStart()
+        internal virtual void OnInteractionStart()
         {
             _initialProperties = new PosRotScale()
             {
@@ -68,7 +68,7 @@ namespace TransformHandles
         /// Called during interaction. Calculates deltas and updates the transform group.
         /// </summary>
         /// <param name="handleType">The type of handle being manipulated.</param>
-        public virtual void OnInteraction(HandleType handleType)
+        internal virtual void OnInteraction(HandleType handleType)
         {
             switch (handleType)
             {

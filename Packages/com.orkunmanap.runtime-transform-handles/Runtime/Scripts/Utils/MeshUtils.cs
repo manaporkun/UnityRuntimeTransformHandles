@@ -7,7 +7,18 @@ namespace TransformHandles.Utils
 	    public static Mesh CreateArc(Vector3 center, Vector3 startPoint, Vector3 axis, float radius, float angle, int segmentCount)
 		{
 			var mesh = new Mesh();
-			
+			RebuildArc(mesh, center, startPoint, axis, radius, angle, segmentCount);
+			return mesh;
+		}
+
+		/// <summary>
+		/// Rewrites an existing mesh into an arc, reusing the Mesh object to avoid per-frame
+		/// allocation and native mesh leaks during continuous rotation handle dragging.
+		/// </summary>
+		public static void RebuildArc(Mesh mesh, Vector3 center, Vector3 startPoint, Vector3 axis, float radius, float angle, int segmentCount)
+		{
+			mesh.Clear();
+
 			var vertices = new Vector3[segmentCount+2];
 
 			var startVector = (startPoint - center).normalized * radius;
@@ -18,7 +29,7 @@ namespace TransformHandles.Utils
 				vertices[i] = v + center;
 			}
 			vertices[segmentCount+1] = center;
-			
+
 			var normals = new Vector3[vertices.Length];
 			for( var n = 0; n < normals.Length; n++ )
 				normals[n] = Vector3.up;
@@ -30,7 +41,7 @@ namespace TransformHandles.Utils
 				uvs[i] = new Vector2(Mathf.Cos(rad) * .5f + .5f, Mathf.Sin(rad) * .5f + .5f);
 			}
 			uvs[segmentCount + 1] = Vector2.one / 2f;
-			
+
 			var triangles = new int[ segmentCount * 3 ];
 			for (var i = 0; i < segmentCount; i++)
 			{
@@ -39,16 +50,13 @@ namespace TransformHandles.Utils
 				triangles[index+1] = i;
 				triangles[index+2] = i + 1;
 			}
-			
+
 			mesh.vertices = vertices;
 			mesh.normals = normals;
 			mesh.uv = uvs;
 			mesh.triangles = triangles;
- 
+
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-			
-			return mesh;
 		}
 		
 		public static Mesh CreateArc(float radius, float angle, int segmentCount)
@@ -90,9 +98,7 @@ namespace TransformHandles.Utils
 			mesh.uv = uvs;
 			mesh.triangles = triangles;
  
-			mesh.RecalculateBounds();
-			mesh.Optimize();
-			
+			mesh.RecalculateBounds();			
 			return mesh;
 		}
 		
@@ -154,8 +160,6 @@ namespace TransformHandles.Utils
 			mesh.triangles = triangles;
  
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-
 			return mesh;
 		}
 		
@@ -275,8 +279,6 @@ namespace TransformHandles.Utils
 			mesh.triangles = triangles;
 
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-
 			return mesh;
 		}
 
@@ -457,8 +459,6 @@ namespace TransformHandles.Utils
 			mesh.triangles = triangles;
 
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-
 			return mesh;
 		}
 
@@ -706,8 +706,6 @@ namespace TransformHandles.Utils
 			mesh.triangles = triangles;
 
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-
 			return mesh;
 		}
 
@@ -792,8 +790,6 @@ namespace TransformHandles.Utils
 			mesh.triangles = triangles;
 
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-
 			return mesh;
 		}
 		
@@ -883,8 +879,6 @@ namespace TransformHandles.Utils
 			mesh.triangles = triangles;
 			 
 			mesh.RecalculateBounds();
-			mesh.Optimize();
-
 			return mesh;
 		}
     }

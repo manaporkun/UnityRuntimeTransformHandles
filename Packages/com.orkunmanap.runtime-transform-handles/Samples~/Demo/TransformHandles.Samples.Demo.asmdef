@@ -1,0 +1,16 @@
+{
+    "name": "TransformHandles.Samples.Demo",
+    "rootNamespace": "",
+    "references": [
+        "com.orkunmanap.runtime-transform-handles"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
