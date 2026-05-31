@@ -48,7 +48,10 @@ namespace TransformHandles
 
             _quadGameObject = quadMeshRenderer.gameObject;
             _cameraTransform = _handleCamera.transform;
-            _quadMaterial = quadMeshRenderer.material;
+
+            // Instantiate the material once; Initialize is re-runnable via Handle.ChangeAxes
+            // and MeshRenderer.material allocates a new instance on every access.
+            if (_quadMaterial == null) _quadMaterial = quadMeshRenderer.material;
 
             _quadGameObject.transform.localPosition = (_axis1 + _axis2) * PlaneVisualOffset;
         }
