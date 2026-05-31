@@ -11,6 +11,58 @@ permissions:
   contents: write
 
 jobs:
+  # UPM-spec gate: manifest + required files + asmdef sanity. No Unity license needed,
+  # so it runs fast on every PR and enforces the package floor going forward.
+  validate:
+    name: Validate package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate manifest & structure
+        run: |
+          set -uo pipefail
+          PKG="Packages/com.orkunmanap.runtime-transform-handles"
+          MANIFEST="$PKG/package.json"
+          fail=0
+          err(){ echo "::error::$1"; fail=1; }
+
+          if [ ! -f "$MANIFEST" ]; then echo "::error::package.json missing"; exit 1; fi
+          jq empty "$MANIFEST" 2>/dev/null || err "package.json is not valid JSON"
+
+          for k in name version displayName description unity; do
+            v=$(jq -r --arg k "$k" '.[$k] // empty' "$MANIFEST")
+            [ -n "$v" ] || err "package.json missing '$k'"
+          done
+
+          NAME=$(jq -r '.name // ""' "$MANIFEST")
+          echo "$NAME" | grep -qE '^[a-z0-9]+(\.[a-z0-9-]+)+$' || err "invalid package name '$NAME'"
+
+          VER=$(jq -r '.version // ""' "$MANIFEST")
+          echo "$VER" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+].+)?$' || err "version '$VER' not semver"
+
+          UNITY=$(jq -r '.unity // ""' "$MANIFEST")
+          echo "$UNITY" | grep -qE '^[0-9]{4}\.[0-9]+$' || err "unity '$UNITY' not in YYYY.N form"
+
+          for f in README.md LICENSE.md CHANGELOG.md "Third Party Notices.md"; do
+            [ -f "$PKG/$f" ] || err "missing in-package file: $f"
+          done
+
+          # Every registered sample path must exist.
+          while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            [ -d "$PKG/$p" ] || err "samples[] path not found: $p"
+          done < <(jq -r '.samples[]?.path' "$MANIFEST")
+
+          # Every asmdef (incl. hidden samples) must be valid JSON with a name.
+          while IFS= read -r -d '' a; do
+            jq -e '.name' "$a" >/dev/null 2>&1 || err "asmdef invalid or unnamed: $a"
+          done < <(find "$PKG" -name '*.asmdef' -print0)
+
+          if [ "$fail" -ne 0 ]; then echo "Package validation FAILED"; exit 1; fi
+          echo "Package validation passed."
+
   # Gate: the package must compile and its EditMode + PlayMode tests must pass
   # before anything is published. Runs on pull_request too so breakage is caught
   # before it reaches main.
@@ -58,8 +110,8 @@ jobs:
           if-no-files-found: ignore
 
   publish:
-    # Only publish on a real push to main (or manual dispatch), and only after tests pass.
-    needs: test
+    # Only publish on a real push to main (or manual dispatch), and only after validate + tests pass.
+    needs: [validate, test]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
