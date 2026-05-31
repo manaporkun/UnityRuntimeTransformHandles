@@ -39,7 +39,8 @@ namespace TransformHandles
 
             _handleCamera = ParentHandle.handleCamera;
 
-            _rotationHandleTransform = transform.GetComponentInParent<Handle>().transform;
+            // ParentHandle was set above; reuse its transform instead of walking the hierarchy again.
+            _rotationHandleTransform = ParentHandle.transform;
 
             // Instantiate the material once; Initialize is re-runnable via Handle.ChangeAxes
             // and MeshRenderer.material allocates a new instance on every access.
@@ -80,7 +81,10 @@ namespace TransformHandles
                 ParentHandle.target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
             }
 
-            _arcMesh = MeshUtils.CreateArc(transform.position, HitPoint, _rotatedAxis,
+            // Reuse a single Mesh instead of allocating a new one each frame. CreateArc would
+            // otherwise leak a native Mesh every frame of the drag (the previous one is never freed).
+            if (_arcMesh == null) _arcMesh = new Mesh { name = "RotationArc" };
+            MeshUtils.RebuildArc(_arcMesh, transform.position, HitPoint, _rotatedAxis,
                 _rotationHandleTransform.localScale.x, angleRadians,
                 Mathf.Abs(Mathf.CeilToInt(angleDegrees)) + 1);
             DrawArc();
@@ -124,16 +128,22 @@ namespace TransformHandles
             Graphics.DrawMesh(_arcMesh, Matrix4x4.identity, arcMaterial, gameObject.layer);
         }
 
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            if (_arcMesh != null) Destroy(_arcMesh);
+        }
+
         /// <inheritdoc/>
         public override void SetColor(Color color)
         {
-            _torusMaterial.color = color;
+            if (_torusMaterial.color != color) _torusMaterial.color = color;
         }
 
         /// <inheritdoc/>
         public override void SetDefaultColor()
         {
-            _torusMaterial.color = DefaultColor;
+            if (_torusMaterial.color != DefaultColor) _torusMaterial.color = DefaultColor;
         }
     }
 }
