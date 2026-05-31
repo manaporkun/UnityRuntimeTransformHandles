@@ -40,7 +40,10 @@ namespace TransformHandles
             _handleCamera = ParentHandle.handleCamera;
 
             _rotationHandleTransform = transform.GetComponentInParent<Handle>().transform;
-            _torusMaterial = torusMeshRenderer.material;
+
+            // Instantiate the material once; Initialize is re-runnable via Handle.ChangeAxes
+            // and MeshRenderer.material allocates a new instance on every access.
+            if (_torusMaterial == null) _torusMaterial = torusMeshRenderer.material;
         }
 
         /// <inheritdoc/>
