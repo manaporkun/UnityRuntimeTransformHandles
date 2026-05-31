@@ -397,12 +397,17 @@ namespace TransformHandles
         {
             if (!_handleActive) return;
 
-            _hoveredHandle = null;
-            _handleHitPoint = Vector3.zero;
+            // Hover detection is unused while dragging (HandleOverEffect is gated off and a drag
+            // can't start mid-hold), so skip the per-frame raycast + GetComponentInParent during a drag.
+            if (_draggingHandle == null)
+            {
+                _hoveredHandle = null;
+                _handleHitPoint = Vector3.zero;
 
-            GetHandle(ref _hoveredHandle, ref _handleHitPoint);
+                GetHandle(ref _hoveredHandle, ref _handleHitPoint);
 
-            HandleOverEffect(_hoveredHandle);
+                HandleOverEffect(_hoveredHandle);
+            }
 
             MouseInput();
             KeyboardInput();
@@ -410,17 +415,11 @@ namespace TransformHandles
 
         protected virtual void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
         {
-            var size = 0;
-            try
-            {
-                var ray = mainCamera.ScreenPointToRay(MousePosition);
-                size = Physics.RaycastNonAlloc(ray, _rayHits, RaycastMaxDistance, layerMask);
-            }
-            catch (MissingReferenceException)
+            // Unity's overloaded == reports a destroyed camera as null, so this proactive check
+            // covers the MissingReferenceException case the old per-frame try/catch handled.
+            if (mainCamera == null)
             {
                 mainCamera = Camera.main;
-                Debug.Log("Camera is null, trying to find main camera");
-
                 if (mainCamera == null)
                 {
                     Debug.Log("Main camera is null, aborting");
@@ -429,12 +428,15 @@ namespace TransformHandles
                 }
             }
 
+            var ray = mainCamera.ScreenPointToRay(MousePosition);
+            var size = Physics.RaycastNonAlloc(ray, _rayHits, RaycastMaxDistance, layerMask);
+
             if (size == 0)
             {
                 return;
             }
 
-            Array.Sort(_rayHits, 0, size, _rayHitComparer);
+            if (size > 1) Array.Sort(_rayHits, 0, size, _rayHitComparer);
 
             for (var i = 0; i < size; i++)
             {
@@ -544,7 +546,7 @@ namespace TransformHandles
 
         protected virtual void OnInteractionStart()
         {
-            _interactedHandle = _draggingHandle.GetComponentInParent<Handle>();
+            _interactedHandle = _draggingHandle.ParentHandle;
             _interactedGhost = _handleGroupMap[_interactedHandle].GroupGhost;
             _interactedGhost.OnInteractionStart();
 
