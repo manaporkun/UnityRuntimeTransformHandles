@@ -2,20 +2,35 @@
   "name": "com.orkunmanap.runtime-transform-handles",
   "version": "1.20.0",
   "displayName": "Runtime Transform Handles",
-  "description": "Unity Runtime Transform Handles is a powerful tool that allows developers to transform objects at runtime using a set of intuitive and professional gizmos. Ideal for building modding tools, runtime editors, or games that require object manipulation, this plugin adds multiple object selection, changeable origin points, better auto scale, multiple handles, and other features to the base project. Easy to use and extend, Unity Runtime Transform Handles is an invaluable tool for any developer looking to add object manipulation capabilities to their project.",
+  "description": "Runtime position, rotation, and scale gizmos for manipulating objects at play time. Supports multi-object selection, switchable pivot/center origin, world/local space, configurable snapping, and both the legacy Input Manager and the New Input System.",
   "keywords": [
-    "Unity",
-    "Runtime",
-    "Transform",
-    "Handles"
+    "gizmo",
+    "transform-handles",
+    "runtime-editor",
+    "object-manipulation",
+    "modding",
+    "input-system"
   ],
   "homepage": "https://github.com/manaporkun/UnityRuntimeTransformHandles",
+  "documentationUrl": "https://github.com/manaporkun/UnityRuntimeTransformHandles#readme",
+  "changelogUrl": "https://github.com/manaporkun/UnityRuntimeTransformHandles/blob/upm/CHANGELOG.md",
+  "licensesUrl": "https://github.com/manaporkun/UnityRuntimeTransformHandles/blob/upm/LICENSE.md",
   "author": {
     "name": "Orkun Manap",
     "email": "hello@manap.dev",
     "url": "https://manap.dev"
   },
   "license": "MIT",
-  "unity": "2019.4",
-  "dependencies": {}
+  "unity": "2021.3",
+  "unityRelease": "0f1",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "12.1.0"
+  },
+  "samples": [
+    {
+      "displayName": "Runtime Transform Handles Demo",
+      "description": "Full-featured demo: spawns its own targets and exercises every handle type, axis mask, space, snapping mode, multi-object grouping, auto-scaling, and the interaction event system through an on-screen control panel.",
+      "path": "Samples~/Demo"
+    }
+  ]
 }
