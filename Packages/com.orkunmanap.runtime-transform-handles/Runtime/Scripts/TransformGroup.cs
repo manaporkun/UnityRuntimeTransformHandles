@@ -125,14 +125,19 @@ namespace TransformHandles
             }
             else
             {
-                // eulerAngles conversions are only needed for the world-space RotateAround path;
-                // computing them up front wasted two quaternion->euler conversions every frame in Self space.
-                var rotationAxis = rotationChange.normalized.eulerAngles;
-                var rotationChangeMagnitude = rotationChange.eulerAngles.magnitude;
+                // Decompose the delta quaternion into a true axis + angle. The previous code used
+                // rotationChange.eulerAngles as the axis and its magnitude as the angle, which is
+                // not a valid axis/angle decomposition (it only happened to work for small
+                // single-axis rotations and diverged for compound/off-axis or large deltas).
+                rotationChange.ToAngleAxis(out var angleInDegrees, out var rotationAxis);
+
+                // ToAngleAxis returns angle 0 (axis (1,0,0)) for the identity delta; skip the
+                // no-op work and guard against any non-finite axis from float drift.
+                if (Mathf.Approximately(angleInDegrees, 0f) || float.IsNaN(rotationAxis.x)) return;
 
                 foreach (var target in RenderersMap.Keys)
                 {
-                    target.RotateAround(ghostPosition, rotationAxis, rotationChangeMagnitude);
+                    target.RotateAround(ghostPosition, rotationAxis, angleInDegrees);
                 }
             }
         }
