@@ -10,6 +10,11 @@
 /[Ll]ogs/
 /[Mm]emoryCaptures/
 
+# Imported package samples are regenerable artifacts (the canonical source lives in
+# the package's Samples~ folder). The WebGL CI build imports them on demand.
+/[Aa]ssets/[Ss]amples/
+/[Aa]ssets/[Ss]amples.meta
+
 # Asset meta data should only be ignored when the corresponding asset is also ignored
 !/[Aa]ssets/**/*.meta
 
