@@ -46,6 +46,15 @@ namespace TransformHandles.Tests
             return go.AddComponent<Ghost>();
         }
 
+        private GameObject NewCube(string name, Vector3 position)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.position = position;
+            _spawned.Add(go);
+            return go;
+        }
+
         [Test]
         public void AddTransform_accepts_unrelated_targets()
         {
@@ -184,6 +193,52 @@ namespace TransformHandles.Tests
 
             Assert.That(Vector3.Distance(a.position, new Vector3(0f, 0f, -1f)), Is.LessThan(1e-4f));
             Assert.That(Vector3.Distance(b.position, new Vector3(1f, 0f, 0f)), Is.LessThan(1e-4f));
+        }
+
+        [Test]
+        public void UpdatePositions_offsets_all_members_by_the_delta()
+        {
+            var group = NewGroup();
+            var a = NewObject("a", new Vector3(1f, 2f, 3f)).transform;
+            var b = NewObject("b", new Vector3(-4f, 0f, 0f)).transform;
+            group.AddTransform(a);
+            group.AddTransform(b);
+
+            group.UpdatePositions(new Vector3(0f, 5f, 0f));
+
+            Assert.That(Vector3.Distance(a.position, new Vector3(1f, 7f, 3f)), Is.LessThan(1e-4f));
+            Assert.That(Vector3.Distance(b.position, new Vector3(-4f, 5f, 0f)), Is.LessThan(1e-4f));
+        }
+
+        [Test]
+        public void UpdateScales_pivot_origin_adds_to_local_scale_and_keeps_position()
+        {
+            var group = NewGroup();
+            group.IsOriginOnCenter = false;
+            var t = NewObject("t", new Vector3(2f, 0f, 0f)).transform; // no renderer -> pivot path
+            group.AddTransform(t);
+
+            group.UpdateScales(new Vector3(0.5f, 0.5f, 0.5f));
+
+            Assert.That(Vector3.Distance(t.localScale, new Vector3(1.5f, 1.5f, 1.5f)), Is.LessThan(1e-4f));
+            Assert.That(Vector3.Distance(t.position, new Vector3(2f, 0f, 0f)), Is.LessThan(1e-4f));
+        }
+
+        [Test]
+        public void UpdateScales_center_origin_scales_centered_cube_without_moving_it()
+        {
+            // A primitive cube's mesh is centered on its transform, so center-origin scaling needs
+            // no position compensation — exercises the IsOriginOnCenter + renderer branch and
+            // confirms a centered object stays put while its scale grows.
+            var group = NewGroup();
+            group.IsOriginOnCenter = true;
+            var cube = NewCube("cube", new Vector3(3f, 0f, 0f)).transform; // has MeshRenderer
+            group.AddTransform(cube);
+
+            group.UpdateScales(new Vector3(1f, 1f, 1f));
+
+            Assert.That(Vector3.Distance(cube.localScale, new Vector3(2f, 2f, 2f)), Is.LessThan(1e-3f));
+            Assert.That(Vector3.Distance(cube.position, new Vector3(3f, 0f, 0f)), Is.LessThan(1e-3f));
         }
     }
 }
