@@ -1,0 +1,22 @@
+{
+    "name": "TransformHandles.Tests.Runtime",
+    "rootNamespace": "TransformHandles.Tests",
+    "references": [
+        "GUID:0d339d55a04a3284ebb59a9263fbea79",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -49,14 +49,17 @@ namespace TransformHandles
             var hasYZ = handle.axes.HasBothAxes(HandleAxes.Y, HandleAxes.Z);
             var hasXZ = handle.axes.HasBothAxes(HandleAxes.X, HandleAxes.Z);
 
-            zPlane.gameObject.SetActive(hasXY);
-            if (hasXY) zPlane.Initialize(handle, Vector3.forward, Vector3.up, -Vector3.right);
+            // Each plane's quad mesh, raycast normal (perp) and visual offset already agree in
+            // the prefab: zPlane=YZ (perp -X), xPlane=XZ (perp Y), yPlane=XY (perp Z). Enable each
+            // on the matching axis pair so dragging the gizmo moves in the plane it renders.
+            zPlane.gameObject.SetActive(hasYZ);
+            if (hasYZ) zPlane.Initialize(handle, Vector3.forward, Vector3.up, -Vector3.right);
 
-            xPlane.gameObject.SetActive(hasYZ);
-            if (hasYZ) xPlane.Initialize(handle, Vector3.right, Vector3.forward, Vector3.up);
+            xPlane.gameObject.SetActive(hasXZ);
+            if (hasXZ) xPlane.Initialize(handle, Vector3.right, Vector3.forward, Vector3.up);
 
-            yPlane.gameObject.SetActive(hasXZ);
-            if (hasXZ) yPlane.Initialize(handle, Vector3.right, Vector3.up, Vector3.forward);
+            yPlane.gameObject.SetActive(hasXY);
+            if (hasXY) yPlane.Initialize(handle, Vector3.right, Vector3.up, Vector3.forward);
         }
     }
 }
