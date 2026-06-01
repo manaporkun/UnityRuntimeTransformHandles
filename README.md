@@ -2,7 +2,7 @@
 
 ![Icon](https://i.imgur.com/NRdmzlQ.png)
 
-[![Unity 2019.4+](https://img.shields.io/badge/Unity-2019.4%2B-blue.svg)](https://unity.com/)
+[![Unity 2021.3+](https://img.shields.io/badge/Unity-2021.3%2B-blue.svg)](https://unity.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/manaporkun/UnityRuntimeTransformHandles?include_prereleases)](https://github.com/manaporkun/UnityRuntimeTransformHandles/releases)
 [![OpenUPM](https://img.shields.io/badge/OpenUPM-compatible-blue.svg)](https://openupm.com/)
@@ -33,8 +33,16 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 
 ## Requirements
 
-- Unity **2019.4** or higher
-- Works with both **Legacy Input Manager** and **New Input System** (auto-detected via `ENABLE_INPUT_SYSTEM` preprocessor)
+- Unity **2021.3** or higher.
+- **Render pipeline:** Built-in and URP (the handle shaders ship both SubShaders, auto-selected).
+  URP (`com.unity.render-pipelines.universal`) is a package dependency so the URP shader includes
+  always resolve; Built-in projects still render via the Built-in SubShader. HDRP is not supported
+  out of the box.
+- **Input:** Works with the **Legacy Input Manager** out of the box; uses the **New Input System**
+  automatically when `com.unity.inputsystem` is present and enabled (no setup required).
+
+> **Upgrading from 1.x?** 2.0.0 is a breaking release — see the
+> [migration guide](Packages/com.orkunmanap.runtime-transform-handles/Documentation~/migration-1.x-to-2.0.md).
 
 ## Installation
 
@@ -66,7 +74,7 @@ To install a specific version, append the version tag:
 ```json
 {
     "dependencies": {
-        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git#v1.16.0"
+        "com.orkunmanap.runtime-transform-handles": "https://github.com/manaporkun/UnityRuntimeTransformHandles.git#v2.0.0"
     }
 }
 ```
@@ -191,15 +199,24 @@ Packages/com.orkunmanap.runtime-transform-handles/
 │   │   │   ├── Position/                    # PositionHandle, PositionAxis, PositionPlane
 │   │   │   ├── Rotation/                    # RotationHandle, RotationAxis
 │   │   │   └── Scale/                       # ScaleHandle, ScaleAxis, ScaleGlobal
-│   │   ├── Utils/                           # InputWrapper, MathUtils, MeshUtils, Singleton
+│   │   ├── Utils/                           # InputWrapper, MathUtils, MeshUtils, SnapUtils, Singleton
 │   │   ├── Ghost.cs                         # Pivot point for manipulation
 │   │   ├── Handle.cs                        # Per-target handle controller
 │   │   ├── TransformGroup.cs                # Multi-object grouping
 │   │   ├── TransformHandleManager.cs        # Central singleton manager
 │   │   └── TransformHandleSettings.cs       # ScriptableObject settings
-│   └── Shader/                              # Handle and origin shaders
+│   └── Shader/                              # Handle and origin shaders (Built-in + URP)
+├── Tests/                                   # EditMode + PlayMode test assemblies
+├── Samples~/Demo/                           # Importable demo sample (Package Manager)
+├── Documentation~/                          # index.md (architecture + API) + migration guide
 └── package.json
 ```
+
+## Documentation
+
+- **API + architecture:** `Documentation~/index.md` in the package.
+- **Upgrading to 2.0:** [`Documentation~/migration-1.x-to-2.0.md`](Packages/com.orkunmanap.runtime-transform-handles/Documentation~/migration-1.x-to-2.0.md).
+- **Changelog:** [`CHANGELOG.md`](Packages/com.orkunmanap.runtime-transform-handles/CHANGELOG.md).
 
 ## Main Components
 
