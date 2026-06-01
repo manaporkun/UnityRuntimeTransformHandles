@@ -58,6 +58,11 @@ namespace TransformHandles
             // unit-direction precondition of MathUtils.ClosestPointOnRay.
             _axis = ParentHandle.transform.InverseTransformDirection(_coneTransform.up).normalized;
             DefaultColor = defaultColor;
+
+            // Initialize re-runs via Handle.ChangeAxes, which re-enables the axis GameObject but
+            // leaves the cone/line children's active state and this cache as they were. Clear the
+            // cache so the next LateUpdate re-asserts visibility instead of early-returning stale.
+            _visibilitySet = false;
         }
 
         /// <inheritdoc/>
