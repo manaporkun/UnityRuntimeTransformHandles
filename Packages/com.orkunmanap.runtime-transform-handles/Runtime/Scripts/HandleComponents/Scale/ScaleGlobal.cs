@@ -8,7 +8,9 @@ namespace TransformHandles
     /// </summary>
     public class ScaleGlobal : HandleBase
     {
-        private const float MouseSensitivity = 2f;
+        // Scale delta per pixel dragged. Chosen to match the previous feel at 60 fps
+        // (the old code used 2f * Time.deltaTime, i.e. ~2/60 per pixel at 60 fps).
+        private const float MouseSensitivity = 0.0333f;
 
         [SerializeField] private Color defaultColor;
         [SerializeField] private MeshRenderer cubeMeshRenderer;
@@ -37,7 +39,10 @@ namespace TransformHandles
         public override void Interact(Vector3 previousPosition)
         {
             var mouseVector = (Vector3)InputWrapper.MousePosition - previousPosition;
-            var d = (mouseVector.x + mouseVector.y) * Time.deltaTime * MouseSensitivity;
+            // mouseVector is the per-frame pixel delta; the total scale change should depend on how
+            // far the mouse moved, not on the frame rate. Multiplying by Time.deltaTime made scaling
+            // speed framerate-dependent (higher fps -> smaller dt -> slower scaling). Drop it.
+            var d = (mouseVector.x + mouseVector.y) * MouseSensitivity;
             delta += d;
             ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * delta;
 
