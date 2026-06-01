@@ -16,21 +16,25 @@ namespace TransformHandles.Utils
 
         public static Bounds GetBounds(this Transform transform)
         {
-            var bounds = new Bounds(Vector3.zero, Vector3.zero);
             var renderers = transform.GetComponentsInChildren<Renderer>();
-            var renderersCount = renderers.Length;
-            
-            var averageCenter = Vector3.zero;
-            var averageSize = Vector3.zero;
-            foreach (var renderer in renderers)
+
+            // No renderers: return a zero-size bounds at the transform position. The previous
+            // code divided by renderers.Length here and produced NaN bounds for renderer-less
+            // targets (e.g. empty pivots), which then poisoned pivot/center placement.
+            if (renderers.Length == 0)
             {
-                var bound = renderer.bounds;
-                averageCenter += bound.center;
-                averageSize += bound.size;
+                return new Bounds(transform.position, Vector3.zero);
             }
-            bounds.center = averageCenter/renderersCount;
-            bounds.size = averageSize/renderersCount;
-            
+
+            // Encapsulate every child renderer into one combined AABB. Averaging the centers and
+            // sizes (the previous approach) yielded a box that neither contained the children nor
+            // sat at their collective center once more than one renderer was involved.
+            var bounds = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+
             return bounds;
         }
     }
