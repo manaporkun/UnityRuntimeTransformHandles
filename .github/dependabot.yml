@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Keep CI action versions current (game-ci, actions/*, softprops/*). Grouped so a single PR
+  # carries all minor/patch action bumps instead of one PR per action.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

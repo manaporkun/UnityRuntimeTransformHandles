@@ -12,6 +12,13 @@ permissions:
   checks: write
   pull-requests: write
 
+# Serialize per ref so two main pushes can't run the publish/bump/tag steps concurrently
+# (which previously raced on the version-bump commit and tag). Stale PR runs are cancelled;
+# main runs queue (never cancelled mid-release) so an in-flight release always completes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # UPM-spec gate: manifest + required files + asmdef sanity. No Unity license needed,
   # so it runs fast on every PR and enforces the package floor going forward.
@@ -175,8 +182,12 @@ jobs:
           elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor)(\(.+\))?:"; then
             BUMP="patch"
           elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
-            # Housekeeping types only bump when actual code/manifest changed in the range.
-            if git log $RANGE --name-only --pretty=format: | sort -u | grep -qE "\.cs$|package\.json$"; then
+            # Housekeeping types only bump when SHIPPING code/manifest changed in the range.
+            # Test- or sample-only changes (Tests/, Samples~/) don't affect consumers, so they
+            # must not trigger a release (otherwise adding a test cuts a pointless version).
+            if git log $RANGE --name-only --pretty=format: | sort -u \
+                 | grep -vE "/Tests/|/Samples~/" \
+                 | grep -qE "\.cs$|package\.json$"; then
               BUMP="patch"
             fi
           fi
