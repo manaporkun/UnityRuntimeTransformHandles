@@ -92,7 +92,13 @@ public class HandleDemo : MonoBehaviour
             _targets.Add(cube.transform);
         }
 
+        // FindAnyObjectByType lands in 2021.3.18 / 2022.2; the package's declared minimum is
+        // 2021.3.0f1, so fall back to FindObjectOfType to keep the sample compiling there.
+#if UNITY_2023_1_OR_NEWER
         if (!Object.FindAnyObjectByType<Light>())
+#else
+        if (!Object.FindObjectOfType<Light>())
+#endif
         {
             var lightGo = new GameObject("Demo Light");
             var l = lightGo.AddComponent<Light>();
