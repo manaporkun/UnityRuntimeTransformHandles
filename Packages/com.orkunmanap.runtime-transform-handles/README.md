@@ -106,6 +106,10 @@ TransformHandleManager.Instance.Settings = mySettings;
 Import the **Runtime Transform Handles Demo** from the package's Samples tab in the Package Manager
 for a selection + multi-object manipulation example scene.
 
+## Upgrading from 1.x
+
+2.0.0 is a breaking release. See `Documentation~/migration-1.x-to-2.0.md` for the (small) steps.
+
 ## License
 
 MIT — see `LICENSE.md`.
