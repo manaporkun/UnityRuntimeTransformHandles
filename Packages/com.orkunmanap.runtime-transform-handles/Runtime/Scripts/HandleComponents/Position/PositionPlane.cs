@@ -56,6 +56,11 @@ namespace TransformHandles
             if (_quadMaterial == null) _quadMaterial = quadMeshRenderer.material;
 
             _quadTransform.localPosition = (_axis1 + _axis2) * PlaneVisualOffset;
+
+            // Initialize re-runs via Handle.ChangeAxes, which re-enables the plane GameObject but
+            // leaves the quad child's active state and this cache as they were. Clear the cache so
+            // the next LateUpdate re-asserts visibility instead of early-returning on a stale match.
+            _visibilitySet = false;
         }
 
         /// <inheritdoc/>
