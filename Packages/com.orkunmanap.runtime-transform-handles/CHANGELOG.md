@@ -5,6 +5,19 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.3] - 2026-06-01
+
+- Merge pull request #34 from manaporkun/test/group-apply-paths
+- Merge pull request #33 from manaporkun/fix/scaleglobal-framerate
+- test: cover TransformGroup apply paths (positions + scales)
+- Merge pull request #32 from manaporkun/ci/min-api-lint
+- fix: make global (uniform) scale speed framerate-independent
+- ci: add min-API lint guarding the Unity 2021.3 floor
+- Merge pull request #30 from manaporkun/docs/handle-target-clarify
+- Merge pull request #29 from manaporkun/ci/harden-publish
+- docs: fix quick-start logging handle.target (the pivot, not the object)
+- ci: harden publish (bump filter, concurrency, dependabot)
+
 ## [3.0.2] - 2026-06-01
 
 - Merge pull request #28 from manaporkun/test/coverage-bounds-rotation
