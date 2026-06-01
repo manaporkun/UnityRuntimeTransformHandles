@@ -55,8 +55,10 @@ public class SimpleExample : MonoBehaviour
     void CreateHandleForObject(Transform target)
     {
         Handle handle = TransformHandleManager.Instance.CreateHandle(target);
-        handle.OnInteractionStartEvent += h => Debug.Log("Started: " + h.target.name);
-        handle.OnInteractionEndEvent   += h => Debug.Log("Finished: " + h.target.name);
+        // Note: handle.target is the internal manipulation pivot (the group's ghost), not your
+        // object. Capture your own `target` reference for anything object-specific.
+        handle.OnInteractionStartEvent += _ => Debug.Log("Started: " + target.name);
+        handle.OnInteractionEndEvent   += _ => Debug.Log("Finished: " + target.name);
     }
 }
 ```
