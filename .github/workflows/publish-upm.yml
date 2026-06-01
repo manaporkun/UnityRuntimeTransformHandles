@@ -284,7 +284,21 @@ jobs:
 
           git add "$PACKAGE_PATH/package.json" "$PACKAGE_PATH/CHANGELOG.md"
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
-          git push origin main
+
+          # main can advance between this run's checkout and now (e.g. another PR merged while this
+          # run was queued behind the concurrency gate), which makes a plain push fail with
+          # non-fast-forward. Rebase the bump onto the latest main and retry so the release lands.
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            if git push origin main; then pushed=1; break; fi
+            echo "push rejected (attempt $attempt); rebasing onto origin/main and retrying"
+            git pull --rebase origin main || true
+            sleep $((attempt * 3))
+          done
+          if [ "$pushed" -ne 1 ]; then
+            echo "::error::Failed to push the version bump after 5 attempts."
+            exit 1
+          fi
 
       - name: Create/Update UPM branch
         if: steps.version.outputs.skip != 'true'
