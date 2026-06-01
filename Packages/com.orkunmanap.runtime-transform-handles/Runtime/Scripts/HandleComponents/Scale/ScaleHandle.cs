@@ -81,23 +81,17 @@ namespace TransformHandles
 
         private void OnGlobalInteractionEnd()
         {
-            if (_parentHandle.axes.HasAxis(HandleAxes.X))
-            {
-                xAxis.SetDefaultColor();
-                xAxis.delta = 0;
-            }
+            // delta is a plain field, safe to clear even on an axis masked out mid-drag and
+            // never Initialized; clearing all three avoids a stale delta resurfacing through
+            // ScaleAxis.Update if the axis is re-enabled later. SetDefaultColor touches cached
+            // materials (null on uninitialized axes), so gate only the color reset by the mask.
+            xAxis.delta = 0;
+            yAxis.delta = 0;
+            zAxis.delta = 0;
 
-            if (_parentHandle.axes.HasAxis(HandleAxes.Y))
-            {
-                yAxis.SetDefaultColor();
-                yAxis.delta = 0;
-            }
-
-            if (_parentHandle.axes.HasAxis(HandleAxes.Z))
-            {
-                zAxis.SetDefaultColor();
-                zAxis.delta = 0;
-            }
+            if (_parentHandle.axes.HasAxis(HandleAxes.X)) xAxis.SetDefaultColor();
+            if (_parentHandle.axes.HasAxis(HandleAxes.Y)) yAxis.SetDefaultColor();
+            if (_parentHandle.axes.HasAxis(HandleAxes.Z)) zAxis.SetDefaultColor();
         }
     }
 }
