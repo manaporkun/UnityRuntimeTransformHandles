@@ -1,0 +1,63 @@
+name: Min-API Lint
+
+# Guards the declared minimum Unity version (package.json `unity` = 2021.3). The dev project and
+# the Unity test job both run on Unity 6000.3, so they cannot catch APIs that fail to compile on an
+# early 2021.3.x consumer. This license-free static check flags such APIs when they are used WITHOUT
+# a version guard. It is a heuristic (not a real 2021.3 compile), focused on the Find*ByType family
+# that previously broke the floor; guarded usage (#if UNITY_..._OR_NEWER ... #else FindObjectOfType)
+# is allowed.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Packages/**/*.cs"
+      - ".github/workflows/min-api-lint.yml"
+  pull_request:
+    paths:
+      - "Packages/**/*.cs"
+      - ".github/workflows/min-api-lint.yml"
+
+jobs:
+  min-api-lint:
+    name: Min-API lint (Unity 2021.3 floor)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Scan for unguarded post-2021.3 APIs
+        run: |
+          set -uo pipefail
+          PKG="Packages/com.orkunmanap.runtime-transform-handles"
+
+          # APIs introduced after 2021.3.0 (Find*ByType: 2021.3.18f1 / 2022.2). Add more here as
+          # the floor concern grows. FindObjectOfType (the pre-2021.3 API) is intentionally allowed.
+          DENY='FindAnyObjectByType|FindFirstObjectByType|FindObjectsByType'
+
+          # awk tracks #if/#elif/#else/#endif nesting and marks a level "version-guarded" when its
+          # condition mentions UNITY_<year> or *_OR_NEWER. A denied API is reported only when it sits
+          # outside every version-guarded region (comment-only lines are ignored).
+          HITS=$(while IFS= read -r -d '' f; do
+            awk -v deny="$DENY" -v file="$f" '
+              function isver(s){ return (s ~ /UNITY_[0-9]/ || s ~ /OR_NEWER/) }
+              /^[ \t]*#[ \t]*if/    { depth++; g[depth]=isver($0)?1:0; next }
+              /^[ \t]*#[ \t]*elif/  { if(depth>0 && isver($0)) g[depth]=1; next }
+              /^[ \t]*#[ \t]*else/  { next }
+              /^[ \t]*#[ \t]*endif/ { if(depth>0) depth--; next }
+              {
+                ing=0; for(i=1;i<=depth;i++) if(g[i]) ing=1
+                if(ing==0 && $0 ~ ("(" deny ")") && $0 !~ /^[ \t]*\/\//)
+                  printf "%s:%d:%s\n", file, NR, $0
+              }
+            ' "$f"
+          done < <(find "$PKG" -name '*.cs' -print0))
+
+          if [ -n "$HITS" ]; then
+            echo "::error::Unguarded post-2021.3 API usage (wrap in '#if UNITY_2023_1_OR_NEWER ... #else <FindObjectOfType> #endif'):"
+            echo "$HITS"
+            exit 1
+          fi
+
+          echo "Min-API lint passed: no unguarded post-2021.3 Find*ByType usage."
