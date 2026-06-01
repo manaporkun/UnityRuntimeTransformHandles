@@ -134,16 +134,32 @@ jobs:
       - name: Determine version bump
         id: bump
         run: |
-          # Latest tag (fallback to v0.0.0 for the first release).
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
+          # Release boundary = the last automated version-bump commit on main. Tags are created
+          # on the orphan `upm` branch, which is NOT reachable from main, so `git describe --tags`
+          # found nothing here and the range fell back to the ENTIRE history — re-counting old
+          # BREAKING/feat commits and over-bumping (major) on every release. The bump commit is
+          # always reachable from main, so it is a reliable, tag-independent boundary.
+          RANGE_START=$(git log --grep='^chore: bump version to' --format=%H -n 1 HEAD || true)
+
+          if [ -n "$RANGE_START" ]; then
+            RANGE="$RANGE_START..HEAD"
+            echo "Previous release commit: $RANGE_START"
+          else
+            RANGE="HEAD"
+            echo "No previous bump commit found; treating all history as the first release."
+          fi
+          echo "Commit range: $RANGE"
 
           # Read FULL commit messages (%B) so `BREAKING CHANGE:` body/footer lines are seen,
           # not just subjects.
-          COMMITS=$(git log $LATEST_TAG..HEAD --format=%B 2>/dev/null || git log --format=%B)
-
-          echo "Commits since $LATEST_TAG:"
+          COMMITS=$(git log $RANGE --format=%B)
+          echo "Commits in range:"
           echo "$COMMITS"
+
+          # Subjects for the changelog / release notes, computed once here (on main) and reused by
+          # later steps via this file — later steps run while checked out on the `upm` branch, where
+          # re-deriving the range would be wrong.
+          git log $RANGE --pretty=format:"- %s" > /tmp/release_entries.md
 
           # Strict Conventional Commits only — no bare ^break/^feature/^bugfix aliases
           # (they mis-bump), and no catch-all "any change -> patch" fallback.
@@ -157,8 +173,8 @@ jobs:
           elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor)(\(.+\))?:"; then
             BUMP="patch"
           elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
-            # Housekeeping types only bump when actual code/manifest changed.
-            if git diff $LATEST_TAG..HEAD --name-only 2>/dev/null | grep -qE "\.cs$|package\.json$"; then
+            # Housekeeping types only bump when actual code/manifest changed in the range.
+            if git log $RANGE --name-only --pretty=format: | sort -u | grep -qE "\.cs$|package\.json$"; then
               BUMP="patch"
             fi
           fi
@@ -217,13 +233,9 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
           CHANGELOG="Packages/com.orkunmanap.runtime-transform-handles/CHANGELOG.md"
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-          if [ -z "$LATEST_TAG" ]; then
-            ENTRIES=$(git log --pretty=format:"- %s" HEAD)
-          else
-            ENTRIES=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s")
-          fi
+          # Reuse the release-boundary range computed in "Determine version bump" (tag-independent).
+          ENTRIES=$(cat /tmp/release_entries.md)
 
           DATE=$(date +%Y-%m-%d)
           {
@@ -315,16 +327,10 @@ jobs:
         if: steps.version.outputs.skip != 'true'
         id: changelog
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          if [ -z "$LATEST_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" HEAD)
-          else
-            COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s")
-          fi
-
+          # Reuse the entries computed on main. The earlier `git describe HEAD^` ran here while
+          # checked out on the `upm` branch (after the tag step), so it never saw main's history.
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
+          cat /tmp/release_entries.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
