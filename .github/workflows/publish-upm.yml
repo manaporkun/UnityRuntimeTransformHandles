@@ -158,8 +158,10 @@ jobs:
 
           # Subjects for the changelog / release notes, computed once here (on main) and reused by
           # later steps via this file — later steps run while checked out on the `upm` branch, where
-          # re-deriving the range would be wrong.
-          git log $RANGE --pretty=format:"- %s" > /tmp/release_entries.md
+          # re-deriving the range would be wrong. Use tformat (trailing newline after every entry,
+          # including the last) so the GITHUB_OUTPUT heredoc in "Generate changelog" finds its EOF
+          # delimiter on its own line; plain format: omits the final newline and breaks it.
+          git log $RANGE --pretty=tformat:"- %s" > /tmp/release_entries.md
 
           # Strict Conventional Commits only — no bare ^break/^feature/^bugfix aliases
           # (they mis-bump), and no catch-all "any change -> patch" fallback.
