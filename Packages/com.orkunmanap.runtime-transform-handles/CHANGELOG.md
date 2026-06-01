@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 This release contains **source-breaking** changes and is intended to ship as **2.0.0**.
+Migration steps: see `Documentation~/migration-1.x-to-2.0.md`.
 
 ### Breaking
 - **Namespaces:** `Singleton<T>`, `ApplicationQuitManager`, and `PreserveScaleOnScreenExtension`
