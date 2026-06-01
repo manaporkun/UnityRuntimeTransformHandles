@@ -1,5 +1,5 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.EnhancedTouch;
@@ -24,7 +24,7 @@ namespace TransformHandles.Utils
         {
             get
             {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
                 return Touchscreen.current != null;
 #else
                 return Input.touchSupported;
@@ -39,7 +39,7 @@ namespace TransformHandles.Utils
         {
             get
             {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
                 EnsureTouchInitialized();
                 return Touch.activeTouches.Count;
 #else
@@ -60,7 +60,7 @@ namespace TransformHandles.Utils
         {
             get
             {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
                 EnsureTouchInitialized();
                 if (Touch.activeTouches.Count > 0)
                     return Touch.activeTouches[0].screenPosition;
@@ -95,7 +95,7 @@ namespace TransformHandles.Utils
         {
             get
             {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
                 // Check touch first on mobile
                 EnsureTouchInitialized();
                 if (Touch.activeTouches.Count > 0)
@@ -112,7 +112,7 @@ namespace TransformHandles.Utils
             }
         }
 
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
         private static void EnsureTouchInitialized()
         {
             if (_touchInitialized) return;
@@ -131,7 +131,7 @@ namespace TransformHandles.Utils
         /// <param name="button">0 = left (or touch), 1 = right, 2 = middle</param>
         public static bool GetMouseButtonDown(int button)
         {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
             // Check touch first for button 0
             if (button == 0)
             {
@@ -173,7 +173,7 @@ namespace TransformHandles.Utils
         /// <param name="button">0 = left (or touch), 1 = right, 2 = middle</param>
         public static bool GetMouseButton(int button)
         {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
             // Check touch first for button 0
             if (button == 0)
             {
@@ -216,7 +216,7 @@ namespace TransformHandles.Utils
         /// <param name="button">0 = left (or touch), 1 = right, 2 = middle</param>
         public static bool GetMouseButtonUp(int button)
         {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
             // Check touch first for button 0
             if (button == 0)
             {
@@ -257,7 +257,7 @@ namespace TransformHandles.Utils
     /// </summary>
     public static bool GetKey(KeyCode key)
     {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
         var keyboard = Keyboard.current;
         if (keyboard == null) return false;
 
@@ -273,7 +273,7 @@ namespace TransformHandles.Utils
     /// </summary>
     public static bool GetKeyDown(KeyCode key)
     {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
         var keyboard = Keyboard.current;
         if (keyboard == null) return false;
 
@@ -289,7 +289,7 @@ namespace TransformHandles.Utils
     /// </summary>
     public static bool GetKeyUp(KeyCode key)
     {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
         var keyboard = Keyboard.current;
         if (keyboard == null) return false;
 
@@ -306,7 +306,7 @@ namespace TransformHandles.Utils
     /// </summary>
     public static float GetAxis(string axisName)
     {
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
         var mouse = Mouse.current;
         if (mouse == null) return 0f;
 
@@ -324,7 +324,7 @@ namespace TransformHandles.Utils
 #endif
     }
 
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
     private static float GetKeyboardAxis(KeyControl negative, KeyControl positive)
     {
         float value = 0f;
