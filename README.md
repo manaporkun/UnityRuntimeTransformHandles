@@ -107,19 +107,10 @@ public class SimpleExample : MonoBehaviour
         // Create a handle for a single object
         Handle handle = _manager.CreateHandle(target);
 
-        // Subscribe to events
-        handle.OnInteractionStartEvent += OnHandleStart;
-        handle.OnInteractionEndEvent += OnHandleEnd;
-    }
-
-    void OnHandleStart(Handle handle)
-    {
-        Debug.Log("Started manipulating: " + handle.target.name);
-    }
-
-    void OnHandleEnd(Handle handle)
-    {
-        Debug.Log("Finished manipulating: " + handle.target.name);
+        // Subscribe to events. Note: handle.target is the internal manipulation pivot (the
+        // group's ghost), not your object — capture your own `target` for anything object-specific.
+        handle.OnInteractionStartEvent += _ => Debug.Log("Started manipulating: " + target.name);
+        handle.OnInteractionEndEvent   += _ => Debug.Log("Finished manipulating: " + target.name);
     }
 }
 ```
