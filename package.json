@@ -1,6 +1,6 @@
 {
   "name": "com.orkunmanap.runtime-transform-handles",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "displayName": "Runtime Transform Handles",
   "description": "Runtime position, rotation, and scale gizmos for manipulating objects at play time. Supports multi-object selection, switchable pivot/center origin, world/local space, configurable snapping, and both the legacy Input Manager and the New Input System.",
   "keywords": [
