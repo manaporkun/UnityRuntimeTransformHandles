@@ -1,66 +1,84 @@
 using UnityEngine;
 
-public class Singleton<T> : MonoBehaviour where T : Singleton<T>
+namespace TransformHandles.Utils
 {
-    private static T _instance;
-
-    public static T Instance
+    // NOTE: Singleton<T> must stay public because the public TransformHandleManager derives from it
+    // (a public type cannot inherit from an internal base — CS0060). Moving it out of the global
+    // namespace is what fixes the CS0436/CS0104 collisions with consumer-defined Singleton<T> types.
+    public class Singleton<T> : MonoBehaviour where T : Singleton<T>
     {
-        get
-        {
-            if (ApplicationQuitManager.ApplicationQuitting)
-            {
-                return null;
-            }
+        private static T _instance;
 
-            if (_instance != null) return _instance;
+        public static T Instance
+        {
+            get
+            {
+                if (ApplicationQuitManager.ApplicationQuitting)
+                {
+                    return null;
+                }
+
+                if (_instance != null) return _instance;
 #if UNITY_2023_1_OR_NEWER
-            _instance = FindFirstObjectByType<T>();
+                _instance = FindFirstObjectByType<T>();
 #else
-            _instance = FindObjectOfType<T>();
+                _instance = FindObjectOfType<T>();
 #endif
 
-            if (_instance != null) return _instance;
-            var obj = new GameObject(typeof(T).Name);
-            _instance = obj.AddComponent<T>();
+                if (_instance != null) return _instance;
 
-            return _instance;
+                // Prefer a configured prefab from Resources (named after the type) so
+                // serialized references (e.g. handle/ghost prefabs) are wired up. Falls
+                // back to a bare GameObject when no such prefab exists.
+                var prefab = Resources.Load<T>(typeof(T).Name);
+                if (prefab != null)
+                {
+                    _instance = Instantiate(prefab);
+                    _instance.name = typeof(T).Name;
+                    return _instance;
+                }
+
+                var obj = new GameObject(typeof(T).Name);
+                _instance = obj.AddComponent<T>();
+
+                return _instance;
+            }
         }
-    }
 
-    protected virtual void Awake()
-    {
-        if (_instance == null)
+        protected virtual void Awake()
         {
-            _instance = (T)this;
-            DontDestroyOnLoad(gameObject);
+            if (_instance == null)
+            {
+                _instance = (T)this;
+                DontDestroyOnLoad(gameObject);
+            }
+            else if (_instance != this)
+            {
+                Destroy(gameObject);
+            }
         }
-        else if (_instance != this)
+
+        protected virtual void OnDestroy()
         {
-            Destroy(gameObject);
+            if (_instance == this)
+            {
+                _instance = null;
+            }
         }
-    }
 
-    protected virtual void OnDestroy()
-    {
-        if (_instance == this)
+        private void OnApplicationQuit()
         {
-            _instance = null;
+            ApplicationQuitManager.SetApplicationQuitting(true);
         }
     }
 
-    private void OnApplicationQuit()
+    internal static class ApplicationQuitManager
     {
-        ApplicationQuitManager.SetApplicationQuitting(true);
-    }
-}
+        public static bool ApplicationQuitting { get; private set; }
 
-public static class ApplicationQuitManager
-{
-    public static bool ApplicationQuitting { get; private set; }
-
-    public static void SetApplicationQuitting(bool quitting)
-    {
-        ApplicationQuitting = quitting;
+        public static void SetApplicationQuitting(bool quitting)
+        {
+            ApplicationQuitting = quitting;
+        }
     }
 }
