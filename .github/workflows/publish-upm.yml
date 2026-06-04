@@ -286,17 +286,23 @@ jobs:
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
 
           # main can advance between this run's checkout and now (e.g. another PR merged while this
-          # run was queued behind the concurrency gate), which makes a plain push fail with
-          # non-fast-forward. Rebase the bump onto the latest main and retry so the release lands.
+          # run was queued behind the concurrency gate), making a plain push fail non-fast-forward.
+          # Rebase the bump onto the latest main and retry. A rebase that CONFLICTS means a competing
+          # release bump already landed (both edit the same version line / CHANGELOG anchor); abort
+          # cleanly and stop rather than leaving a half-finished rebase for later steps to copy.
           pushed=0
           for attempt in 1 2 3 4 5; do
             if git push origin main; then pushed=1; break; fi
-            echo "push rejected (attempt $attempt); rebasing onto origin/main and retrying"
-            git pull --rebase origin main || true
-            sleep $((attempt * 3))
+            echo "push rejected (attempt $attempt); rebasing onto origin/main"
+            if ! git pull --rebase origin main; then
+              git rebase --abort 2>/dev/null || true
+              echo "::error::version-bump rebase conflicted with main (a competing release bump already landed)."
+              break
+            fi
+            if [ "$attempt" -lt 5 ]; then sleep $((attempt * 3)); fi
           done
           if [ "$pushed" -ne 1 ]; then
-            echo "::error::Failed to push the version bump after 5 attempts."
+            echo "::error::Failed to push the version bump after $attempt attempt(s)."
             exit 1
           fi
 
