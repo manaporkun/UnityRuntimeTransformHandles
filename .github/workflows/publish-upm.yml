@@ -200,7 +200,11 @@ jobs:
               echo "v$CURRENT was bumped on main but has no release; completing it before any new bump."
               SKIP="false"
               RECOVER="true"
+              BUMP="none"
               NEW_VERSION="$CURRENT"
+              # Package the bump commit's tree, NOT HEAD — commits that landed after the interrupted
+              # publish must not ship under this recovered tag (they release on a later run).
+              RELEASE_REF="$RANGE_START"
               # Recover this version's notes from its committed CHANGELOG section.
               awk -v h="## [$CURRENT]" '
                 index($0, h) == 1 { grab = 1; next }
@@ -277,6 +281,8 @@ jobs:
 
             git add "$MANIFEST" "$CHANGELOG"
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+            # Package exactly this bump commit, so later steps are immune to main advancing again.
+            RELEASE_REF="$(git rev-parse HEAD)"
           }
 
           # Each iteration recomputes against the latest main, so the loop self-corrects when main moves:
@@ -317,6 +323,7 @@ jobs:
             echo "skip=false"
             echo "version=$NEW_VERSION"
             echo "bump=$BUMP"
+            echo "release_ref=$RELEASE_REF"
           } >> $GITHUB_OUTPUT
 
       - name: Create/Update UPM branch
@@ -324,6 +331,9 @@ jobs:
         run: |
           PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
           UPM_BRANCH="upm"
+          # Exact commit whose package this release ships: the bump commit (normal) or the
+          # interrupted bump being recovered. Never plain `main`, which may have moved on.
+          RELEASE_REF="${{ steps.release.outputs.release_ref }}"
 
           if git ls-remote --heads origin $UPM_BRANCH | grep -q $UPM_BRANCH; then
             echo "UPM branch exists, updating..."
@@ -332,7 +342,7 @@ jobs:
 
             find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
 
-            git checkout main -- "$PACKAGE_PATH"
+            git checkout "$RELEASE_REF" -- "$PACKAGE_PATH"
             mv "$PACKAGE_PATH"/* .
             rm -rf Packages
           else
@@ -342,7 +352,7 @@ jobs:
             git rm -rf . || true
             git clean -fd
 
-            git checkout main -- "$PACKAGE_PATH"
+            git checkout "$RELEASE_REF" -- "$PACKAGE_PATH"
             mv "$PACKAGE_PATH"/* .
             rm -rf Packages
           fi
