@@ -306,13 +306,16 @@ jobs:
           pushed=0
           for attempt in 1 2 3 4 5; do
             if git push origin main; then pushed=1; break; fi
+            # The final attempt is a push only: a rebase here would have no following push to use it,
+            # so stop instead of leaving a rebased-but-unpushed bump and failing one push short.
+            if [ "$attempt" -eq 5 ]; then break; fi
             echo "push rejected (attempt $attempt); rebasing onto origin/main"
             if ! git pull --rebase origin main; then
               git rebase --abort 2>/dev/null || true
               echo "::error::version-bump rebase conflicted with main (a competing release bump already landed)."
               break
             fi
-            if [ "$attempt" -lt 5 ]; then sleep $((attempt * 3)); fi
+            sleep $((attempt * 3))
           done
           if [ "$pushed" -ne 1 ]; then
             echo "::error::Failed to push the version bump after $attempt attempt(s)."
