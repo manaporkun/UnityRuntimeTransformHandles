@@ -154,12 +154,28 @@ jobs:
           MANIFEST="$PACKAGE_PATH/package.json"
           CHANGELOG="$PACKAGE_PATH/CHANGELOG.md"
 
+          # Robust "is this version already released?" check. Distinguishes a real 404 (no release) from
+          # a transient auth/rate-limit/network error: only a 404 means "not released", anything else
+          # fails the job loudly so a flaky API call can never trigger a false recovery.
+          release_exists() {
+            local tag="$1" err
+            if err=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$tag" 2>&1 >/dev/null); then
+              return 0
+            fi
+            if printf '%s' "$err" | grep -qE "HTTP 404|Not Found"; then
+              return 1
+            fi
+            echo "::error::release lookup for $tag failed (not a 404): $err"
+            exit 1
+          }
+
           # Recompute everything from the latest origin/main, edit the files, and commit the bump.
-          # Sets NEW_VERSION / BUMP / SKIP and (re)writes /tmp/release_entries.md for later steps.
+          # Sets NEW_VERSION / BUMP / SKIP / RECOVER and (re)writes /tmp/release_entries.md for later steps.
           prepare() {
             git fetch origin main
             git checkout -B main origin/main
 
+            RECOVER="false"
             CURRENT=$(jq -r '.version' "$MANIFEST")
             echo "Current version: $CURRENT"
 
@@ -174,6 +190,25 @@ jobs:
               echo "No previous bump commit found; treating all history as the first release."
             fi
             echo "Commit range: $RANGE"
+
+            # Recovery takes priority over a new bump: if the last automated bump's version was never
+            # released (an earlier publish run pushed the bump commit, then died before tag/release),
+            # finish THAT release first — even if newer commits have since landed. Publish runs are
+            # serialized, so an unreleased bump means its run already terminated; there is no concurrent
+            # release to collide with. The newer commits keep their place in the range and ship next run.
+            if [ -n "$RANGE_START" ] && ! release_exists "v$CURRENT"; then
+              echo "v$CURRENT was bumped on main but has no release; completing it before any new bump."
+              SKIP="false"
+              RECOVER="true"
+              NEW_VERSION="$CURRENT"
+              # Recover this version's notes from its committed CHANGELOG section.
+              awk -v h="## [$CURRENT]" '
+                index($0, h) == 1 { grab = 1; next }
+                grab && /^## \[/ { exit }
+                grab && /^- /    { print }
+              ' "$CHANGELOG" > /tmp/release_entries.md
+              return 0
+            fi
 
             # Full messages (%B) so `BREAKING CHANGE:` footers are seen, not just subjects.
             COMMITS=$(git log $RANGE --format=%B)
@@ -201,28 +236,11 @@ jobs:
             fi
             echo "Bump type: $BUMP"
 
-            RECOVER="false"
+            # No new release-worthy commits and the current version is already released (recovery above
+            # handled the not-yet-released case): nothing to do.
             if [ "$BUMP" = "none" ]; then
+              SKIP="true"
               NEW_VERSION="$CURRENT"
-              # bump=none normally means "already released, nothing to do". But if an earlier run pushed
-              # this version's bump commit and then died before tagging/releasing it, main sits at a
-              # version with no GitHub release and no future run would ever finish it (the bump commit
-              # makes the range empty forever). Detect that — a bump commit exists for CURRENT but its
-              # release does not — and complete the publish instead of skipping it. No new commit to push.
-              if [ -n "$RANGE_START" ] \
-                 && ! gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v$CURRENT" >/dev/null 2>&1; then
-                echo "v$CURRENT was bumped on main but has no release; completing the publish."
-                SKIP="false"
-                RECOVER="true"
-                # Recover this version's notes from its committed CHANGELOG section.
-                awk -v h="## [$CURRENT]" '
-                  index($0, h) == 1 { grab = 1; next }
-                  grab && /^## \[/ { exit }
-                  grab && /^- /    { print }
-                ' "$CHANGELOG" > /tmp/release_entries.md
-              else
-                SKIP="true"
-              fi
               return 0
             fi
             SKIP="false"
