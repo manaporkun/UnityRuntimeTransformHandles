@@ -138,6 +138,8 @@ jobs:
 
       - name: Prepare release and push
         id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # actions/checkout pins this job to the triggering commit (github.sha). The job is serialized
         # by the concurrency group, but while it waited on the ~5-min test job (or queued behind another
         # release) main can advance, and it can advance again between computing the bump and pushing it.
@@ -199,9 +201,28 @@ jobs:
             fi
             echo "Bump type: $BUMP"
 
+            RECOVER="false"
             if [ "$BUMP" = "none" ]; then
-              SKIP="true"
               NEW_VERSION="$CURRENT"
+              # bump=none normally means "already released, nothing to do". But if an earlier run pushed
+              # this version's bump commit and then died before tagging/releasing it, main sits at a
+              # version with no GitHub release and no future run would ever finish it (the bump commit
+              # makes the range empty forever). Detect that — a bump commit exists for CURRENT but its
+              # release does not — and complete the publish instead of skipping it. No new commit to push.
+              if [ -n "$RANGE_START" ] \
+                 && ! gh api "repos/${GITHUB_REPOSITORY}/releases/tags/v$CURRENT" >/dev/null 2>&1; then
+                echo "v$CURRENT was bumped on main but has no release; completing the publish."
+                SKIP="false"
+                RECOVER="true"
+                # Recover this version's notes from its committed CHANGELOG section.
+                awk -v h="## [$CURRENT]" '
+                  index($0, h) == 1 { grab = 1; next }
+                  grab && /^## \[/ { exit }
+                  grab && /^- /    { print }
+                ' "$CHANGELOG" > /tmp/release_entries.md
+              else
+                SKIP="true"
+              fi
               return 0
             fi
             SKIP="false"
@@ -247,7 +268,12 @@ jobs:
           for attempt in 1 2 3 4 5; do
             prepare
             if [ "$SKIP" = "true" ]; then
-              echo "Nothing to release (no bump in range); skipping."
+              echo "Nothing to release (already published, or no bump in range); skipping."
+              break
+            fi
+            if [ "$RECOVER" = "true" ]; then
+              echo "Completing an incomplete publish of v$NEW_VERSION (nothing to push)."
+              pushed=1
               break
             fi
             if git push origin main; then pushed=1; break; fi
@@ -320,10 +346,16 @@ jobs:
 
           git checkout upm
 
-          git tag -a $VERSION -m "Release $VERSION"
-          git push origin $VERSION
-
-          echo "Tagged version: $VERSION"
+          # Idempotent: a recovery run (completing an earlier interrupted publish) may reach here with
+          # the tag already pushed. Only create + push it when it is missing, so the non-force tag push
+          # never fails the job on an existing tag.
+          if git ls-remote --tags origin "refs/tags/$VERSION" | grep -q "refs/tags/$VERSION"; then
+            echo "Tag $VERSION already exists on origin; leaving it."
+          else
+            git tag -a "$VERSION" -m "Release $VERSION"
+            git push origin "$VERSION"
+            echo "Tagged version: $VERSION"
+          fi
 
       - name: Generate changelog
         if: steps.release.outputs.skip != 'true'
