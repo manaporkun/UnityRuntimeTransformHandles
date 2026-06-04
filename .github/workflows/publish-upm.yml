@@ -205,12 +205,15 @@ jobs:
               # Package the bump commit's tree, NOT HEAD — commits that landed after the interrupted
               # publish must not ship under this recovered tag (they release on a later run).
               RELEASE_REF="$RANGE_START"
-              # Recover this version's notes from its committed CHANGELOG section.
-              awk -v h="## [$CURRENT]" '
-                index($0, h) == 1 { grab = 1; next }
-                grab && /^## \[/ { exit }
-                grab && /^- /    { print }
-              ' "$CHANGELOG" > /tmp/release_entries.md
+              # Recover this version's notes from the CHANGELOG at the bump commit (the same ref we
+              # package from), so the GitHub release notes match the shipped in-package changelog even
+              # if main's CHANGELOG changed after the bump.
+              git show "$RANGE_START:$CHANGELOG" \
+                | awk -v h="## [$CURRENT]" '
+                    index($0, h) == 1 { grab = 1; next }
+                    grab && /^## \[/ { exit }
+                    grab && /^- /    { print }
+                  ' > /tmp/release_entries.md
               return 0
             fi
 
