@@ -131,6 +131,19 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sync to latest main
+        # The publish job is serialized by the concurrency group, but actions/checkout pins to the
+        # triggering commit (github.sha). While this run waited on the ~5-min test job (or queued
+        # behind another release), main may have advanced. Compute the version against the REAL
+        # latest main so that a release another run already landed is seen as "nothing to bump" and
+        # this run skips cleanly, instead of recomputing a stale/duplicate version that then collides
+        # on push (rebase conflict) or on the non-force tag push. The retry loop in "Commit version
+        # bump" only has to cover main advancing during this job's own (seconds-long) window.
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          echo "Synced to origin/main: $(git rev-parse --short HEAD)"
+
       - name: Get current version
         id: current
         run: |
@@ -285,11 +298,11 @@ jobs:
           git add "$PACKAGE_PATH/package.json" "$PACKAGE_PATH/CHANGELOG.md"
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
 
-          # main can advance between this run's checkout and now (e.g. another PR merged while this
-          # run was queued behind the concurrency gate), making a plain push fail non-fast-forward.
+          # We synced to origin/main at job start, but main can still advance during this run (the
+          # window between that sync and this push), making a plain push fail non-fast-forward.
           # Rebase the bump onto the latest main and retry. A rebase that CONFLICTS means a competing
-          # release bump already landed (both edit the same version line / CHANGELOG anchor); abort
-          # cleanly and stop rather than leaving a half-finished rebase for later steps to copy.
+          # release bump landed inside that window (both edit the same version line / CHANGELOG
+          # anchor); abort cleanly and stop rather than leaving a half-finished rebase for later steps.
           pushed=0
           for attempt in 1 2 3 4 5; do
             if git push origin main; then pushed=1; break; fi
