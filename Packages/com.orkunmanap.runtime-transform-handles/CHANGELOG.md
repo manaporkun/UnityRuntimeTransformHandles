@@ -5,6 +5,18 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Align axis and uniform scale input with Unity Editor handle math (`CalcLineTranslation`, `GetHandleSize`).
+- Keep scale axis line and cube gizmo visuals in sync (tube mesh length vs cube rest distance).
+- Reset scale axis gizmo visuals on drag end and re-initialize; guard absolute snap when start scale is zero.
+- Guard scale handles when the interaction camera is missing.
+
+### Added
+- `HandleTransformUtility` runtime port of Unity Editor scale handle math.
+- Edit Mode tests for handle transform utility and line/cube visual reach parity.
+
 ## [3.0.3] - 2026-06-01
 
 - Merge pull request #34 from manaporkun/test/group-apply-paths
