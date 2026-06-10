@@ -7,14 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.5] - 2026-06-10
 
-- fix: resolve missing script refs and scale handle line overshoot
-- Merge pull request #31 from manaporkun/dependabot/github_actions/github-actions-7884a734f0
-- chore(deps): bump the github-actions group across 1 directory with 8 updates
+### Fixed
+- Strip UTF-8 BOM from script `.meta` files so `NativeTransformHandle` script references stay stable after Unity restart.
+- Stop scale axis line at the handle cube inner face so the line no longer extends through the cube during drag.
+
+### Changed
+- ci: reject UTF-8 BOM in package `.meta` files.
 
 ## [3.0.4] - 2026-06-10
 
+### Fixed
+- Align axis and uniform scale input with Unity Editor handle math (`CalcLineTranslation`, `GetHandleSize`).
+- Keep scale axis line and cube gizmo visuals in sync (tube mesh length vs cube rest distance).
+- Reset scale axis gizmo visuals on drag end and re-initialize; guard absolute snap when start scale is zero.
+- Guard scale handles when the interaction camera is missing.
+
+### Added
+- `HandleTransformUtility` runtime port of Unity Editor scale handle math.
+- Edit Mode tests for handle transform utility and line/cube visual reach parity.
+
 - Merge pull request #35 from manaporkun/ci/publish-push-rebase
-- fix: match Unity Editor scale handle feel and gizmo visuals
 - ci: recover release notes from the bump commit's changelog
 - ci: package the exact bump commit, not main HEAD
 - ci: make publish-recovery robust to new commits and API errors
@@ -26,16 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ci: make version-bump push resilient to main advancing
 
 ## [Unreleased]
-
-### Fixed
-- Align axis and uniform scale input with Unity Editor handle math (`CalcLineTranslation`, `GetHandleSize`).
-- Keep scale axis line and cube gizmo visuals in sync (tube mesh length vs cube rest distance).
-- Reset scale axis gizmo visuals on drag end and re-initialize; guard absolute snap when start scale is zero.
-- Guard scale handles when the interaction camera is missing.
-
-### Added
-- `HandleTransformUtility` runtime port of Unity Editor scale handle math.
-- Edit Mode tests for handle transform utility and line/cube visual reach parity.
 
 ## [3.0.3] - 2026-06-01
 
@@ -394,5 +396,5 @@ Migration steps: see `Documentation~/migration-1.x-to-2.0.md`.
   [GitHub releases](https://github.com/manaporkun/UnityRuntimeTransformHandles/releases) for the
   history prior to this changelog.
 
-[Unreleased]: https://github.com/manaporkun/UnityRuntimeTransformHandles/compare/v1.20.0...HEAD
+[Unreleased]: https://github.com/manaporkun/UnityRuntimeTransformHandles/compare/v3.0.5...HEAD
 [1.20.0]: https://github.com/manaporkun/UnityRuntimeTransformHandles/releases/tag/v1.20.0
