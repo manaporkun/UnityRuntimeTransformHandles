@@ -5,6 +5,32 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.4] - 2026-06-10
+
+- Merge pull request #35 from manaporkun/ci/publish-push-rebase
+- fix: match Unity Editor scale handle feel and gizmo visuals
+- ci: recover release notes from the bump commit's changelog
+- ci: package the exact bump commit, not main HEAD
+- ci: make publish-recovery robust to new commits and API errors
+- ci: complete an interrupted publish instead of skipping it
+- ci: recompute release against latest main on every push attempt
+- ci: don't waste the final push attempt on a rebase
+- ci: compute release version against fresh origin/main
+- ci: fail clean on version-bump rebase conflict
+- ci: make version-bump push resilient to main advancing
+
+## [Unreleased]
+
+### Fixed
+- Align axis and uniform scale input with Unity Editor handle math (`CalcLineTranslation`, `GetHandleSize`).
+- Keep scale axis line and cube gizmo visuals in sync (tube mesh length vs cube rest distance).
+- Reset scale axis gizmo visuals on drag end and re-initialize; guard absolute snap when start scale is zero.
+- Guard scale handles when the interaction camera is missing.
+
+### Added
+- `HandleTransformUtility` runtime port of Unity Editor scale handle math.
+- Edit Mode tests for handle transform utility and line/cube visual reach parity.
+
 ## [3.0.3] - 2026-06-01
 
 - Merge pull request #34 from manaporkun/test/group-apply-paths
