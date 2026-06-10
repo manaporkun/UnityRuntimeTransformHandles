@@ -8,15 +8,13 @@ namespace TransformHandles
     /// </summary>
     public class ScaleGlobal : HandleBase
     {
-        // Scale delta per pixel dragged. Chosen to match the previous feel at 60 fps
-        // (the old code used 2f * Time.deltaTime, i.e. ~2/60 per pixel at 60 fps).
-        private const float MouseSensitivity = 0.0333f;
-
         [SerializeField] private Color defaultColor;
         [SerializeField] private MeshRenderer cubeMeshRenderer;
 
         private Vector3 _axis;
         private Vector3 _startScale;
+        private Vector2 _startMousePosition;
+        private Vector3 _uniformScaleDirection;
         private Material _cubeMaterial;
 
         /// <summary>
@@ -38,12 +36,30 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var mouseVector = (Vector3)InputWrapper.MousePosition - previousPosition;
-            // mouseVector is the per-frame pixel delta; the total scale change should depend on how
-            // far the mouse moved, not on the frame rate. Multiplying by Time.deltaTime made scaling
-            // speed framerate-dependent (higher fps -> smaller dt -> slower scaling). Drop it.
-            var d = (mouseVector.x + mouseVector.y) * MouseSensitivity;
-            delta += d;
+            var camera = ParentHandle.handleCamera;
+            if (camera == null) return;
+
+            var position = ParentHandle.target.position;
+            var handleSize = HandleTransformUtility.GetHandleSize(position, camera);
+            var lineTranslation = HandleTransformUtility.CalcLineTranslation(
+                _startMousePosition,
+                InputWrapper.MousePosition,
+                position,
+                _uniformScaleDirection,
+                camera);
+
+            // Unity SliderScale.DoCenter: value = (Snap(CalcLineTranslation(...) / size) + 1) * startScale.
+            var dist = lineTranslation / handleSize;
+            var snap = GetActiveScaleSnap();
+            if (snap != 0)
+            {
+                if (ParentHandle.snappingType == SnappingType.Relative)
+                    dist = SnapUtils.Snap(dist, snap);
+                else
+                    dist = SnapUtils.Snap(dist + 1f, snap) - 1f;
+            }
+
+            delta = dist;
             ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * delta;
 
             base.Interact(previousPosition);
@@ -54,6 +70,17 @@ namespace TransformHandles
         {
             base.StartInteraction(hitPoint);
             _startScale = ParentHandle.target.localScale;
+            _startMousePosition = InputWrapper.MousePosition;
+
+            var camera = ParentHandle.handleCamera;
+            if (camera == null)
+            {
+                _uniformScaleDirection = Vector3.one;
+                return;
+            }
+
+            var cameraTransform = camera.transform;
+            _uniformScaleDirection = (cameraTransform.right + cameraTransform.up).normalized;
         }
 
         /// <inheritdoc/>
@@ -66,6 +93,16 @@ namespace TransformHandles
         public override void SetDefaultColor()
         {
             if (_cubeMaterial.color != DefaultColor) _cubeMaterial.color = DefaultColor;
+        }
+
+        private float GetActiveScaleSnap()
+        {
+            var snap = ParentHandle.scaleSnap;
+            var max = 0f;
+            if (_axis.x > 0f) max = Mathf.Max(max, snap.x);
+            if (_axis.y > 0f) max = Mathf.Max(max, snap.y);
+            if (_axis.z > 0f) max = Mathf.Max(max, snap.z);
+            return max;
         }
     }
 }
