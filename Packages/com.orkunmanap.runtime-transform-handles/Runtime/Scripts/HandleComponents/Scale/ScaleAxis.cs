@@ -21,6 +21,7 @@ namespace TransformHandles
         private Vector2 _startMousePosition;
 
         private float _cubeRestDistance;
+        private float _cubeHalfExtent;
         private float _lineMeshLength;
         private float _lastDelta = float.NaN;
 
@@ -62,13 +63,22 @@ namespace TransformHandles
             _lineMeshLength = mesh != null ? mesh.bounds.size.y : 0f;
             if (_lineMeshLength <= 0f)
                 _lineMeshLength = ScaleCubeSize;
+
+            var cubeMeshFilter = cubeMeshRenderer.GetComponent<MeshFilter>();
+            var cubeMesh = cubeMeshFilter != null ? cubeMeshFilter.sharedMesh : null;
+            var cubeMeshSize = cubeMesh != null ? cubeMesh.bounds.size : Vector3.one;
+            var cubeScale = cubeMeshRenderer.transform.localScale;
+            var cubeExtents = Vector3.Scale(cubeMeshSize, cubeScale) * 0.5f;
+            _cubeHalfExtent = Mathf.Abs(Vector3.Dot(cubeExtents, _axis));
         }
 
         private void ApplyVisualDelta(float scaleFactor)
         {
-            var lineScaleY = _cubeRestDistance / _lineMeshLength * scaleFactor;
+            var cubeReach = _cubeRestDistance * scaleFactor;
+            var lineReach = Mathf.Max(0f, cubeReach - _cubeHalfExtent);
+            var lineScaleY = lineReach / _lineMeshLength;
             lineMeshRenderer.transform.localScale = new Vector3(1f, lineScaleY, 1f);
-            cubeMeshRenderer.transform.localPosition = _axis * (_cubeRestDistance * scaleFactor);
+            cubeMeshRenderer.transform.localPosition = _axis * cubeReach;
         }
 
         protected void Update()

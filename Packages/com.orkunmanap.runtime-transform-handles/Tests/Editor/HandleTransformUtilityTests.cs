@@ -64,17 +64,19 @@ namespace TransformHandles.Tests.Editor
         }
 
         [Test]
-        public void LineVisualScale_reaches_same_distance_as_cube_for_tube_mesh()
+        public void LineVisualScale_stops_at_cube_inner_face_for_tube_mesh()
         {
             const float cubeRestDistance = 0.75f;
+            const float cubeHalfExtent = 0.1f;
             const float lineMeshLength = 0.8f;
 
             foreach (var scaleFactor in new[] { 0.5f, 1f, 1.5f, 2f })
             {
-                var lineScaleY = cubeRestDistance / lineMeshLength * scaleFactor;
-                var lineReach = lineMeshLength * lineScaleY;
                 var cubeReach = cubeRestDistance * scaleFactor;
-                Assert.AreEqual(cubeReach, lineReach, 1e-5f);
+                var lineReach = cubeReach - cubeHalfExtent;
+                var lineScaleY = lineReach / lineMeshLength;
+                Assert.AreEqual(lineReach, lineMeshLength * lineScaleY, 1e-5f);
+                Assert.Less(lineReach, cubeReach);
             }
         }
     }

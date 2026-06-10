@@ -12,11 +12,11 @@ on:
     branches:
       - main
     paths:
-      - "Packages/**/*.cs"
+      - "Packages/**"
       - ".github/workflows/min-api-lint.yml"
   pull_request:
     paths:
-      - "Packages/**/*.cs"
+      - "Packages/**"
       - ".github/workflows/min-api-lint.yml"
 
 jobs:
@@ -61,3 +61,21 @@ jobs:
           fi
 
           echo "Min-API lint passed: no unguarded post-2021.3 Find*ByType usage."
+
+      - name: Reject UTF-8 BOM in package .meta files
+        run: |
+          set -uo pipefail
+          PKG="Packages/com.orkunmanap.runtime-transform-handles"
+          BOM=$(while IFS= read -r -d '' f; do
+            if [ "$(head -c 3 "$f" | xxd -p)" = "efbbbf" ]; then
+              echo "$f"
+            fi
+          done < <(find "$PKG" -name '*.meta' -print0))
+
+          if [ -n "$BOM" ]; then
+            echo "::error::UTF-8 BOM in Unity .meta files can break script GUIDs after reimport:"
+            echo "$BOM"
+            exit 1
+          fi
+
+          echo "Meta lint passed: no UTF-8 BOM in package .meta files."
