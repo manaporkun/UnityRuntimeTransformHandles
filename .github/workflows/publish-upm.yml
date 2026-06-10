@@ -131,166 +131,212 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current version
-        id: current
-        run: |
-          VERSION=$(cat Packages/com.orkunmanap.runtime-transform-handles/package.json | jq -r '.version')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $VERSION"
-
-      - name: Determine version bump
-        id: bump
-        run: |
-          # Release boundary = the last automated version-bump commit on main. Tags are created
-          # on the orphan `upm` branch, which is NOT reachable from main, so `git describe --tags`
-          # found nothing here and the range fell back to the ENTIRE history — re-counting old
-          # BREAKING/feat commits and over-bumping (major) on every release. The bump commit is
-          # always reachable from main, so it is a reliable, tag-independent boundary.
-          RANGE_START=$(git log --grep='^chore: bump version to' --format=%H -n 1 HEAD || true)
-
-          if [ -n "$RANGE_START" ]; then
-            RANGE="$RANGE_START..HEAD"
-            echo "Previous release commit: $RANGE_START"
-          else
-            RANGE="HEAD"
-            echo "No previous bump commit found; treating all history as the first release."
-          fi
-          echo "Commit range: $RANGE"
-
-          # Read FULL commit messages (%B) so `BREAKING CHANGE:` body/footer lines are seen,
-          # not just subjects.
-          COMMITS=$(git log $RANGE --format=%B)
-          echo "Commits in range:"
-          echo "$COMMITS"
-
-          # Subjects for the changelog / release notes, computed once here (on main) and reused by
-          # later steps via this file — later steps run while checked out on the `upm` branch, where
-          # re-deriving the range would be wrong. Use tformat (trailing newline after every entry,
-          # including the last) so the GITHUB_OUTPUT heredoc in "Generate changelog" finds its EOF
-          # delimiter on its own line; plain format: omits the final newline and breaks it.
-          git log $RANGE --pretty=tformat:"- %s" > /tmp/release_entries.md
-
-          # Strict Conventional Commits only — no bare ^break/^feature/^bugfix aliases
-          # (they mis-bump), and no catch-all "any change -> patch" fallback.
-          BUMP="none"
-
-          if echo "$COMMITS" | grep -qE "^BREAKING CHANGE:" \
-             || echo "$COMMITS" | grep -qiE "^[a-z]+(\(.+\))?!:"; then
-            BUMP="major"
-          elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:"; then
-            BUMP="minor"
-          elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor)(\(.+\))?:"; then
-            BUMP="patch"
-          elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
-            # Housekeeping types only bump when SHIPPING code/manifest changed in the range.
-            # Test- or sample-only changes (Tests/, Samples~/) don't affect consumers, so they
-            # must not trigger a release (otherwise adding a test cuts a pointless version).
-            if git log $RANGE --name-only --pretty=format: | sort -u \
-                 | grep -vE "/Tests/|/Samples~/" \
-                 | grep -qE "\.cs$|package\.json$"; then
-              BUMP="patch"
-            fi
-          fi
-
-          echo "bump=$BUMP" >> $GITHUB_OUTPUT
-          echo "Bump type: $BUMP"
-
-      - name: Calculate new version
-        id: version
-        run: |
-          CURRENT="${{ steps.current.outputs.version }}"
-          BUMP="${{ steps.bump.outputs.bump }}"
-
-          if [ "$BUMP" = "none" ]; then
-            echo "version=$CURRENT" >> $GITHUB_OUTPUT
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "No version bump needed"
-            exit 0
-          fi
-
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-
-          case $BUMP in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "skip=false" >> $GITHUB_OUTPUT
-          echo "New version: $NEW_VERSION"
-
-      - name: Update package.json version
-        if: steps.version.outputs.skip != 'true'
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-          PACKAGE_FILE="Packages/com.orkunmanap.runtime-transform-handles/package.json"
-
-          jq ".version = \"$NEW_VERSION\"" $PACKAGE_FILE > tmp.json && mv tmp.json $PACKAGE_FILE
-
-          echo "Updated package.json to version $NEW_VERSION"
-          cat $PACKAGE_FILE
-
-      - name: Prepend release notes into in-package CHANGELOG
-        if: steps.version.outputs.skip != 'true'
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-          CHANGELOG="Packages/com.orkunmanap.runtime-transform-handles/CHANGELOG.md"
-
-          # Reuse the release-boundary range computed in "Determine version bump" (tag-independent).
-          ENTRIES=$(cat /tmp/release_entries.md)
-
-          DATE=$(date +%Y-%m-%d)
-          {
-            echo "## [$NEW_VERSION] - $DATE"
-            echo ""
-            echo "$ENTRIES"
-            echo ""
-          } > /tmp/new_entry.md
-
-          if [ -f "$CHANGELOG" ]; then
-            # Insert the new section just before the first existing "## [" heading.
-            awk 'BEGIN{ins=0}
-                 /^## \[/ && ins==0 {while((getline line < "/tmp/new_entry.md")>0) print line; ins=1}
-                 {print}
-                 END{if(ins==0){while((getline line < "/tmp/new_entry.md")>0) print line}}' \
-                "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
-          else
-            cp /tmp/new_entry.md "$CHANGELOG"
-          fi
-
-          echo "Updated $CHANGELOG"
-
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit version bump
-        if: steps.version.outputs.skip != 'true'
+      - name: Prepare release and push
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # actions/checkout pins this job to the triggering commit (github.sha). The job is serialized
+        # by the concurrency group, but while it waited on the ~5-min test job (or queued behind another
+        # release) main can advance, and it can advance again between computing the bump and pushing it.
+        # So compute version + notes against the CURRENT origin/main and commit + push as one unit; if
+        # the push is rejected, RECOMPUTE against the now-latest main and retry. Recomputing (rather than
+        # rebasing a pre-built commit) keeps the release correct whatever landed in the window:
+        #   - a non-bump commit that slipped in is folded into this release's notes and bump type;
+        #   - a competing release bump makes the range empty -> bump=none -> this run skips cleanly,
+        #     so there is no duplicate version and no colliding (non-force) tag push.
         run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
           PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
+          MANIFEST="$PACKAGE_PATH/package.json"
+          CHANGELOG="$PACKAGE_PATH/CHANGELOG.md"
 
-          git add "$PACKAGE_PATH/package.json" "$PACKAGE_PATH/CHANGELOG.md"
-          git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
-          git push origin main
+          # Robust "is this version already released?" check. Distinguishes a real 404 (no release) from
+          # a transient auth/rate-limit/network error: only a 404 means "not released", anything else
+          # fails the job loudly so a flaky API call can never trigger a false recovery.
+          release_exists() {
+            local tag="$1" err
+            if err=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$tag" 2>&1 >/dev/null); then
+              return 0
+            fi
+            if printf '%s' "$err" | grep -qE "HTTP 404|Not Found"; then
+              return 1
+            fi
+            echo "::error::release lookup for $tag failed (not a 404): $err"
+            exit 1
+          }
+
+          # Recompute everything from the latest origin/main, edit the files, and commit the bump.
+          # Sets NEW_VERSION / BUMP / SKIP / RECOVER and (re)writes /tmp/release_entries.md for later steps.
+          prepare() {
+            git fetch origin main
+            git checkout -B main origin/main
+
+            RECOVER="false"
+            CURRENT=$(jq -r '.version' "$MANIFEST")
+            echo "Current version: $CURRENT"
+
+            # Release boundary = the last automated version-bump commit on main (tag-independent: tags
+            # live on the orphan `upm` branch, unreachable from main, so `git describe` is wrong here).
+            RANGE_START=$(git log --grep='^chore: bump version to' --format=%H -n 1 HEAD || true)
+            if [ -n "$RANGE_START" ]; then
+              RANGE="$RANGE_START..HEAD"
+              echo "Previous release commit: $RANGE_START"
+            else
+              RANGE="HEAD"
+              echo "No previous bump commit found; treating all history as the first release."
+            fi
+            echo "Commit range: $RANGE"
+
+            # Recovery takes priority over a new bump: if the last automated bump's version was never
+            # released (an earlier publish run pushed the bump commit, then died before tag/release),
+            # finish THAT release first — even if newer commits have since landed. Publish runs are
+            # serialized, so an unreleased bump means its run already terminated; there is no concurrent
+            # release to collide with. The newer commits keep their place in the range and ship next run.
+            if [ -n "$RANGE_START" ] && ! release_exists "v$CURRENT"; then
+              echo "v$CURRENT was bumped on main but has no release; completing it before any new bump."
+              SKIP="false"
+              RECOVER="true"
+              BUMP="none"
+              NEW_VERSION="$CURRENT"
+              # Package the bump commit's tree, NOT HEAD — commits that landed after the interrupted
+              # publish must not ship under this recovered tag (they release on a later run).
+              RELEASE_REF="$RANGE_START"
+              # Recover this version's notes from the CHANGELOG at the bump commit (the same ref we
+              # package from), so the GitHub release notes match the shipped in-package changelog even
+              # if main's CHANGELOG changed after the bump.
+              git show "$RANGE_START:$CHANGELOG" \
+                | awk -v h="## [$CURRENT]" '
+                    index($0, h) == 1 { grab = 1; next }
+                    grab && /^## \[/ { exit }
+                    grab && /^- /    { print }
+                  ' > /tmp/release_entries.md
+              return 0
+            fi
+
+            # Full messages (%B) so `BREAKING CHANGE:` footers are seen, not just subjects.
+            COMMITS=$(git log $RANGE --format=%B)
+            # tformat = trailing newline after every entry so the "Generate changelog" heredoc EOF
+            # lands on its own line (plain `format:` omits the final newline and breaks it).
+            git log $RANGE --pretty=tformat:"- %s" > /tmp/release_entries.md
+
+            # Strict Conventional Commits only — no bare aliases, no "any change -> patch" fallback.
+            BUMP="none"
+            if echo "$COMMITS" | grep -qE "^BREAKING CHANGE:" \
+               || echo "$COMMITS" | grep -qiE "^[a-z]+(\(.+\))?!:"; then
+              BUMP="major"
+            elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:"; then
+              BUMP="minor"
+            elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor)(\(.+\))?:"; then
+              BUMP="patch"
+            elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
+              # Housekeeping types bump only when SHIPPING code/manifest changed (not Tests/ or Samples~/),
+              # otherwise adding a test would cut a pointless release.
+              if git log $RANGE --name-only --pretty=format: | sort -u \
+                   | grep -vE "/Tests/|/Samples~/" \
+                   | grep -qE "\.cs$|package\.json$"; then
+                BUMP="patch"
+              fi
+            fi
+            echo "Bump type: $BUMP"
+
+            # No new release-worthy commits and the current version is already released (recovery above
+            # handled the not-yet-released case): nothing to do.
+            if [ "$BUMP" = "none" ]; then
+              SKIP="true"
+              NEW_VERSION="$CURRENT"
+              return 0
+            fi
+            SKIP="false"
+
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+            echo "New version: $NEW_VERSION"
+
+            jq ".version = \"$NEW_VERSION\"" "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
+
+            ENTRIES=$(cat /tmp/release_entries.md)
+            DATE=$(date +%Y-%m-%d)
+            {
+              echo "## [$NEW_VERSION] - $DATE"
+              echo ""
+              echo "$ENTRIES"
+              echo ""
+            } > /tmp/new_entry.md
+            if [ -f "$CHANGELOG" ]; then
+              # Insert the new section just before the first existing "## [" heading.
+              awk 'BEGIN{ins=0}
+                   /^## \[/ && ins==0 {while((getline line < "/tmp/new_entry.md")>0) print line; ins=1}
+                   {print}
+                   END{if(ins==0){while((getline line < "/tmp/new_entry.md")>0) print line}}' \
+                  "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
+            else
+              cp /tmp/new_entry.md "$CHANGELOG"
+            fi
+
+            git add "$MANIFEST" "$CHANGELOG"
+            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+            # Package exactly this bump commit, so later steps are immune to main advancing again.
+            RELEASE_REF="$(git rev-parse HEAD)"
+          }
+
+          # Each iteration recomputes against the latest main, so the loop self-corrects when main moves:
+          # the next attempt's range/version/notes reflect whatever just landed. No rebase of a stale
+          # commit, so nothing gets orphaned and a competing bump is detected as nothing-to-do.
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            prepare
+            if [ "$SKIP" = "true" ]; then
+              echo "Nothing to release (already published, or no bump in range); skipping."
+              break
+            fi
+            if [ "$RECOVER" = "true" ]; then
+              echo "Completing an incomplete publish of v$NEW_VERSION (nothing to push)."
+              pushed=1
+              break
+            fi
+            if git push origin main; then pushed=1; break; fi
+            echo "push rejected (attempt $attempt); main advanced — recomputing against latest origin/main"
+            if [ "$attempt" -lt 5 ]; then sleep $((attempt * 3)); fi
+          done
+
+          if [ "$SKIP" = "true" ]; then
+            {
+              echo "skip=true"
+              echo "version=$NEW_VERSION"
+              echo "bump=none"
+            } >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$pushed" -ne 1 ]; then
+            echo "::error::Failed to push the version bump after $attempt attempt(s)."
+            exit 1
+          fi
+
+          {
+            echo "skip=false"
+            echo "version=$NEW_VERSION"
+            echo "bump=$BUMP"
+            echo "release_ref=$RELEASE_REF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create/Update UPM branch
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         run: |
           PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
           UPM_BRANCH="upm"
+          # Exact commit whose package this release ships: the bump commit (normal) or the
+          # interrupted bump being recovered. Never plain `main`, which may have moved on.
+          RELEASE_REF="${{ steps.release.outputs.release_ref }}"
 
           if git ls-remote --heads origin $UPM_BRANCH | grep -q $UPM_BRANCH; then
             echo "UPM branch exists, updating..."
@@ -299,7 +345,7 @@ jobs:
 
             find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
 
-            git checkout main -- "$PACKAGE_PATH"
+            git checkout "$RELEASE_REF" -- "$PACKAGE_PATH"
             mv "$PACKAGE_PATH"/* .
             rm -rf Packages
           else
@@ -309,7 +355,7 @@ jobs:
             git rm -rf . || true
             git clean -fd
 
-            git checkout main -- "$PACKAGE_PATH"
+            git checkout "$RELEASE_REF" -- "$PACKAGE_PATH"
             mv "$PACKAGE_PATH"/* .
             rm -rf Packages
           fi
@@ -319,25 +365,31 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Release v${{ steps.version.outputs.version }}"
+            git commit -m "Release v${{ steps.release.outputs.version }}"
             git push origin $UPM_BRANCH --force
             echo "UPM branch updated successfully!"
           fi
 
       - name: Create version tag
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         run: |
-          VERSION="v${{ steps.version.outputs.version }}"
+          VERSION="v${{ steps.release.outputs.version }}"
 
           git checkout upm
 
-          git tag -a $VERSION -m "Release $VERSION"
-          git push origin $VERSION
-
-          echo "Tagged version: $VERSION"
+          # Idempotent: a recovery run (completing an earlier interrupted publish) may reach here with
+          # the tag already pushed. Only create + push it when it is missing, so the non-force tag push
+          # never fails the job on an existing tag.
+          if git ls-remote --tags origin "refs/tags/$VERSION" | grep -q "refs/tags/$VERSION"; then
+            echo "Tag $VERSION already exists on origin; leaving it."
+          else
+            git tag -a "$VERSION" -m "Release $VERSION"
+            git push origin "$VERSION"
+            echo "Tagged version: $VERSION"
+          fi
 
       - name: Generate changelog
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         id: changelog
         run: |
           # Reuse the entries computed on main. The earlier `git describe HEAD^` ran here while
@@ -347,11 +399,11 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        if: steps.version.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.release.outputs.version }}
+          name: v${{ steps.release.outputs.version }}
           body: |
             ## Changes
             ${{ steps.changelog.outputs.changelog }}
@@ -360,7 +412,7 @@ jobs:
 
             Add to your `manifest.json`:
             ```json
-            "com.orkunmanap.runtime-transform-handles": "https://github.com/${{ github.repository }}.git#v${{ steps.version.outputs.version }}"
+            "com.orkunmanap.runtime-transform-handles": "https://github.com/${{ github.repository }}.git#v${{ steps.release.outputs.version }}"
             ```
 
             Or use the latest:
@@ -372,14 +424,14 @@ jobs:
 
       - name: Summary
         run: |
-          if [ "${{ steps.version.outputs.skip }}" = "true" ]; then
+          if [ "${{ steps.release.outputs.skip }}" = "true" ]; then
             echo "## No Release Needed" >> $GITHUB_STEP_SUMMARY
             echo "No version bump was triggered by the commits." >> $GITHUB_STEP_SUMMARY
           else
             echo "## UPM Package Released 🎉" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Version:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Bump Type:** ${{ steps.bump.outputs.bump }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Version:** v${{ steps.release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Bump Type:** ${{ steps.release.outputs.bump }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Installation" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
