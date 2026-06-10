@@ -18,10 +18,11 @@ namespace TransformHandles
 
         private Vector3 _axis;
         private Vector3 _startScale;
+        private Vector2 _startMousePosition;
 
-        private float _interactionDistance;
+        private float _cubeRestDistance;
+        private float _lineMeshLength;
         private float _lastDelta = float.NaN;
-        private Ray _rAxisRay;
 
         private Material _cubeMaterial;
         private Material _lineMaterial;
@@ -43,6 +44,31 @@ namespace TransformHandles
             // and MeshRenderer.material allocates a new instance on every access.
             if (_cubeMaterial == null) _cubeMaterial = cubeMeshRenderer.material;
             if (_lineMaterial == null) _lineMaterial = lineMeshRenderer.material;
+
+            delta = 0f;
+            _lastDelta = float.NaN;
+            CacheVisualRestLengths();
+            ApplyVisualDelta(1f);
+        }
+
+        private void CacheVisualRestLengths()
+        {
+            _cubeRestDistance = Mathf.Abs(Vector3.Dot(cubeMeshRenderer.transform.localPosition, _axis));
+            if (_cubeRestDistance <= 0f)
+                _cubeRestDistance = ScaleCubeSize;
+
+            var meshFilter = lineMeshRenderer.GetComponent<MeshFilter>();
+            var mesh = meshFilter != null ? meshFilter.sharedMesh : null;
+            _lineMeshLength = mesh != null ? mesh.bounds.size.y : 0f;
+            if (_lineMeshLength <= 0f)
+                _lineMeshLength = ScaleCubeSize;
+        }
+
+        private void ApplyVisualDelta(float scaleFactor)
+        {
+            var lineScaleY = _cubeRestDistance / _lineMeshLength * scaleFactor;
+            lineMeshRenderer.transform.localScale = new Vector3(1f, lineScaleY, 1f);
+            cubeMeshRenderer.transform.localPosition = _axis * (_cubeRestDistance * scaleFactor);
         }
 
         protected void Update()
@@ -51,38 +77,46 @@ namespace TransformHandles
             if (delta == _lastDelta) return;
             _lastDelta = delta;
 
-            lineMeshRenderer.transform.localScale = new Vector3(1, 1 + delta, 1);
-            cubeMeshRenderer.transform.localPosition = _axis * (ScaleCubeSize * (1 + delta));
+            ApplyVisualDelta(1f + delta);
         }
 
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
+            if (_handleCamera == null) return;
 
-            var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
-            var hitPoint = _rAxisRay.GetPoint(closestT);
+            var position = ParentHandle.target.position;
+            var direction = GetRotatedAxis(_axis);
+            var handleSize = HandleTransformUtility.GetHandleSize(position, _handleCamera);
+            var lineTranslation = HandleTransformUtility.CalcLineTranslation(
+                _startMousePosition,
+                InputWrapper.MousePosition,
+                position,
+                direction,
+                _handleCamera);
 
-            var distance = Vector3.Distance(ParentHandle.target.position, hitPoint);
-            var axisScaleDelta = distance / _interactionDistance - 1f;
+            // Unity SliderScale.DoAxis: dist = 1 + CalcLineTranslation(...) / handleSize; scale = start * dist.
+            var dist = 1f + lineTranslation / handleSize;
 
-            var snapping = ParentHandle.scaleSnap;
-            var snap = Mathf.Abs(Vector3.Dot(snapping, _axis));
+            var snap = Mathf.Abs(Vector3.Dot(ParentHandle.scaleSnap, _axis));
             if (snap != 0)
             {
                 if (ParentHandle.snappingType == SnappingType.Relative)
                 {
-                    axisScaleDelta = SnapUtils.Snap(axisScaleDelta, snap);
+                    dist = SnapUtils.Snap(dist, snap);
                 }
                 else
                 {
-                    var axisStartScale = Mathf.Abs(Vector3.Dot(_startScale, _axis));
-                    axisScaleDelta = SnapUtils.Snap(axisScaleDelta + axisStartScale, snap) - axisStartScale;
+                    var axisStartScale = GetAxisStartScale();
+                    if (axisStartScale > 0f)
+                        dist = SnapUtils.Snap(axisStartScale * dist, snap) / axisStartScale;
+                    else
+                        dist = SnapUtils.Snap(dist, snap);
                 }
             }
 
-            delta = axisScaleDelta;
-            var scale = Vector3.Scale(_startScale, _axis * axisScaleDelta + Vector3.one);
+            delta = dist - 1f;
+            var scale = Vector3.Scale(_startScale, _axis * delta + Vector3.one);
 
             ParentHandle.target.localScale = scale;
 
@@ -94,18 +128,15 @@ namespace TransformHandles
         {
             base.StartInteraction(hitPoint);
             _startScale = ParentHandle.target.localScale;
+            _startMousePosition = InputWrapper.MousePosition;
+        }
 
-            var rAxis = GetRotatedAxis(_axis);
-
-            var position = ParentHandle.target.position;
-            _rAxisRay = new Ray(position, rAxis);
-
-            var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
-
-            var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
-            var rayHitPoint = _rAxisRay.GetPoint(closestT);
-
-            _interactionDistance = Vector3.Distance(position, rayHitPoint);
+        /// <inheritdoc/>
+        public override void EndInteraction()
+        {
+            base.EndInteraction();
+            _lastDelta = float.NaN;
+            ApplyVisualDelta(1f);
         }
 
         /// <inheritdoc/>
@@ -120,6 +151,13 @@ namespace TransformHandles
         {
             if (_cubeMaterial.color != DefaultColor) _cubeMaterial.color = DefaultColor;
             if (_lineMaterial.color != DefaultColor) _lineMaterial.color = DefaultColor;
+        }
+
+        private float GetAxisStartScale()
+        {
+            if (Mathf.Abs(_axis.x) > 0.5f) return Mathf.Abs(_startScale.x);
+            if (Mathf.Abs(_axis.y) > 0.5f) return Mathf.Abs(_startScale.y);
+            return Mathf.Abs(_startScale.z);
         }
     }
 }
