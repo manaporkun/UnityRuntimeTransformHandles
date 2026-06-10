@@ -5,6 +5,12 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.5] - 2026-06-10
+
+- fix: resolve missing script refs and scale handle line overshoot
+- Merge pull request #31 from manaporkun/dependabot/github_actions/github-actions-7884a734f0
+- chore(deps): bump the github-actions group across 1 directory with 8 updates
+
 ## [3.0.4] - 2026-06-10
 
 - Merge pull request #35 from manaporkun/ci/publish-push-rebase
