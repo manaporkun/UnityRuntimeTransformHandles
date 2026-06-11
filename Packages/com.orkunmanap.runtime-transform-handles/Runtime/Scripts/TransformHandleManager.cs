@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TransformHandles.Utils;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using static TransformHandles.Utils.InputWrapper;
 
 namespace TransformHandles
@@ -16,8 +17,18 @@ namespace TransformHandles
         private const int MaxRaycastHits = 16;
         private const float RaycastMaxDistance = 1000f;
 
-        /// <summary>The main camera used for raycasting.</summary>
-        public Camera mainCamera;
+        [SerializeField, FormerlySerializedAs("mainCamera")] private Camera _mainCamera;
+
+        /// <summary>The main camera used for raycasting. Assign to recover when no <see cref="Camera.main"/> exists.</summary>
+        public Camera MainCamera
+        {
+            get => _mainCamera;
+            set => _mainCamera = value;
+        }
+
+        /// <inheritdoc cref="MainCamera"/>
+        [Obsolete("Use MainCamera instead.")]
+        public Camera mainCamera { get => MainCamera; set => MainCamera = value; }
 
         [Header("Prefabs")]
         [SerializeField] private GameObject transformHandlePrefab;
@@ -101,7 +112,7 @@ namespace TransformHandles
         {
             if (_isInitialized) return;
 
-            mainCamera = mainCamera == null ? Camera.main : mainCamera;
+            _mainCamera = _mainCamera == null ? Camera.main : _mainCamera;
 
             _handleGroupMap = new Dictionary<Handle, TransformGroup>();
             _ghostGroupMap = new Dictionary<Ghost, TransformGroup>();
@@ -409,18 +420,18 @@ namespace TransformHandles
         {
             // Unity's overloaded == reports a destroyed camera as null, so this proactive check
             // covers the MissingReferenceException case the old per-frame try/catch handled.
-            if (mainCamera == null)
+            if (_mainCamera == null)
             {
-                mainCamera = Camera.main;
-                if (mainCamera == null)
+                _mainCamera = Camera.main;
+                if (_mainCamera == null)
                 {
                     // No camera this frame (scene load, camera swap, etc.) is a recoverable
                     // transient. Skip raycasting and survive instead of self-destructing the
-                    // DontDestroyOnLoad singleton. Assign 'mainCamera' to recover explicitly.
+                    // DontDestroyOnLoad singleton. Assign 'MainCamera' to recover explicitly.
                     if (!_cameraMissingLogged)
                     {
                         Debug.LogWarning("TransformHandles: No main camera found; handle raycasting " +
-                                         "is paused until a camera is available. Assign 'mainCamera' to recover.");
+                                         "is paused until a camera is available. Assign 'MainCamera' to recover.");
                         _cameraMissingLogged = true;
                     }
                     return;
@@ -429,7 +440,7 @@ namespace TransformHandles
 
             _cameraMissingLogged = false;
 
-            var ray = mainCamera.ScreenPointToRay(MousePosition);
+            var ray = _mainCamera.ScreenPointToRay(MousePosition);
             var size = Physics.RaycastNonAlloc(ray, _rayHits, RaycastMaxDistance, layerMask);
 
             if (size == 0)
@@ -532,7 +543,7 @@ namespace TransformHandles
             {
                 foreach (var handle in _handleGroupMap.Keys)
                 {
-                    ChangeHandleSpace(handle, handle.space == Space.World ? Space.Self : Space.World);
+                    ChangeHandleSpace(handle, handle.Space == Space.World ? Space.Self : Space.World);
                 }
             }
 
@@ -556,7 +567,7 @@ namespace TransformHandles
 
         protected virtual void OnInteraction()
         {
-            _interactedGhost.OnInteraction(_interactedHandle.type);
+            _interactedGhost.OnInteraction(_interactedHandle.Type);
             _interactedHandle.InteractionStay();
         }
 
@@ -580,7 +591,7 @@ namespace TransformHandles
         public static void ChangeHandleType(Handle handle, HandleType type)
         {
             if (handle == null) throw new ArgumentNullException(nameof(handle));
-            handle.type = type;
+            handle.Type = type;
         }
 
         /// <summary>
@@ -591,7 +602,7 @@ namespace TransformHandles
         public void ChangeHandleSpace(Handle handle, Space space)
         {
             if (handle == null) throw new ArgumentNullException(nameof(handle));
-            handle.space = space;
+            handle.Space = space;
 
             var group = _handleGroupMap[handle];
             group.GroupGhost.UpdateGhostTransform(group.GetAveragePosRotScale());
