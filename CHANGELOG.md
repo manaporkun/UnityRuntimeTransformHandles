@@ -5,27 +5,47 @@ All notable changes to this package are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [3.1.0] - 2026-06-11
+
+### Added
+- PascalCase public API across the package: `Handle.Target`/`Type`/`Space`/`Axes`/`SnappingType`/`PositionSnap`/`RotationSnap`/`ScaleSnap`/`AutoScale`/`HandleCamera`, `TransformHandleManager.MainCamera`, `HandleBase.Delta`, and accessors for the prefab-wired axis components (`PositionHandle.XAxis` etc.).
+- PlayMode tests for `TransformHandleManager` create, multi-select, add/remove target, and destroy flows.
+- PlayMode interaction test suite: Handle event contract (C# events + Inspector UnityEvents, ordering, destroy notification), `HandleBase` interaction lifecycle, group position updates through the ghost pivot, and ghost cleanup.
+- CI compatibility-floor job that runs the package tests on Unity 2021.3 without the Input System or URP, verifying the declared floor, the legacy Input Manager path, and URP-free installs on every change.
+- Root `.editorconfig` for consistent C# formatting, plus repository `CONTRIBUTING.md` and `SECURITY.md`.
+
+### Changed
+- URP is no longer a package dependency. The URP SubShaders are gated behind `PackageRequirements` and compile only when `com.unity.render-pipelines.universal` 12.1.0+ is installed; Built-in projects need no extra packages.
+- `com.unity.modules.physics` is now declared explicitly as a built-in module dependency.
+- `Third Party Notices.md` restores the upstream attribution: the package derives from [Runtime Transform Handle](https://github.com/pshtif/RuntimeTransformHandle) by Peter @sHTiF Stefcek (MIT), whose copyright and permission notice is now reproduced as the MIT license requires.
+- Release notes are now generated from the curated `[Unreleased]` changelog section (with grouped Conventional Commit subjects as fallback) instead of raw commit logs.
+- Clean consumer-facing changelog entries for 2.0.0–3.0.4 (remove merge-commit noise) and document 3.0.0 as a release-automation artifact with no breaking changes.
+- README specific-version install example updated to `v3.0.5`.
+
+### Deprecated
+- The camelCase public members (`Handle.target`/`type`/`space`/`axes`/`snappingType`/`positionSnap`/`rotationSnap`/`scaleSnap`/`autoScale`/`handleCamera`, `TransformHandleManager.mainCamera`, `HandleBase.delta`, and the prefab wiring fields `xAxis`/`yAxis`/`zAxis`/`xPlane`/`yPlane`/`zPlane`/`globalScale`) are now `[Obsolete]` shims that forward to their PascalCase replacements. They keep compiling and serializing exactly as before and will be removed in the next major release.
+
+### Removed
+- Unused `Plane.mat` and `Object.mat` from `Runtime/Materials` (never referenced by any shipped prefab, sample, or scene).
+
+### Fixed
+- Handle component materials (instantiated per axis/plane/ring at handle creation) are now destroyed with their components — previously ~19 material instances leaked on every handle create/destroy cycle.
+- Rotation arc mesh rebuilds no longer allocate fresh vertex/index arrays every drag frame (the package's main steady GC source, ~8 KB/frame while rotating).
+- Static singleton state is reset when a play session starts, so the package works with Enter Play Mode Options (domain reload disabled); previously the quit flag survived and every `Instance` access returned null on the next run.
+- Collider controllers destroy the previously generated mesh when rebuilding (leak on rebuild), and their development-only refresh hotkey is compiled out of release players.
+
 ## [3.0.5] - 2026-06-10
 
-- fix: resolve missing script refs and scale handle line overshoot
-- Merge pull request #31 from manaporkun/dependabot/github_actions/github-actions-7884a734f0
-- chore(deps): bump the github-actions group across 1 directory with 8 updates
+### Fixed
+- Strip UTF-8 BOM from script `.meta` files so `NativeTransformHandle` script references stay stable after Unity restart.
+- Stop scale axis line at the handle cube inner face so the line no longer extends through the cube during drag.
+
+### Changed
+- ci: reject UTF-8 BOM in package `.meta` files.
 
 ## [3.0.4] - 2026-06-10
-
-- Merge pull request #35 from manaporkun/ci/publish-push-rebase
-- fix: match Unity Editor scale handle feel and gizmo visuals
-- ci: recover release notes from the bump commit's changelog
-- ci: package the exact bump commit, not main HEAD
-- ci: make publish-recovery robust to new commits and API errors
-- ci: complete an interrupted publish instead of skipping it
-- ci: recompute release against latest main on every push attempt
-- ci: don't waste the final push attempt on a rebase
-- ci: compute release version against fresh origin/main
-- ci: fail clean on version-bump rebase conflict
-- ci: make version-bump push resilient to main advancing
-
-## [Unreleased]
 
 ### Fixed
 - Align axis and uniform scale input with Unity Editor handle math (`CalcLineTranslation`, `GetHandleSize`).
@@ -37,308 +57,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HandleTransformUtility` runtime port of Unity Editor scale handle math.
 - Edit Mode tests for handle transform utility and line/cube visual reach parity.
 
+### Changed
+- Harden automated publish workflow: recover interrupted releases, recompute version against latest main, package the exact bump commit, and make version-bump pushes resilient to concurrent main updates.
+
 ## [3.0.3] - 2026-06-01
 
-- Merge pull request #34 from manaporkun/test/group-apply-paths
-- Merge pull request #33 from manaporkun/fix/scaleglobal-framerate
-- test: cover TransformGroup apply paths (positions + scales)
-- Merge pull request #32 from manaporkun/ci/min-api-lint
-- fix: make global (uniform) scale speed framerate-independent
-- ci: add min-API lint guarding the Unity 2021.3 floor
-- Merge pull request #30 from manaporkun/docs/handle-target-clarify
-- Merge pull request #29 from manaporkun/ci/harden-publish
-- docs: fix quick-start logging handle.target (the pivot, not the object)
-- ci: harden publish (bump filter, concurrency, dependabot)
+### Fixed
+- Make global (uniform) scale speed framerate-independent.
+- Clarify in docs that `handle.target` is the manipulation pivot (ghost), not the user's object.
+
+### Added
+- PlayMode tests covering TransformGroup apply paths (positions + scales).
+- Min-API lint CI job guarding the Unity 2021.3 floor.
+
+### Changed
+- Harden publish workflow (bump filter, concurrency, Dependabot).
 
 ## [3.0.2] - 2026-06-01
 
-- Merge pull request #28 from manaporkun/test/coverage-bounds-rotation
-- test: cover GetBounds and world/self group rotation
-- Merge pull request #27 from manaporkun/fix/changelog-output-newline
-- ci: fix changelog GITHUB_OUTPUT heredoc missing trailing newline
+### Fixed
+- Changelog GITHUB_OUTPUT heredoc missing trailing newline.
+
+### Added
+- Tests covering GetBounds and world/self group rotation.
 
 ## [3.0.1] - 2026-06-01
 
-- Merge pull request #24 from manaporkun/fix/rotation-bounds-correctness
-- Merge pull request #25 from manaporkun/fix/release-version-range
-- ci: fix release version bump computed from entire history
-- fix: correct world-space group rotation and multi-renderer bounds
+### Fixed
+- Correct world-space group rotation and multi-renderer bounds.
+- Release version bump computed from entire git history instead of the last release range (CI).
 
 ## [3.0.0] - 2026-06-01
 
-- Merge pull request #23 from manaporkun/develop
-- chore: remove planning markdown (CLAUDE, IMPROVEMENT_PLAN, ROADMAP)
-- refactor: consolidate WebGL demo onto the package sample
-- chore: bump version to 2.0.0 [skip ci]
-- Merge pull request #22 from manaporkun/develop
-- fix: address PR #22 review feedback
-- fix: assign position-plane quad materials by normal axis
-- fix: color position-plane gizmos by normal axis for Unity parity
-- Merge pull request #20 from manaporkun/docs/2.0-migration-readme
-- docs: add 1.x->2.0 migration guide, API reference, sample README; sync root README
-- Merge pull request #17 from manaporkun/fix/change-axes-mask-10
-- fix: enable each position plane on the axis pair it constrains + harden scale-delta
-- Merge pull request #19 from manaporkun/feat/upm-2.0-industry-standard
-- fix: declare URP dependency so handle shaders resolve without URP installed (PR #19 review)
-- ci: grant checks/pull-requests write so test-runner can post results
-- docs: mark P2-2 validation gate done in improvement plan
-- ci: add UPM package validation gate (P2-2)
-- fix: capture position-axis drag vector in handle-local space
-- fix: absolute position snap only snaps the dragged axis
-- feat!: bring UPM package to industry standard (2.0.0)
-- chore: upgrade to Unity 6000.3.16f1 and add demo scene
-- refactor: tidy handle component internals
-- fix: stop long HandleType names clipping in demo HUD
-- fix: make HandleDemo HUD legible over bright scenes
-- fix: auto-load configured manager prefab from Resources
-- fix: use FindAnyObjectByType in HandleDemo to drop CS0618 warning
-- docs: add self-contained HandleDemo exercising the full public API
-- chore: bump version to 1.20.0 [skip ci]
-- Merge pull request #14 from manaporkun/fix/change-axes-mask-10
-- perf: cache handle materials once so re-runnable Initialize doesn't leak
-- fix: make handle Initialize re-runnable so ChangeAxes applies the mask
-- chore: bump version to 1.19.0 [skip ci]
-- docs: update README project description and credits
-- chore: bump version to 1.18.0 [skip ci]
-- ci: fix WebGL Pages build running out of disk space
-- chore: bump version to 1.17.0 [skip ci]
-- chore: update README, clean up tracked files, improve .gitignore
-- chore: bump version to 1.16.0 [skip ci]
-- Merge pull request #9 from manaporkun/fix/code-analysis-improvements
-- fix: use localScale consistently in Ghost scale delta calculations
-- fix: add warning log and update docs for null target in AddTransform
-- fix: address Copilot review feedback
-- fix: reduce GC pressure and improve null safety across handle system
-- chore: bump version to 1.15.0 [skip ci]
-- ci: avoid writing .nojekyll into Unity build output
-- chore: bump version to 1.14.0 [skip ci]
-- ci: resolve WebGL output path for pages artifact
-- chore: bump version to 1.13.0 [skip ci]
-- ci: fix Unity activation env handling for GameCI
-- chore: bump version to 1.12.0 [skip ci]
-- Force license-file activation by clearing serial and credentials
-- chore: bump version to 1.11.0 [skip ci]
-- Use UNITY_LICENSE-only activation in CI
-- chore: bump version to 1.10.0 [skip ci]
-- Pass Unity credentials to WebGL build workflow
-- chore: bump version to 1.9.0 [skip ci]
-- Simplify README browser demo section
-- chore: bump version to 1.8.0 [skip ci]
-- Add WebGL showcase site and Pages deployment pipeline
-- chore: bump version to 1.7.0 [skip ci]
-- fix: clean up _transformHashSet in RemoveHandle to allow handle re-creation
-- feat: implement Phase 1 quick wins for improved usability
-- chore: bump version to 1.6.0 [skip ci]
-- refactor(package): Rename to FQDN format
-- chore: bump version to 1.5.0 [skip ci]
-- chore: Update project development settings
-- chore: bump version to 1.4.0 [skip ci]
-- chore: update project to Unity 6 and New Input System
-- chore: bump version to 1.3.0 [skip ci]
-- docs: update README with dynamic badges and conventional commits
-- chore: bump version to 1.2.0 [skip ci]
-- fix: resolve FindObjectOfType deprecation warning
-- chore: bump version to 1.1.0 [skip ci]
-- fix(ci): add write permissions to workflow
-- docs: update README and add CLAUDE.md
-- ci: add GitHub Action for automatic UPM publishing
-- feat: add New Input System support and runtime layer configuration
-- Merge remote-tracking branch 'origin/copilot/fix-import-package-errors'
-- chore: add missing meta files
-- Merge remote-tracking branch 'origin/claude/what-do-you-01DYQNLqJJ8VTkw74CexH3tJ'
-- Improve README with comprehensive documentation
-- Merge branch 'feature/code_overhaul'
-- Improve code quality across the codebase
-- Refactor: Extract TransformGroup and consolidate collider controllers
-- Merge branch 'hotfix/2-error-when-creating-handle-in-transfor'
-- Create a ghost object if prefab is empty
-- Delete unused Axis script, don't update ghost transform on interaction end, public properties for groups
-- Small change
-- Every handle has its own interaction events
-- Fix the RemoveHandle function called twice bug
-- deactivate position plane when it cannot be seen
-- Deactivate position handle when it cannot be seen
-- New test scene, scene changer, handle OnDestroy, ActiveSceneChanged, singleton update
-- Prevent possible errors when camera got destroyed
-- Update README.md
-- Update README.md
-- Delete .idea/.idea.UnityRuntimeTransformHandles/.idea directory
-- Delete .github/workflows directory
-- Update main.yml
-- Delete license.yml
-- Update main.yml
-- Update main.yml
-- Update license.yml
-- Create license.yml
-- Update main.yml
-- Create .github/workflows/main.yml
-- Delete unity-package.yml
-- Update unity-package.yml
-- Create unity-package.yml
-- Make it a Unity package
-- Add shortcut texts to the scene
-- Make materials more transparent, origin indicator update, handle prefab update, etc.
-- Cache HSV values and change the script name
-- Update README.md typo
-- Update README.md
-- default pixel size change
-- Fixes and project settings
-- Auto scale extension
-- Remove accidentally pushed build
-- Small change
-- AutoScale fix
-- Camera zoom, and other small changes
-- Code refactor and folders
-- URP, torus collider mesh change, scene update, etc
-- Some improvements, folder change, etc
-- Small fix
-- Handle shader and bug fix
-- Camera movement, events, bug fixes
-- A lot of fixes
-- Handle prefab
-- Remove com.shtif.runtimetransformhandle
-- New scripts
-- Peter @sHTiF Stefcek's Runtime Transform Handles added as a package
-- Unity project init
-- Initial commit
+> **No breaking changes.** This major version number is a release-automation artifact: the
+> version bump was computed from the entire git history (re-counting 2.0.0's `feat!` commit)
+> instead of the commits since 2.0.0. The bug was fixed in 3.0.1. Upgrading from 2.x requires
+> no code changes.
+
+### Changed
+- Consolidate the WebGL browser demo onto the package sample scene.
+- Remove internal planning markdown files from the repository.
 
 ## [2.0.0] - 2026-06-01
 
-- Merge pull request #22 from manaporkun/develop
-- fix: address PR #22 review feedback
-- fix: assign position-plane quad materials by normal axis
-- fix: color position-plane gizmos by normal axis for Unity parity
-- Merge pull request #20 from manaporkun/docs/2.0-migration-readme
-- docs: add 1.x->2.0 migration guide, API reference, sample README; sync root README
-- Merge pull request #17 from manaporkun/fix/change-axes-mask-10
-- fix: enable each position plane on the axis pair it constrains + harden scale-delta
-- Merge pull request #19 from manaporkun/feat/upm-2.0-industry-standard
-- fix: declare URP dependency so handle shaders resolve without URP installed (PR #19 review)
-- ci: grant checks/pull-requests write so test-runner can post results
-- docs: mark P2-2 validation gate done in improvement plan
-- ci: add UPM package validation gate (P2-2)
-- fix: capture position-axis drag vector in handle-local space
-- fix: absolute position snap only snaps the dragged axis
-- feat!: bring UPM package to industry standard (2.0.0)
-- chore: upgrade to Unity 6000.3.16f1 and add demo scene
-- refactor: tidy handle component internals
-- fix: stop long HandleType names clipping in demo HUD
-- fix: make HandleDemo HUD legible over bright scenes
-- fix: auto-load configured manager prefab from Resources
-- fix: use FindAnyObjectByType in HandleDemo to drop CS0618 warning
-- docs: add self-contained HandleDemo exercising the full public API
-- chore: bump version to 1.20.0 [skip ci]
-- Merge pull request #14 from manaporkun/fix/change-axes-mask-10
-- perf: cache handle materials once so re-runnable Initialize doesn't leak
-- fix: make handle Initialize re-runnable so ChangeAxes applies the mask
-- chore: bump version to 1.19.0 [skip ci]
-- docs: update README project description and credits
-- chore: bump version to 1.18.0 [skip ci]
-- ci: fix WebGL Pages build running out of disk space
-- chore: bump version to 1.17.0 [skip ci]
-- chore: update README, clean up tracked files, improve .gitignore
-- chore: bump version to 1.16.0 [skip ci]
-- Merge pull request #9 from manaporkun/fix/code-analysis-improvements
-- fix: use localScale consistently in Ghost scale delta calculations
-- fix: add warning log and update docs for null target in AddTransform
-- fix: address Copilot review feedback
-- fix: reduce GC pressure and improve null safety across handle system
-- chore: bump version to 1.15.0 [skip ci]
-- ci: avoid writing .nojekyll into Unity build output
-- chore: bump version to 1.14.0 [skip ci]
-- ci: resolve WebGL output path for pages artifact
-- chore: bump version to 1.13.0 [skip ci]
-- ci: fix Unity activation env handling for GameCI
-- chore: bump version to 1.12.0 [skip ci]
-- Force license-file activation by clearing serial and credentials
-- chore: bump version to 1.11.0 [skip ci]
-- Use UNITY_LICENSE-only activation in CI
-- chore: bump version to 1.10.0 [skip ci]
-- Pass Unity credentials to WebGL build workflow
-- chore: bump version to 1.9.0 [skip ci]
-- Simplify README browser demo section
-- chore: bump version to 1.8.0 [skip ci]
-- Add WebGL showcase site and Pages deployment pipeline
-- chore: bump version to 1.7.0 [skip ci]
-- fix: clean up _transformHashSet in RemoveHandle to allow handle re-creation
-- feat: implement Phase 1 quick wins for improved usability
-- chore: bump version to 1.6.0 [skip ci]
-- refactor(package): Rename to FQDN format
-- chore: bump version to 1.5.0 [skip ci]
-- chore: Update project development settings
-- chore: bump version to 1.4.0 [skip ci]
-- chore: update project to Unity 6 and New Input System
-- chore: bump version to 1.3.0 [skip ci]
-- docs: update README with dynamic badges and conventional commits
-- chore: bump version to 1.2.0 [skip ci]
-- fix: resolve FindObjectOfType deprecation warning
-- chore: bump version to 1.1.0 [skip ci]
-- fix(ci): add write permissions to workflow
-- docs: update README and add CLAUDE.md
-- ci: add GitHub Action for automatic UPM publishing
-- feat: add New Input System support and runtime layer configuration
-- Merge remote-tracking branch 'origin/copilot/fix-import-package-errors'
-- chore: add missing meta files
-- Merge remote-tracking branch 'origin/claude/what-do-you-01DYQNLqJJ8VTkw74CexH3tJ'
-- Improve README with comprehensive documentation
-- Merge branch 'feature/code_overhaul'
-- Improve code quality across the codebase
-- Refactor: Extract TransformGroup and consolidate collider controllers
-- Merge branch 'hotfix/2-error-when-creating-handle-in-transfor'
-- Create a ghost object if prefab is empty
-- Delete unused Axis script, don't update ghost transform on interaction end, public properties for groups
-- Small change
-- Every handle has its own interaction events
-- Fix the RemoveHandle function called twice bug
-- deactivate position plane when it cannot be seen
-- Deactivate position handle when it cannot be seen
-- New test scene, scene changer, handle OnDestroy, ActiveSceneChanged, singleton update
-- Prevent possible errors when camera got destroyed
-- Update README.md
-- Update README.md
-- Delete .idea/.idea.UnityRuntimeTransformHandles/.idea directory
-- Delete .github/workflows directory
-- Update main.yml
-- Delete license.yml
-- Update main.yml
-- Update main.yml
-- Update license.yml
-- Create license.yml
-- Update main.yml
-- Create .github/workflows/main.yml
-- Delete unity-package.yml
-- Update unity-package.yml
-- Create unity-package.yml
-- Make it a Unity package
-- Add shortcut texts to the scene
-- Make materials more transparent, origin indicator update, handle prefab update, etc.
-- Cache HSV values and change the script name
-- Update README.md typo
-- Update README.md
-- default pixel size change
-- Fixes and project settings
-- Auto scale extension
-- Remove accidentally pushed build
-- Small change
-- AutoScale fix
-- Camera zoom, and other small changes
-- Code refactor and folders
-- URP, torus collider mesh change, scene update, etc
-- Some improvements, folder change, etc
-- Small fix
-- Handle shader and bug fix
-- Camera movement, events, bug fixes
-- A lot of fixes
-- Handle prefab
-- Remove com.shtif.runtimetransformhandle
-- New scripts
-- Peter @sHTiF Stefcek's Runtime Transform Handles added as a package
-- Unity project init
-- Initial commit
-
-## [Unreleased]
-
-This release contains **source-breaking** changes and is intended to ship as **2.0.0**.
+This release contains **source-breaking** changes.
 Migration steps: see `Documentation~/migration-1.x-to-2.0.md`.
 
 ### Breaking
@@ -388,11 +150,11 @@ Migration steps: see `Documentation~/migration-1.x-to-2.0.md`.
 - Aborted handle creation (`CreateHandle` / `CreateHandleFromList`) now fully tears down the
   partially-built handle and its ghost instead of leaking orphaned map entries.
 
-## [1.20.0]
+## [1.20.0] - 2026-05-31
 
 - Baseline release. See the
   [GitHub releases](https://github.com/manaporkun/UnityRuntimeTransformHandles/releases) for the
   history prior to this changelog.
 
-[Unreleased]: https://github.com/manaporkun/UnityRuntimeTransformHandles/compare/v1.20.0...HEAD
+[Unreleased]: https://github.com/manaporkun/UnityRuntimeTransformHandles/compare/v3.0.5...HEAD
 [1.20.0]: https://github.com/manaporkun/UnityRuntimeTransformHandles/releases/tag/v1.20.0

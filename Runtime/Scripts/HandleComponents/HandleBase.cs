@@ -29,7 +29,11 @@ namespace TransformHandles
         protected Vector3 HitPoint;
 
         /// <summary>The change in value during interaction.</summary>
-        public float delta;
+        public float Delta { get; set; }
+
+        /// <inheritdoc cref="Delta"/>
+        [Obsolete("Use Delta instead.")]
+        public float delta { get => Delta; set => Delta = value; }
 
         protected virtual void OnDestroy()
         {
@@ -74,7 +78,7 @@ namespace TransformHandles
         /// <param name="previousPosition">The previous mouse position.</param>
         public virtual void Interact(Vector3 previousPosition)
         {
-            InteractionUpdate?.Invoke(delta);
+            InteractionUpdate?.Invoke(Delta);
         }
 
         /// <summary>
@@ -83,7 +87,7 @@ namespace TransformHandles
         public virtual void EndInteraction()
         {
             InteractionEnd?.Invoke();
-            delta = 0;
+            Delta = 0;
             SetDefaultColor();
         }
 
@@ -94,8 +98,8 @@ namespace TransformHandles
         /// <returns>The axis rotated to match the current coordinate space.</returns>
         protected Vector3 GetRotatedAxis(Vector3 axis)
         {
-            return ParentHandle.space == Space.Self
-                ? ParentHandle.target.rotation * axis
+            return ParentHandle.Space == Space.Self
+                ? ParentHandle.Target.rotation * axis
                 : axis;
         }
 
