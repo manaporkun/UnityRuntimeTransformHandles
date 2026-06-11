@@ -92,15 +92,16 @@ type/space/axes, and highlight color, then assign it:
 TransformHandleManager.Instance.Settings = mySettings;
 ```
 
-### Blocking interaction over UI
+### Blocking interaction over UI (opt-in)
 
-By default a handle interaction will not start while the pointer is over a uGUI element, so
-clicking a button or panel rendered above the scene does not begin a drag (an interaction already
-in progress is never interrupted). This needs an `EventSystem` in the scene and the uGUI package;
-projects without uGUI are unaffected. Toggle it at runtime or in the Inspector:
+Optionally, a handle interaction can be prevented from starting while the pointer is over a uGUI
+element, so clicking a button or panel above the scene does not begin a drag (an interaction
+already in progress is never interrupted; touch uses the active finger). It is **off by default**
+so it never silently changes input behavior. Needs an `EventSystem` and the uGUI package; projects
+without uGUI are unaffected. Enable it at runtime or in the Inspector:
 
 ```csharp
-TransformHandleManager.Instance.BlockWhenPointerOverUI = false;
+TransformHandleManager.Instance.BlockWhenPointerOverUI = true;
 ```
 
 For a non-uGUI UI stack, subclass and override `IsPointerOverUI()`.
