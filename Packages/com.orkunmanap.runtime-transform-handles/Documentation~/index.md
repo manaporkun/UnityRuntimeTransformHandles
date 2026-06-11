@@ -61,25 +61,28 @@ Handles require a dedicated physics layer (default name `TransformHandle`). Crea
 | `static void ChangeHandleType(Handle, HandleType)` | Set a handle's type. |
 | `void ChangeHandleSpace(Handle, Space)` | Set a handle's space and re-center the ghost. |
 | `void ChangeHandlePivot(TransformGroup, bool originToCenter)` | Toggle pivot vs. bounds-center origin. |
-| `Camera mainCamera` | Camera used for raycasting (settable; falls back to `Camera.main`). |
+| `Camera MainCamera` | Camera used for raycasting (settable; falls back to `Camera.main`). |
 | `TransformHandleSettings Settings` | Optional settings asset (overrides serialized defaults). |
 
 ### `Handle`
 
 | Member | Description |
 |--------|-------------|
-| `Transform target` | Manipulated transform (**read-only**; set via `CreateHandle`/`Enable`). |
-| `Camera handleCamera` | Camera for screen math (**read-only**; set when enabled). |
-| `HandleType type` | Property; assigning rebuilds the child handles. |
-| `HandleAxes axes` | Property; assigning rebuilds the child handles. |
-| `Space space` | Property; setter clamps Scale handles to `Space.Self`. |
-| `SnappingType snappingType` | `Relative` or `Absolute`. |
-| `Vector3 positionSnap` / `float rotationSnap` / `Vector3 scaleSnap` | Snap increments (0 = off). |
-| `bool autoScale` / `float ScaleMultiplier` / `AutoScaleSizeInPixels` | Constant on-screen sizing. |
+| `Transform Target` | Manipulated transform (**read-only**; set via `CreateHandle`/`Enable`). |
+| `Camera HandleCamera` | Camera for screen math (**read-only**; set when enabled). |
+| `HandleType Type` | Property; assigning rebuilds the child handles. |
+| `HandleAxes Axes` | Property; assigning rebuilds the child handles. |
+| `Space Space` | Property; setter clamps Scale handles to `Space.Self`. |
+| `SnappingType SnappingType` | `Relative` or `Absolute`. |
+| `Vector3 PositionSnap` / `float RotationSnap` / `Vector3 ScaleSnap` | Snap increments (0 = off). |
+| `bool AutoScale` / `float ScaleMultiplier` / `AutoScaleSizeInPixels` | Constant on-screen sizing. |
 | events `OnInteractionStartEvent` / `OnInteractionEvent` / `OnInteractionEndEvent` / `OnHandleDestroyedEvent` | `Action<Handle>`. Inspector-friendly `*UnityEvent` mirrors exist. |
 | `void ApplySettings(TransformHandleSettings)` | Apply scale/appearance from a settings asset. |
 
-> `ChangeHandleType`/`ChangeHandleSpace`/`ChangeAxes` are `[Obsolete]` — assign the `type`/`space`/`axes` properties instead.
+> The camelCase spellings of these members (`target`, `type`, `space`, `axes`, `snappingType`,
+> `positionSnap`, `rotationSnap`, `scaleSnap`, `autoScale`, `handleCamera`, `mainCamera`) and the
+> `ChangeHandleType`/`ChangeHandleSpace`/`ChangeAxes` methods are `[Obsolete]` shims — they keep
+> working but will be removed in the next major release.
 
 ### Enums
 
