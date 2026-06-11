@@ -67,7 +67,11 @@ namespace TransformHandles.Tests
 
             CollectionAssert.Contains(handle.Targets, target, "Targets must expose the selected object");
             Assert.AreEqual(1, handle.Targets.Count);
-            CollectionAssert.DoesNotContain(handle.Targets, handle.Pivot, "the pivot is not one of the targets");
+            // Pivot is the ghost; the manipulated object is not. (Reference identity, not NUnit
+            // collection equality, which is unreliable on UnityEngine.Object's fake-null operator.)
+            Assert.AreNotSame(target, handle.Pivot, "the pivot is not the manipulated object");
+            Assert.IsNotNull(handle.Pivot.GetComponent<Ghost>(), "Pivot is the ghost pivot");
+            Assert.IsNull(target.GetComponent<Ghost>(), "the manipulated object is not a ghost");
         }
 
         [Test]
