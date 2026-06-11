@@ -291,7 +291,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Created and maintained by [Orkun Manap](https://manap.dev)
 - Based on [Runtime Transform Handle](https://github.com/pshtif/RuntimeTransformHandle) by
-  Peter @sHTiF Stefcek (MIT) — see
+  Peter Stefcek and contributors (MIT) — see
   [`Third Party Notices.md`](Packages/com.orkunmanap.runtime-transform-handles/Third%20Party%20Notices.md)
 
 ## Support
