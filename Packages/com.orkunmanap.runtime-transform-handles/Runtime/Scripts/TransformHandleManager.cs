@@ -450,7 +450,13 @@ namespace TransformHandles
             if (!blockWhenPointerOverUI) return false;
 #if TH_UGUI
             var eventSystem = UnityEngine.EventSystems.EventSystem.current;
-            return eventSystem != null && eventSystem.IsPointerOverGameObject();
+            if (eventSystem == null) return false;
+
+            // The no-arg overload only queries the mouse pointer. The package treats the first
+            // active touch as the primary pointer (see InputWrapper), so on touch devices also
+            // test that finger's pointer id — otherwise a tap over UI bypasses the guard.
+            if (eventSystem.IsPointerOverGameObject()) return true;
+            return HasActiveTouch && eventSystem.IsPointerOverGameObject(PrimaryTouchPointerId);
 #else
             return false;
 #endif

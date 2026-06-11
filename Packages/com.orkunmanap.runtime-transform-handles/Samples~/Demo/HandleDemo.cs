@@ -172,7 +172,10 @@ public class HandleDemo : MonoBehaviour
     {
 #if TH_UGUI
         var es = EventSystem.current;
-        return es != null && es.IsPointerOverGameObject();
+        if (es == null) return false;
+        if (es.IsPointerOverGameObject()) return true; // mouse / default pointer
+        // Also test the active finger so the guard works under touch (mouse-only otherwise).
+        return InputWrapper.HasActiveTouch && es.IsPointerOverGameObject(InputWrapper.PrimaryTouchPointerId);
 #else
         return false;
 #endif
