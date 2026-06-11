@@ -68,5 +68,20 @@ namespace TransformHandles.Utils
         {
             return -(Vector2.Dot(x1 - x0, x2 - x1) / (x2 - x1).sqrMagnitude);
         }
+
+        /// <summary>
+        /// Local Y scale for a scale-axis line mesh so the line ends at the inner face of the
+        /// gizmo cube instead of extending through it: the line spans from the handle origin to
+        /// <paramref name="cubeReach"/> minus <paramref name="cubeHalfExtent"/>, never negative.
+        /// </summary>
+        /// <param name="cubeReach">Distance from the handle origin to the cube center.</param>
+        /// <param name="cubeHalfExtent">Half the cube's extent along the drag axis.</param>
+        /// <param name="lineMeshLength">Unscaled length of the line mesh along its Y axis.</param>
+        public static float LineScaleForCubeReach(float cubeReach, float cubeHalfExtent, float lineMeshLength)
+        {
+            if (lineMeshLength <= 0f) return 0f;
+            var lineReach = Mathf.Max(0f, cubeReach - cubeHalfExtent);
+            return lineReach / lineMeshLength;
+        }
     }
 }

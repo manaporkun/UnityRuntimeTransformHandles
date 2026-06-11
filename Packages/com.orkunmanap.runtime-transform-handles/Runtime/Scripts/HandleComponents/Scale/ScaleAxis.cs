@@ -39,14 +39,14 @@ namespace TransformHandles
             _axis = axis;
             DefaultColor = defaultColor;
 
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = ParentHandle.HandleCamera;
 
             // Instantiate materials once; Initialize is re-runnable via Handle.ChangeAxes
             // and MeshRenderer.material allocates a new instance on every access.
             if (_cubeMaterial == null) _cubeMaterial = cubeMeshRenderer.material;
             if (_lineMaterial == null) _lineMaterial = lineMeshRenderer.material;
 
-            delta = 0f;
+            Delta = 0f;
             _lastDelta = float.NaN;
             CacheVisualRestLengths();
             ApplyVisualDelta(1f);
@@ -75,8 +75,7 @@ namespace TransformHandles
         private void ApplyVisualDelta(float scaleFactor)
         {
             var cubeReach = _cubeRestDistance * scaleFactor;
-            var lineReach = Mathf.Max(0f, cubeReach - _cubeHalfExtent);
-            var lineScaleY = lineReach / _lineMeshLength;
+            var lineScaleY = HandleTransformUtility.LineScaleForCubeReach(cubeReach, _cubeHalfExtent, _lineMeshLength);
             lineMeshRenderer.transform.localScale = new Vector3(1f, lineScaleY, 1f);
             cubeMeshRenderer.transform.localPosition = _axis * cubeReach;
         }
@@ -84,10 +83,10 @@ namespace TransformHandles
         protected void Update()
         {
             // Skip redundant transform writes when delta hasn't changed (e.g. idle handle, delta == 0).
-            if (delta == _lastDelta) return;
-            _lastDelta = delta;
+            if (Delta == _lastDelta) return;
+            _lastDelta = Delta;
 
-            ApplyVisualDelta(1f + delta);
+            ApplyVisualDelta(1f + Delta);
         }
 
         /// <inheritdoc/>
@@ -95,7 +94,7 @@ namespace TransformHandles
         {
             if (_handleCamera == null) return;
 
-            var position = ParentHandle.target.position;
+            var position = ParentHandle.Target.position;
             var direction = GetRotatedAxis(_axis);
             var handleSize = HandleTransformUtility.GetHandleSize(position, _handleCamera);
             var lineTranslation = HandleTransformUtility.CalcLineTranslation(
@@ -108,10 +107,10 @@ namespace TransformHandles
             // Unity SliderScale.DoAxis: dist = 1 + CalcLineTranslation(...) / handleSize; scale = start * dist.
             var dist = 1f + lineTranslation / handleSize;
 
-            var snap = Mathf.Abs(Vector3.Dot(ParentHandle.scaleSnap, _axis));
+            var snap = Mathf.Abs(Vector3.Dot(ParentHandle.ScaleSnap, _axis));
             if (snap != 0)
             {
-                if (ParentHandle.snappingType == SnappingType.Relative)
+                if (ParentHandle.SnappingType == SnappingType.Relative)
                 {
                     dist = SnapUtils.Snap(dist, snap);
                 }
@@ -125,10 +124,10 @@ namespace TransformHandles
                 }
             }
 
-            delta = dist - 1f;
-            var scale = Vector3.Scale(_startScale, _axis * delta + Vector3.one);
+            Delta = dist - 1f;
+            var scale = Vector3.Scale(_startScale, _axis * Delta + Vector3.one);
 
-            ParentHandle.target.localScale = scale;
+            ParentHandle.Target.localScale = scale;
 
             base.Interact(previousPosition);
         }
@@ -137,7 +136,7 @@ namespace TransformHandles
         public override void StartInteraction(Vector3 hitPoint)
         {
             base.StartInteraction(hitPoint);
-            _startScale = ParentHandle.target.localScale;
+            _startScale = ParentHandle.Target.localScale;
             _startMousePosition = InputWrapper.MousePosition;
         }
 
@@ -147,6 +146,15 @@ namespace TransformHandles
             base.EndInteraction();
             _lastDelta = float.NaN;
             ApplyVisualDelta(1f);
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            // Destroy the material instances created in Initialize; renderer.material clones
+            // leak per handle create/destroy cycle otherwise.
+            if (_cubeMaterial != null) Destroy(_cubeMaterial);
+            if (_lineMaterial != null) Destroy(_lineMaterial);
         }
 
         /// <inheritdoc/>

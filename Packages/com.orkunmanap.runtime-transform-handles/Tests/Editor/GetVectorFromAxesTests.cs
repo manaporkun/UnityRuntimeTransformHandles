@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 
-namespace TransformHandles.Tests
+namespace TransformHandles.Tests.Editor
 {
     /// <summary>
     /// Covers HandleBase.GetVectorFromAxes, which converts an axis mask to the
@@ -23,7 +23,7 @@ namespace TransformHandles.Tests
         };
 
         [TestCaseSource(nameof(Cases))]
-        public void GetVectorFromAxes_MapsMaskToMultiplier(HandleAxes axes, Vector3 expected)
+        public void GetVectorFromAxes_maps_mask_to_multiplier(HandleAxes axes, Vector3 expected)
         {
             Assert.AreEqual(expected, HandleBase.GetVectorFromAxes(axes));
         }

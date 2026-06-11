@@ -19,13 +19,16 @@ on:
       - "Packages/**"
       - ".github/workflows/min-api-lint.yml"
 
+permissions:
+  contents: read
+
 jobs:
   min-api-lint:
     name: Min-API lint (Unity 2021.3 floor)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Scan for unguarded post-2021.3 APIs
         run: |

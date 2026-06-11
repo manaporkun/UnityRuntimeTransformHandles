@@ -2,10 +2,18 @@ using UnityEngine;
 
 namespace TransformHandles.Utils
 {
+    /// <summary>
+    /// Math helpers for handle interaction geometry.
+    /// </summary>
     public static class MathUtils
     {
         private const float PrecisionThreshold = 0.001f;
-		
+
+        /// <summary>
+        /// Returns the distance along <paramref name="ray"/> of the point closest to
+        /// <paramref name="other"/>. Both ray directions must be normalized. Returns 0 when the
+        /// rays are (near-)parallel.
+        /// </summary>
         public static float ClosestPointOnRay(Ray ray, Ray other)
         {
             // based on: https://math.stackexchange.com/questions/1036959/midpoint-of-the-shortest-distance-between-2-rays-in-3d

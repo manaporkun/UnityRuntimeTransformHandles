@@ -7,10 +7,8 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  checks: write
-  pull-requests: write
+# Least-privilege: permissions are granted per job. Only `publish` writes to the repo.
+permissions: {}
 
 # Serialize per ref so two main pushes can't run the publish/bump/tag steps concurrently
 # (which previously raced on the version-bump commit and tag). Stale PR runs are cancelled;
@@ -20,14 +18,62 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Computes the gates for the licensed Unity test job: whether Unity credentials are
+  # available (they are not on Dependabot/fork runs - the job then skips neutrally instead
+  # of failing red), and whether the PR touches code at all (docs-only PRs skip the
+  # ~5-minute licensed editor run). The secrets context is not available in job-level
+  # `if:` expressions, so the check runs in a step and is exported as a job output.
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      has-unity-secrets: ${{ steps.secrets.outputs.has-secrets }}
+      code-changed: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Detect code changes
+        id: filter
+        # PR-only: the output is only consulted for pull_request runs, and paths-filter
+        # has no natural diff base on workflow_dispatch.
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+        with:
+          filters: |
+            code:
+              - 'Packages/**'
+              - 'Assets/**'
+              - 'ProjectSettings/**'
+              - '.github/workflows/publish-upm.yml'
+
+      - name: Check Unity credentials
+        id: secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+        run: |
+          if [ -n "$UNITY_LICENSE" ] || [ -n "$UNITY_SERIAL" ] || [ -n "$UNITY_LICENSING_SERVER" ]; then
+            echo "has-secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-secrets=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Unity credentials unavailable (Dependabot/fork run?); the licensed test job will be skipped."
+          fi
+
   # UPM-spec gate: manifest + required files + asmdef sanity. No Unity license needed,
   # so it runs fast on every PR and enforces the package floor going forward.
   validate:
     name: Validate package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Validate manifest & structure
         run: |
@@ -74,10 +120,18 @@ jobs:
 
   # Gate: the package must compile and its EditMode + PlayMode tests must pass
   # before anything is published. Runs on pull_request too so breakage is caught
-  # before it reaches main.
+  # before it reaches main. Skips neutrally (not red) when Unity credentials are
+  # unavailable (Dependabot/forks) and on docs-only PRs; pushes to main always test.
   test:
     name: Tests (EditMode + PlayMode)
+    needs: preflight
+    if: >-
+      needs.preflight.outputs.has-unity-secrets == 'true' &&
+      (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Free disk space
         run: |
@@ -85,12 +139,10 @@ jobs:
           sudo docker image prune --all --force 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          lfs: true
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Cache Library
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: Library
           key: Library-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
@@ -98,7 +150,7 @@ jobs:
             Library-
 
       - name: Run tests
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
@@ -112,21 +164,30 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-results
           path: artifacts
           if-no-files-found: ignore
 
   publish:
-    # Only publish on a real push to main (or manual dispatch), and only after validate + tests pass.
+    # Only publish on a real push to main (or manual dispatch), and only after validate + tests
+    # SUCCEEDED. `needs.test.result == 'success'` (with !cancelled()) is load-bearing: the test
+    # job can be SKIPPED when Unity credentials are missing, and a skipped gate must never
+    # let untested code publish.
     needs: [validate, test]
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: >-
+      !cancelled() &&
+      needs.validate.result == 'success' &&
+      needs.test.result == 'success' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -207,21 +268,71 @@ jobs:
               RELEASE_REF="$RANGE_START"
               # Recover this version's notes from the CHANGELOG at the bump commit (the same ref we
               # package from), so the GitHub release notes match the shipped in-package changelog even
-              # if main's CHANGELOG changed after the bump.
+              # if main's CHANGELOG changed after the bump. Capture the FULL section body ("### "
+              # group headings included), not just dash lines - curated sections are grouped.
               git show "$RANGE_START:$CHANGELOG" \
                 | awk -v h="## [$CURRENT]" '
                     index($0, h) == 1 { grab = 1; next }
                     grab && /^## \[/ { exit }
-                    grab && /^- /    { print }
+                    grab { print }
                   ' > /tmp/release_entries.md
               return 0
             fi
 
             # Full messages (%B) so `BREAKING CHANGE:` footers are seen, not just subjects.
             COMMITS=$(git log $RANGE --format=%B)
-            # tformat = trailing newline after every entry so the "Generate changelog" heredoc EOF
-            # lands on its own line (plain `format:` omits the final newline and breaks it).
-            git log $RANGE --pretty=tformat:"- %s" > /tmp/release_entries.md
+
+            # Release notes: prefer the curated [Unreleased] section of the CHANGELOG. If it has
+            # real content it becomes the release entries verbatim (and is consumed below when the
+            # new version section is written). Otherwise fall back to commit subjects in the range,
+            # grouped Keep-a-Changelog style by Conventional Commit type - never the old raw
+            # "git log --pretty='- %s'" dump that put merge commits into released sections.
+            UNRELEASED_BODY=""
+            if [ -f "$CHANGELOG" ] && grep -q '^## \[Unreleased\]' "$CHANGELOG"; then
+              UNRELEASED_BODY=$(awk '
+                /^## \[Unreleased\]/ { grab = 1; next }
+                grab && /^## \[/ { exit }
+                grab { print }
+              ' "$CHANGELOG")
+            fi
+
+            if printf '%s\n' "$UNRELEASED_BODY" | grep -qE '^(### |- )'; then
+              # sed '/./,$!d' strips the leading blank lines left by the heading separator.
+              printf '%s\n' "$UNRELEASED_BODY" | sed '/./,$!d' > /tmp/release_entries.md
+            else
+              git log $RANGE --no-merges --pretty=tformat:"%s" \
+                | grep -vE '^chore: bump version to' > /tmp/subjects.txt || true
+              awk '
+                {
+                  rest = $0; type = ""
+                  if (match($0, /^[A-Za-z]+(\([^)]*\))?!?: /)) {
+                    type = substr($0, 1, RLENGTH)
+                    rest = substr($0, RLENGTH + 1)
+                    sub(/\(.*/, "", type); sub(/!?: ?$/, "", type)
+                    type = tolower(type)
+                  }
+                  if (type == "feat")                                   group = "Added"
+                  else if (type == "fix")                               group = "Fixed"
+                  else if (type == "perf" || type == "refactor")        group = "Changed"
+                  else if (type == "docs")                              group = "Documentation"
+                  else if (type ~ /^(ci|build|chore|test|style)$/)      group = "Maintenance"
+                  else                                                  { group = "Changed"; rest = $0 }
+                  lines[group] = lines[group] "- " rest "\n"
+                }
+                END {
+                  n = split("Added Changed Fixed Documentation Maintenance", order, " ")
+                  first = 1
+                  for (i = 1; i <= n; i++) {
+                    g = order[i]
+                    if (lines[g] != "") {
+                      if (!first) printf "\n"
+                      printf "### %s\n%s", g, lines[g]
+                      first = 0
+                    }
+                  }
+                }
+              ' /tmp/subjects.txt > /tmp/release_entries.md
+            fi
 
             # Strict Conventional Commits only — no bare aliases, no "any change -> patch" fallback.
             BUMP="none"
@@ -263,21 +374,33 @@ jobs:
 
             jq ".version = \"$NEW_VERSION\"" "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
 
-            ENTRIES=$(cat /tmp/release_entries.md)
             DATE=$(date +%Y-%m-%d)
             {
               echo "## [$NEW_VERSION] - $DATE"
               echo ""
-              echo "$ENTRIES"
+              cat /tmp/release_entries.md
               echo ""
             } > /tmp/new_entry.md
             if [ -f "$CHANGELOG" ]; then
-              # Insert the new section just before the first existing "## [" heading.
-              awk 'BEGIN{ins=0}
-                   /^## \[/ && ins==0 {while((getline line < "/tmp/new_entry.md")>0) print line; ins=1}
-                   {print}
-                   END{if(ins==0){while((getline line < "/tmp/new_entry.md")>0) print line}}' \
-                  "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
+              if grep -q '^## \[Unreleased\]' "$CHANGELOG"; then
+                # Consume the [Unreleased] body (it became this release's notes) and insert the
+                # new version section right below the now-empty [Unreleased] heading.
+                awk '
+                  /^## \[Unreleased\]/ { print; print ""; skip = 1; ins = 1; next }
+                  skip && /^## \[/ { skip = 0 }
+                  skip { next }
+                  ins && /^## \[/ { while ((getline line < "/tmp/new_entry.md") > 0) print line; ins = 0 }
+                  { print }
+                  END { if (ins) { while ((getline line < "/tmp/new_entry.md") > 0) print line } }
+                ' "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
+              else
+                # Legacy layout without an [Unreleased] heading: insert before the first version heading.
+                awk 'BEGIN{ins=0}
+                     /^## \[/ && ins==0 {while((getline line < "/tmp/new_entry.md")>0) print line; ins=1}
+                     {print}
+                     END{if(ins==0){while((getline line < "/tmp/new_entry.md")>0) print line}}' \
+                    "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
+              fi
             else
               cp /tmp/new_entry.md "$CHANGELOG"
             fi
@@ -366,7 +489,10 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Release v${{ steps.release.outputs.version }}"
-            git push origin $UPM_BRANCH --force
+            # force-with-lease: the remote-tracking ref is fresh from the pull above, so this
+            # behaves like --force unless someone moved upm mid-run - then it fails loudly
+            # instead of silently rewriting the branch consumers track.
+            git push origin $UPM_BRANCH --force-with-lease
             echo "UPM branch updated successfully!"
           fi
 
@@ -400,7 +526,7 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.release.outputs.skip != 'true'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: v${{ steps.release.outputs.version }}
           name: v${{ steps.release.outputs.version }}

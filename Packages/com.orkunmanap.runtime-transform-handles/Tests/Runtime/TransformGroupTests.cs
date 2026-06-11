@@ -143,7 +143,7 @@ namespace TransformHandles.Tests
         [Test]
         public void UpdateRotations_self_space_rotates_member_around_ghost()
         {
-            _handle.space = Space.Self;
+            _handle.Space = Space.Self;
             var ghost = NewGhost(Vector3.zero);
             var group = new TransformGroup(ghost, _handle);
             var target = NewObject("t", new Vector3(1f, 0f, 0f)).transform;
@@ -164,7 +164,7 @@ namespace TransformHandles.Tests
             // permutes the axes (X->Y), so a member at (1,0,0) must land at (0,1,0). The old code
             // derived the axis/angle from rotationChange.eulerAngles and its magnitude, which is not
             // a valid axis/angle decomposition and lands the point somewhere else for this delta.
-            _handle.space = Space.World;
+            _handle.Space = Space.World;
             var ghost = NewGhost(Vector3.zero);
             var group = new TransformGroup(ghost, _handle);
             var target = NewObject("t", new Vector3(1f, 0f, 0f)).transform;
@@ -180,7 +180,7 @@ namespace TransformHandles.Tests
         [Test]
         public void UpdateRotations_world_space_rotates_all_members_around_ghost()
         {
-            _handle.space = Space.World;
+            _handle.Space = Space.World;
             var ghost = NewGhost(Vector3.zero);
             var group = new TransformGroup(ghost, _handle);
             var a = NewObject("a", new Vector3(1f, 0f, 0f)).transform;

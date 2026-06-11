@@ -36,10 +36,10 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            var camera = ParentHandle.handleCamera;
+            var camera = ParentHandle.HandleCamera;
             if (camera == null) return;
 
-            var position = ParentHandle.target.position;
+            var position = ParentHandle.Target.position;
             var handleSize = HandleTransformUtility.GetHandleSize(position, camera);
             var lineTranslation = HandleTransformUtility.CalcLineTranslation(
                 _startMousePosition,
@@ -53,14 +53,14 @@ namespace TransformHandles
             var snap = GetActiveScaleSnap();
             if (snap != 0)
             {
-                if (ParentHandle.snappingType == SnappingType.Relative)
+                if (ParentHandle.SnappingType == SnappingType.Relative)
                     dist = SnapUtils.Snap(dist, snap);
                 else
                     dist = SnapUtils.Snap(dist + 1f, snap) - 1f;
             }
 
-            delta = dist;
-            ParentHandle.target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * delta;
+            Delta = dist;
+            ParentHandle.Target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * Delta;
 
             base.Interact(previousPosition);
         }
@@ -69,10 +69,10 @@ namespace TransformHandles
         public override void StartInteraction(Vector3 hitPoint)
         {
             base.StartInteraction(hitPoint);
-            _startScale = ParentHandle.target.localScale;
+            _startScale = ParentHandle.Target.localScale;
             _startMousePosition = InputWrapper.MousePosition;
 
-            var camera = ParentHandle.handleCamera;
+            var camera = ParentHandle.HandleCamera;
             if (camera == null)
             {
                 _uniformScaleDirection = Vector3.one;
@@ -81,6 +81,14 @@ namespace TransformHandles
 
             var cameraTransform = camera.transform;
             _uniformScaleDirection = (cameraTransform.right + cameraTransform.up).normalized;
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            // Destroy the material instance created in Initialize; renderer.material clones
+            // leak per handle create/destroy cycle otherwise.
+            if (_cubeMaterial != null) Destroy(_cubeMaterial);
         }
 
         /// <inheritdoc/>
@@ -97,7 +105,7 @@ namespace TransformHandles
 
         private float GetActiveScaleSnap()
         {
-            var snap = ParentHandle.scaleSnap;
+            var snap = ParentHandle.ScaleSnap;
             var max = 0f;
             if (_axis.x > 0f) max = Mathf.Max(max, snap.x);
             if (_axis.y > 0f) max = Mathf.Max(max, snap.y);

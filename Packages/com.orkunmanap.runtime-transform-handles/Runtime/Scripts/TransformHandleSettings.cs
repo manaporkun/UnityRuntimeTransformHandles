@@ -64,27 +64,41 @@ namespace TransformHandles
         [Tooltip("Enable auto-scaling handles based on camera distance")]
         [SerializeField] private bool autoScaleHandles = true;
 
-        // Public accessors for keyboard shortcuts
+        /// <summary>Whether all keyboard shortcuts are enabled.</summary>
         public bool EnableShortcuts => enableShortcuts;
+        /// <summary>Key to switch to Position handle mode.</summary>
         public KeyCode PositionKey => positionKey;
+        /// <summary>Key to switch to Rotation handle mode.</summary>
         public KeyCode RotationKey => rotationKey;
+        /// <summary>Key to switch to Scale handle mode.</summary>
         public KeyCode ScaleKey => scaleKey;
+        /// <summary>Key to switch to All handles mode (Position + Rotation + Scale).</summary>
         public KeyCode AllKey => allKey;
+        /// <summary>Key to toggle between World and Local coordinate space.</summary>
         public KeyCode SpaceToggleKey => spaceToggleKey;
+        /// <summary>Key to toggle between Pivot and Center origin.</summary>
         public KeyCode PivotToggleKey => pivotToggleKey;
 
-        // Public accessors for visual settings
+        /// <summary>Color used when hovering over a handle.</summary>
         public Color HighlightColor => highlightColor;
+        /// <summary>Color for the X axis.</summary>
         public Color XAxisColor => xAxisColor;
+        /// <summary>Color for the Y axis.</summary>
         public Color YAxisColor => yAxisColor;
+        /// <summary>Color for the Z axis.</summary>
         public Color ZAxisColor => zAxisColor;
+        /// <summary>Color for the global/center handle.</summary>
         public Color GlobalHandleColor => globalHandleColor;
+        /// <summary>Scale multiplier for handle size.</summary>
         public float HandleScale => handleScale;
 
-        // Public accessors for default handle settings
+        /// <summary>Default handle type for new handles.</summary>
         public HandleType DefaultHandleType => defaultHandleType;
+        /// <summary>Default coordinate space for new handles.</summary>
         public Space DefaultSpace => defaultSpace;
+        /// <summary>Default axes for new handles.</summary>
         public HandleAxes DefaultAxes => defaultAxes;
+        /// <summary>Whether handles auto-scale to keep a constant screen size.</summary>
         public bool AutoScaleHandles => autoScaleHandles;
 
         /// <summary>
