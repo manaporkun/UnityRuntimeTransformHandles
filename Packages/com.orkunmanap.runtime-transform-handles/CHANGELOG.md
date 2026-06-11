@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Handle.Targets` (`IReadOnlyCollection<Transform>`) exposes the actual manipulated objects, and
+  `TransformGroup.Targets` / `TransformHandleManager.GetTargets(handle)` provide the same — there
+  was previously no public way to ask a handle which objects it controls.
+- `Handle.Pivot` is the honest name for the manipulation pivot (the ghost transform the handle
+  moves around).
+
+### Deprecated
+- `Handle.Target` is now `[Obsolete]`. It returns the manipulation pivot (ghost), not the selected
+  object — a long-standing source of confusion. Use `Handle.Pivot` for the pivot or
+  `Handle.Targets` for the manipulated objects. The member keeps working until the next major.
+
 ## [3.2.0] - 2026-06-11
 
 ### Added

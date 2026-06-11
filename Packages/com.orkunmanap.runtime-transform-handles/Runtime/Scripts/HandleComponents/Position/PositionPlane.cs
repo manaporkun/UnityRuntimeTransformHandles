@@ -96,7 +96,7 @@ namespace TransformHandles
                 if (Mathf.Abs(axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
-            ParentHandle.Target.position = position;
+            ParentHandle.Pivot.position = position;
 
             base.Interact(previousPosition);
         }
@@ -106,7 +106,7 @@ namespace TransformHandles
         {
             var rPerp = GetRotatedAxis(_perp);
 
-            var position = ParentHandle.Target.position;
+            var position = ParentHandle.Pivot.position;
             _plane = new Plane(rPerp, position);
 
             var ray = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
