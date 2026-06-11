@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Optional UI-occlusion guard: when enabled, handle interactions do not start while the pointer
+  is over a uGUI element. Opt-in via `TransformHandleManager.BlockWhenPointerOverUI` (serialized,
+  **off by default** so it never silently changes existing input behavior); an interaction already
+  in progress is never interrupted, and touch is handled via the active finger's pointer id.
+  Requires the uGUI package and an `EventSystem` in the scene — projects without uGUI are
+  unaffected (no-op via the `TH_UGUI` version define). Override `IsPointerOverUI()` to integrate a
+  non-uGUI UI stack.
+  The Demo sample now spawns a uGUI panel and an EventSystem and exposes a HUD toggle so the
+  guard can be tried directly: with it on, clicking the panel does not disturb objects behind it.
+
 ## [3.1.0] - 2026-06-11
 
 ### Added
