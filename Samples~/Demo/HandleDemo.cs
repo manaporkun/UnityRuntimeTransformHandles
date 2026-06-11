@@ -3,6 +3,10 @@ using System.Linq;
 using TransformHandles;
 using TransformHandles.Utils;
 using UnityEngine;
+#if TH_UGUI
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+#endif
 
 /// <summary>
 /// Self-contained showcase that exercises the whole public surface of the package:
@@ -105,6 +109,79 @@ public class HandleDemo : MonoBehaviour
             l.type = LightType.Directional;
             lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
         }
+
+        BuildUiOcclusionOverlay();
+    }
+
+    // Builds a real uGUI panel (+ an EventSystem if the scene lacks one) so the
+    // TransformHandleManager.BlockWhenPointerOverUI guard is demonstrable: with the guard on,
+    // clicking the panel must not select targets or start a handle drag underneath it.
+    private void BuildUiOcclusionOverlay()
+    {
+#if TH_UGUI
+        // The guard is opt-in (off by default on the manager); turn it on here so the sample
+        // demonstrates it out of the box. Flip it from the HUD to compare on/off behavior.
+        _manager.BlockWhenPointerOverUI = true;
+#if UNITY_2023_1_OR_NEWER
+        var hasEventSystem = Object.FindAnyObjectByType<EventSystem>() != null;
+#else
+        var hasEventSystem = Object.FindObjectOfType<EventSystem>() != null;
+#endif
+        if (!hasEventSystem)
+        {
+            var esGo = new GameObject("EventSystem");
+            esGo.AddComponent<EventSystem>();
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
+            esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>().AssignDefaultActions();
+#else
+            esGo.AddComponent<StandaloneInputModule>();
+#endif
+        }
+
+        var canvasGo = new GameObject("Demo UI Canvas");
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasGo.AddComponent<CanvasScaler>();
+        canvasGo.AddComponent<GraphicRaycaster>();
+
+        var panelGo = new GameObject("UI Occlusion Test Panel");
+        panelGo.transform.SetParent(canvasGo.transform, false);
+        var panel = panelGo.AddComponent<Image>();
+        panel.color = new Color(0.15f, 0.45f, 0.85f, 0.85f); // raycast target by default
+        var rect = panel.rectTransform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.sizeDelta = new Vector2(420f, 64f);
+        rect.anchoredPosition = new Vector2(0f, -12f);
+
+        var labelGo = new GameObject("Label");
+        labelGo.transform.SetParent(panelGo.transform, false);
+        var label = labelGo.AddComponent<Text>();
+        label.text = "uGUI panel — clicks here must NOT move objects\n(toggle the guard in the HUD)";
+        label.alignment = TextAnchor.MiddleCenter;
+        label.color = Color.white;
+        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                     ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+        var labelRect = label.rectTransform;
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
+#endif
+    }
+
+    // True while the pointer is over a uGUI element, so the demo's own target picking respects
+    // UI occlusion the same way the handle manager does. No-op without uGUI.
+    private bool PointerOverUi()
+    {
+#if TH_UGUI
+        var es = EventSystem.current;
+        if (es == null) return false;
+        if (es.IsPointerOverGameObject()) return true; // mouse / default pointer
+        // Also test the active finger so the guard works under touch (mouse-only otherwise).
+        return InputWrapper.HasActiveTouch && es.IsPointerOverGameObject(InputWrapper.PrimaryTouchPointerId);
+#else
+        return false;
+#endif
     }
 
     private void Update()
@@ -118,6 +195,9 @@ public class HandleDemo : MonoBehaviour
     private void HandleSelectionInput()
     {
         if (_interacting) return; // don't pick targets mid-drag
+        // Respect the same toggle the handle manager uses, so flipping it off in the HUD lets
+        // both picking and handle drags pass through the panel (matching the on-screen hint).
+        if (_manager.BlockWhenPointerOverUI && PointerOverUi()) return;
 
         // Left click: select (Shift adds to the current handle's group).
         if (InputWrapper.GetMouseButtonDown(0) && TryPickTarget(out var picked))
@@ -331,6 +411,10 @@ public class HandleDemo : MonoBehaviour
 
         var useSettings = GUILayout.Toggle(_useSettings, " Apply runtime Settings asset");
         if (useSettings != _useSettings) { _useSettings = useSettings; if (_useSettings && _activeHandle != null) _activeHandle.ApplySettings(_settings); }
+
+        var blockUi = GUILayout.Toggle(_manager.BlockWhenPointerOverUI, " Block interaction over UI");
+        if (blockUi != _manager.BlockWhenPointerOverUI) _manager.BlockWhenPointerOverUI = blockUi;
+        GUILayout.Label("<size=11>Click the blue panel (top): blocked when on, drags through when off.</size>");
 
         GUILayout.Space(6);
         GUILayout.BeginHorizontal();

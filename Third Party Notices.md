@@ -5,10 +5,10 @@ This package contains third-party software components governed by the license(s)
 ## Runtime Transform Handle
 
 This package is derived from [Runtime Transform Handle](https://github.com/pshtif/RuntimeTransformHandle)
-by Peter @sHTiF Stefcek. The code has since been substantially modified and extended, but the
+by Peter Stefcek and contributors. The code has since been substantially modified and extended, but the
 package originates from that project and portions of the original implementation remain.
 
-- **Author:** Peter @sHTiF Stefcek
+- **Author:** Peter Stefcek and contributors
 - **Source:** https://github.com/pshtif/RuntimeTransformHandle
 - **License:** MIT
 

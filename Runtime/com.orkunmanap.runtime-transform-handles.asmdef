@@ -2,7 +2,8 @@
     "name": "com.orkunmanap.runtime-transform-handles",
     "rootNamespace": "TransformHandles",
     "references": [
-        "GUID:75469ad4d38634e559750d17036d5f7c"
+        "GUID:75469ad4d38634e559750d17036d5f7c",
+        "GUID:2bafac87e7f4b9b418d9448d219b01ab"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -16,6 +17,11 @@
             "name": "com.unity.inputsystem",
             "expression": "1.0.0",
             "define": "TH_INPUTSYSTEM"
+        },
+        {
+            "name": "com.unity.ugui",
+            "expression": "1.0.0",
+            "define": "TH_UGUI"
         }
     ],
     "noEngineReferences": false

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-06-11
+
+### Added
+- Optional UI-occlusion guard: when enabled, handle interactions do not start while the pointer
+  is over a uGUI element. Opt-in via `TransformHandleManager.BlockWhenPointerOverUI` (serialized,
+  **off by default** so it never silently changes existing input behavior); an interaction already
+  in progress is never interrupted, and touch is handled via the active finger's pointer id.
+  Requires the uGUI package and an `EventSystem` in the scene — projects without uGUI are
+  unaffected (no-op via the `TH_UGUI` version define). Override `IsPointerOverUI()` to integrate a
+  non-uGUI UI stack.
+  The Demo sample now spawns a uGUI panel and an EventSystem and exposes a HUD toggle so the
+  guard can be tried directly: with it on, clicking the panel does not disturb objects behind it.
+
 ## [3.1.0] - 2026-06-11
 
 ### Added
@@ -19,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - URP is no longer a package dependency. The URP SubShaders are gated behind `PackageRequirements` and compile only when `com.unity.render-pipelines.universal` 12.1.0+ is installed; Built-in projects need no extra packages.
 - `com.unity.modules.physics` is now declared explicitly as a built-in module dependency.
-- `Third Party Notices.md` restores the upstream attribution: the package derives from [Runtime Transform Handle](https://github.com/pshtif/RuntimeTransformHandle) by Peter @sHTiF Stefcek (MIT), whose copyright and permission notice is now reproduced as the MIT license requires.
+- `Third Party Notices.md` restores the upstream attribution: the package derives from [Runtime Transform Handle](https://github.com/pshtif/RuntimeTransformHandle) by Peter Stefcek (MIT), whose copyright and permission notice is now reproduced as the MIT license requires.
 - Release notes are now generated from the curated `[Unreleased]` changelog section (with grouped Conventional Commit subjects as fallback) instead of raw commit logs.
 - Clean consumer-facing changelog entries for 2.0.0–3.0.4 (remove merge-commit noise) and document 3.0.0 as a release-automation artifact with no breaking changes.
 - README specific-version install example updated to `v3.0.5`.
