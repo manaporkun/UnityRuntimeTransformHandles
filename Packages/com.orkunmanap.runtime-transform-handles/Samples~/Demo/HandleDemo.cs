@@ -71,7 +71,7 @@ public class HandleDemo : MonoBehaviour
         }
 
         _manager = TransformHandleManager.Instance;
-        _manager.mainCamera = _camera;
+        _manager.MainCamera = _camera;
 
         // Build a runtime settings asset (no .asset file needed) to demo Settings injection.
         _settings = TransformHandleSettings.CreateDefault();
@@ -201,9 +201,9 @@ public class HandleDemo : MonoBehaviour
         if (_activeHandle == null) return;
         TransformHandleManager.ChangeHandleType(_activeHandle, _type);
         _manager.ChangeHandleSpace(_activeHandle, _space);
-        _activeHandle.axes = _axes;
+        _activeHandle.Axes = _axes;
         ApplySnapping();
-        _activeHandle.autoScale = _autoScale;
+        _activeHandle.AutoScale = _autoScale;
         _activeHandle.SetScale(_scaleMultiplier);
         if (_useSettings) _activeHandle.ApplySettings(_settings);
     }
@@ -211,10 +211,10 @@ public class HandleDemo : MonoBehaviour
     private void ApplySnapping()
     {
         if (_activeHandle == null) return;
-        _activeHandle.snappingType = _snapType;
-        _activeHandle.positionSnap = Vector3.one * _posSnap;
-        _activeHandle.rotationSnap = _rotSnap;
-        _activeHandle.scaleSnap = Vector3.one * _scaleSnap;
+        _activeHandle.SnappingType = _snapType;
+        _activeHandle.PositionSnap = Vector3.one * _posSnap;
+        _activeHandle.RotationSnap = _rotSnap;
+        _activeHandle.ScaleSnap = Vector3.one * _scaleSnap;
     }
 
     // ----- Events ----------------------------------------------------------------------------
@@ -314,7 +314,7 @@ public class HandleDemo : MonoBehaviour
         GUILayout.Space(6);
 
         EnumRow("Type", ref _type, () => { if (_activeHandle != null) TransformHandleManager.ChangeHandleType(_activeHandle, _type); });
-        EnumRow("Axes", ref _axes, () => { if (_activeHandle != null) _activeHandle.axes = _axes; });
+        EnumRow("Axes", ref _axes, () => { if (_activeHandle != null) _activeHandle.Axes = _axes; });
         EnumRow("Space", ref _space, () => { if (_activeHandle != null) _manager.ChangeHandleSpace(_activeHandle, _space); });
         EnumRow("Snap mode", ref _snapType, ApplySnapping);
 
@@ -327,7 +327,7 @@ public class HandleDemo : MonoBehaviour
         Slider("Handle scale", ref _scaleMultiplier, 0.1f, 10f, () => _activeHandle?.SetScale(_scaleMultiplier));
 
         var auto = GUILayout.Toggle(_autoScale, " Auto-scale with distance");
-        if (auto != _autoScale) { _autoScale = auto; if (_activeHandle != null) _activeHandle.autoScale = _autoScale; }
+        if (auto != _autoScale) { _autoScale = auto; if (_activeHandle != null) _activeHandle.AutoScale = _autoScale; }
 
         var useSettings = GUILayout.Toggle(_useSettings, " Apply runtime Settings asset");
         if (useSettings != _useSettings) { _useSettings = useSettings; if (_useSettings && _activeHandle != null) _activeHandle.ApplySettings(_settings); }

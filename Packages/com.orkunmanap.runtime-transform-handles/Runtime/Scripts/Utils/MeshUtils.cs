@@ -1,9 +1,24 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TransformHandles.Utils
 {
+    /// <summary>
+    /// Procedural mesh builders for the handle gizmos and their runtime colliders.
+    /// </summary>
     public class MeshUtils
     {
+		// Reused across RebuildArc calls: it runs every frame of a rotation drag, and fresh
+		// arrays each call were the package's main steady GC source (~8 KB per drag frame).
+		private static readonly List<Vector3> ArcVertices = new List<Vector3>();
+		private static readonly List<Vector3> ArcNormals = new List<Vector3>();
+		private static readonly List<Vector2> ArcUvs = new List<Vector2>();
+		private static readonly List<int> ArcTriangles = new List<int>();
+
+		/// <summary>
+		/// Creates a new arc mesh. Prefer <see cref="RebuildArc"/> with a reused mesh for
+		/// per-frame rebuilds.
+		/// </summary>
 	    public static Mesh CreateArc(Vector3 center, Vector3 startPoint, Vector3 axis, float radius, float angle, int segmentCount)
 		{
 			var mesh = new Mesh();
@@ -12,53 +27,53 @@ namespace TransformHandles.Utils
 		}
 
 		/// <summary>
-		/// Rewrites an existing mesh into an arc, reusing the Mesh object to avoid per-frame
-		/// allocation and native mesh leaks during continuous rotation handle dragging.
+		/// Rewrites an existing mesh into an arc, reusing the Mesh object and shared buffers to
+		/// avoid per-frame allocation and native mesh leaks during continuous rotation dragging.
 		/// </summary>
 		public static void RebuildArc(Mesh mesh, Vector3 center, Vector3 startPoint, Vector3 axis, float radius, float angle, int segmentCount)
 		{
 			mesh.Clear();
 
-			var vertices = new Vector3[segmentCount+2];
+			ArcVertices.Clear();
+			ArcNormals.Clear();
+			ArcUvs.Clear();
+			ArcTriangles.Clear();
 
 			var startVector = (startPoint - center).normalized * radius;
 			for (var i = 0; i<=segmentCount; i++)
 			{
 				var rad = (float) i / segmentCount * angle;
 				var v = Quaternion.AngleAxis(rad*180f/Mathf.PI, axis) * startVector;
-				vertices[i] = v + center;
+				ArcVertices.Add(v + center);
 			}
-			vertices[segmentCount+1] = center;
+			ArcVertices.Add(center);
 
-			var normals = new Vector3[vertices.Length];
-			for( var n = 0; n < normals.Length; n++ )
-				normals[n] = Vector3.up;
+			for( var n = 0; n < ArcVertices.Count; n++ )
+				ArcNormals.Add(Vector3.up);
 
-			var uvs = new Vector2[vertices.Length];
 			for (var i = 0; i<=segmentCount; i++)
 			{
 				var rad = (float) i / segmentCount * angle;
-				uvs[i] = new Vector2(Mathf.Cos(rad) * .5f + .5f, Mathf.Sin(rad) * .5f + .5f);
+				ArcUvs.Add(new Vector2(Mathf.Cos(rad) * .5f + .5f, Mathf.Sin(rad) * .5f + .5f));
 			}
-			uvs[segmentCount + 1] = Vector2.one / 2f;
+			ArcUvs.Add(Vector2.one / 2f);
 
-			var triangles = new int[ segmentCount * 3 ];
 			for (var i = 0; i < segmentCount; i++)
 			{
-				var index = i * 3;
-				triangles[index] = segmentCount+1;
-				triangles[index+1] = i;
-				triangles[index+2] = i + 1;
+				ArcTriangles.Add(segmentCount+1);
+				ArcTriangles.Add(i);
+				ArcTriangles.Add(i + 1);
 			}
 
-			mesh.vertices = vertices;
-			mesh.normals = normals;
-			mesh.uv = uvs;
-			mesh.triangles = triangles;
+			mesh.SetVertices(ArcVertices);
+			mesh.SetNormals(ArcNormals);
+			mesh.SetUVs(0, ArcUvs);
+			mesh.SetTriangles(ArcTriangles, 0);
 
 			mesh.RecalculateBounds();
 		}
 		
+		/// <summary>Creates a flat arc (pie-slice) mesh in the XZ plane around the origin.</summary>
 		public static Mesh CreateArc(float radius, float angle, int segmentCount)
 		{
 			var mesh = new Mesh();
@@ -102,6 +117,7 @@ namespace TransformHandles.Utils
 			return mesh;
 		}
 		
+		/// <summary>Creates a flat grid mesh in the XZ plane centered on the origin.</summary>
 		public static Mesh CreateGrid(float width, float height, int segmentsX = 1, int segmentsY = 1)
 		{
 			var mesh = new Mesh();
@@ -163,6 +179,7 @@ namespace TransformHandles.Utils
 			return mesh;
 		}
 		
+		/// <summary>Creates a box mesh centered on the origin.</summary>
 		public static Mesh CreateBox(float width, float height, float depth)
 		{
 			var mesh = new Mesh();
@@ -282,6 +299,7 @@ namespace TransformHandles.Utils
 			return mesh;
 		}
 
+		/// <summary>Creates a cone (or truncated cone) mesh used by the runtime cone collider.</summary>
 		public static Mesh CreateCone(float height, float bottomRadius, float topRadius, int sideCount,
 			int heightSegmentCount)
 		{
@@ -462,6 +480,7 @@ namespace TransformHandles.Utils
 			return mesh;
 		}
 
+		/// <summary>Creates a hollow tube mesh used by the runtime tube collider.</summary>
 		public static Mesh CreateTube(float height, int sideCount, float bottomRadius, float bottomThickness,
 			float topRadius, float topThickness)
 		{
@@ -709,6 +728,7 @@ namespace TransformHandles.Utils
 			return mesh;
 		}
 
+		/// <summary>Creates a torus mesh used by the rotation ring's runtime collider.</summary>
 		public static Mesh CreateTorus(float radius, float thickness, int radiusSegmentCount, int sideCount)
 		{
 			var mesh = new Mesh();
@@ -793,6 +813,7 @@ namespace TransformHandles.Utils
 			return mesh;
 		}
 		
+		/// <summary>Creates a UV sphere mesh centered on the origin.</summary>
 		public static Mesh CreateSphere(float radius, int longitudeCount, int latitudeCount)
 		{
 			var mesh = new Mesh();

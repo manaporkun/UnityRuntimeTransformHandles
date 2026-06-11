@@ -115,7 +115,7 @@ namespace TransformHandles
         {
             var ghostPosition = GroupGhost.transform.position;
 
-            if (GroupHandle.space == Space.Self)
+            if (GroupHandle.Space == Space.Self)
             {
                 foreach (var target in RenderersMap.Keys)
                 {
@@ -181,7 +181,7 @@ namespace TransformHandles
         /// <returns>The average position, rotation, and scale.</returns>
         public PosRotScale GetAveragePosRotScale()
         {
-            var space = GroupHandle.space;
+            var space = GroupHandle.Space;
             var averagePosRotScale = new PosRotScale();
 
             var transformsCount = Transforms.Count;

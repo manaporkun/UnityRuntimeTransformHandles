@@ -1,3 +1,5 @@
+.DS_Store
+
 # This .gitignore file should be placed at the root of your Unity project directory
 #
 # Get latest from https://github.com/github/gitignore/blob/master/Unity.gitignore
@@ -10,13 +12,27 @@
 /[Ll]ogs/
 /[Mm]emoryCaptures/
 
+# CI compatibility-floor project (ci/floor-2021) generates its own editor artifacts;
+# the root-anchored patterns above don't cover them.
+/ci/floor-2021/[Ll]ibrary/
+/ci/floor-2021/[Tt]emp/
+/ci/floor-2021/[Oo]bj/
+/ci/floor-2021/[Ll]ogs/
+/ci/floor-2021/[Uu]serSettings/
+
+# Asset meta data should only be ignored when the corresponding asset is also ignored.
+# Keep this negation ABOVE the specific Assets/ ignores below: later rules win, so a
+# negation placed after them would re-include the very files they ignore.
+!/[Aa]ssets/**/*.meta
+
 # Imported package samples are regenerable artifacts (the canonical source lives in
 # the package's Samples~ folder). The WebGL CI build imports them on demand.
 /[Aa]ssets/[Ss]amples/
 /[Aa]ssets/[Ss]amples.meta
 
-# Asset meta data should only be ignored when the corresponding asset is also ignored
-!/[Aa]ssets/**/*.meta
+# Local scratch assets (test models etc.) that must never be committed.
+/[Aa]ssets/[Ll]ocalTesting/
+/[Aa]ssets/[Ll]ocalTesting.meta
 
 # Uncomment this line if you wish to ignore the asset store tools plugin
 # /[Aa]ssets/AssetStoreTools*

@@ -17,14 +17,13 @@
   "licensesUrl": "https://github.com/manaporkun/UnityRuntimeTransformHandles/blob/upm/LICENSE.md",
   "author": {
     "name": "Orkun Manap",
-    "email": "hello@manap.dev",
     "url": "https://manap.dev"
   },
   "license": "MIT",
   "unity": "2021.3",
   "unityRelease": "0f1",
   "dependencies": {
-    "com.unity.render-pipelines.universal": "12.1.0"
+    "com.unity.modules.physics": "1.0.0"
   },
   "samples": [
     {

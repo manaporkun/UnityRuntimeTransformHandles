@@ -4,7 +4,9 @@
       "version": "file:com.orkunmanap.runtime-transform-handles",
       "depth": 0,
       "source": "embedded",
-      "dependencies": {}
+      "dependencies": {
+        "com.unity.modules.physics": "1.0.0"
+      }
     },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
