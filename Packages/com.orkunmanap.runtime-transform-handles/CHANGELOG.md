@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an interaction already in progress is never interrupted. Requires the uGUI package and an
   `EventSystem` in the scene — projects without uGUI are unaffected (the guard is a no-op via the
   `TH_UGUI` version define). Override `IsPointerOverUI()` to integrate a non-uGUI UI stack.
+  The Demo sample now spawns a uGUI panel and an EventSystem and exposes a HUD toggle so the
+  guard can be tried directly: with it on, clicking the panel does not disturb objects behind it.
 
 ## [3.1.0] - 2026-06-11
 
