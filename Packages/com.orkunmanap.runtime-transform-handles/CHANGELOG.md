@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- UI-occlusion guard: handle interactions no longer start while the pointer is over a uGUI
+  element. Controlled by `TransformHandleManager.BlockWhenPointerOverUI` (serialized, default on);
+  an interaction already in progress is never interrupted. Requires the uGUI package and an
+  `EventSystem` in the scene — projects without uGUI are unaffected (the guard is a no-op via the
+  `TH_UGUI` version define). Override `IsPointerOverUI()` to integrate a non-uGUI UI stack.
+
 ## [3.1.0] - 2026-06-11
 
 ### Added
