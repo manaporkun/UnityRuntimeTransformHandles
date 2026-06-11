@@ -94,7 +94,7 @@ namespace TransformHandles
                 if (Mathf.Abs(_axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
-            ParentHandle.Target.position = position;
+            ParentHandle.Pivot.position = position;
 
             base.Interact(previousPosition);
         }
@@ -104,7 +104,7 @@ namespace TransformHandles
         {
             base.StartInteraction(hitPoint);
 
-            _startPosition = ParentHandle.Target.position;
+            _startPosition = ParentHandle.Pivot.position;
 
             var rAxis = GetRotatedAxis(_axis);
 
