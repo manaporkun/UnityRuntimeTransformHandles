@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-06-11
+
 ### Added
 - PascalCase public API across the package: `Handle.Target`/`Type`/`Space`/`Axes`/`SnappingType`/`PositionSnap`/`RotationSnap`/`ScaleSnap`/`AutoScale`/`HandleCamera`, `TransformHandleManager.MainCamera`, `HandleBase.Delta`, and accessors for the prefab-wired axis components (`PositionHandle.XAxis` etc.).
 - PlayMode tests for `TransformHandleManager` create, multi-select, add/remove target, and destroy flows.
