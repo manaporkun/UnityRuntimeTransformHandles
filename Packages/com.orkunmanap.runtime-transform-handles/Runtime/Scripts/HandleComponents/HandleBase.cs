@@ -99,7 +99,7 @@ namespace TransformHandles
         protected Vector3 GetRotatedAxis(Vector3 axis)
         {
             return ParentHandle.Space == Space.Self
-                ? ParentHandle.Target.rotation * axis
+                ? ParentHandle.Pivot.rotation * axis
                 : axis;
         }
 

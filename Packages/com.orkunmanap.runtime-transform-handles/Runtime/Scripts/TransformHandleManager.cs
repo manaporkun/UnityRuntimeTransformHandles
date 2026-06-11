@@ -414,6 +414,20 @@ namespace TransformHandles
             group.GroupGhost.UpdateGhostTransform(averagePosRotScale);
         }
 
+        /// <summary>
+        /// Returns the transforms manipulated by <paramref name="handle"/> — the actual selected
+        /// objects, not the pivot. The result is a read-only, live view of the handle's current
+        /// group (do not cache it across add/remove); empty if the handle is not managed here.
+        /// </summary>
+        /// <param name="handle">The handle to query.</param>
+        public IReadOnlyCollection<Transform> GetTargets(Handle handle)
+        {
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
+            if (_handleGroupMap != null && _handleGroupMap.TryGetValue(handle, out var group))
+                return group.Transforms;
+            return System.Array.Empty<Transform>();
+        }
+
         protected virtual void Update()
         {
             if (!_handleActive) return;
