@@ -80,5 +80,22 @@ namespace TransformHandles.Utils
         {
             ApplicationQuitting = quitting;
         }
+
+        /// <summary>
+        /// Resets the quitting flag when a play session starts. With Enter Play Mode Options
+        /// (domain reload disabled), static state survives between sessions, so the flag set by
+        /// <see cref="Singleton{T}"/>'s OnApplicationQuit on play-mode exit would otherwise stay
+        /// true and make every Instance getter return null on the next run.
+        /// </summary>
+        /// <remarks>
+        /// Lives on this non-generic class because [RuntimeInitializeOnLoadMethod] never fires on
+        /// generic types. Singleton&lt;T&gt;._instance needs no reset: destroyed instances compare
+        /// equal to null, so the Instance getter self-heals on first access.
+        /// </remarks>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlaySessionStart()
+        {
+            ApplicationQuitting = false;
+        }
     }
 }
