@@ -6,9 +6,15 @@ Shader "Handles/Handle"
     }
 
     // Universal Render Pipeline SubShader. Unity auto-selects this when URP is active
-    // (the "RenderPipeline"="UniversalPipeline" tag matches the current pipeline).
+    // (the "RenderPipeline"="UniversalPipeline" tag matches the current pipeline) and
+    // skips it entirely when the URP package is not installed (PackageRequirements).
     SubShader
     {
+        PackageRequirements
+        {
+            "com.unity.render-pipelines.universal": "12.1.0"
+        }
+
         Tags { "RenderType"="Transparent" "Queue"="Transparent+1" "RenderPipeline"="UniversalPipeline" }
         LOD 100
 
