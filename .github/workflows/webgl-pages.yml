@@ -38,9 +38,7 @@ jobs:
           df -h /
 
       - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          lfs: true
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Validate Unity activation configuration
         env:
@@ -63,8 +61,16 @@ jobs:
           echo "::error::Invalid Unity activation config. Set UNITY_LICENSING_SERVER or set UNITY_EMAIL + UNITY_PASSWORD + (UNITY_SERIAL or UNITY_LICENSE) as repository secrets."
           exit 1
 
+      - name: Cache Library
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/**', 'ProjectSettings/**', 'Assets/**') }}
+          restore-keys: |
+            Library-
+
       - name: Build WebGL project
-        uses: game-ci/unity-builder@v5
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
@@ -97,10 +103,10 @@ jobs:
           touch site-dist/.nojekyll
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
       - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: site-dist
 
@@ -114,4 +120,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5

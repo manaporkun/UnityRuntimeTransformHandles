@@ -1,0 +1,99 @@
+# Verifies the declared package floor with a real editor: compiles the package and runs its
+# EditMode + PlayMode tests on Unity 2021.3 LTS via the minimal project in ci/floor-2021.
+# That project has no Input System package and no URP, so this job also compiles the legacy
+# Input Manager branches of InputWrapper.cs and proves URP-free installs work — three gaps the
+# Unity 6 test job structurally cannot cover (see ci/floor-2021/README.md).
+name: Compatibility floor (2021.3)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Packages/com.orkunmanap.runtime-transform-handles/**"
+      - "ci/floor-2021/**"
+      - ".github/workflows/compat-floor.yml"
+  pull_request:
+    paths:
+      - "Packages/com.orkunmanap.runtime-transform-handles/**"
+      - "ci/floor-2021/**"
+      - ".github/workflows/compat-floor.yml"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The secrets context is not available in job-level `if:` expressions, so credential
+  # availability is computed in a step and exported. Dependabot/fork runs (no secrets)
+  # skip the licensed job neutrally instead of failing red.
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      has-unity-secrets: ${{ steps.secrets.outputs.has-secrets }}
+    steps:
+      - name: Check Unity credentials
+        id: secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+        run: |
+          if [ -n "$UNITY_LICENSE" ] || [ -n "$UNITY_SERIAL" ] || [ -n "$UNITY_LICENSING_SERVER" ]; then
+            echo "has-secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-secrets=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Unity credentials unavailable (Dependabot/fork run?); skipping the floor test job."
+          fi
+
+  floor-test:
+    name: Tests on 2021.3 (no Input System, no URP)
+    needs: preflight
+    if: needs.preflight.outputs.has-unity-secrets == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Cache Library
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ci/floor-2021/Library
+          key: FloorLibrary-${{ hashFiles('Packages/com.orkunmanap.runtime-transform-handles/**', 'ci/floor-2021/Packages/manifest.json', 'ci/floor-2021/ProjectSettings/**') }}
+          restore-keys: |
+            FloorLibrary-
+
+      - name: Run tests
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+        with:
+          projectPath: ci/floor-2021
+          unityVersion: 2021.3.45f1
+          testMode: all
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Floor (2021.3) test results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: floor-test-results
+          path: artifacts
+          if-no-files-found: ignore
