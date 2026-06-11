@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-06-11
+
 ### Added
 - `Handle.Targets` (`IReadOnlyCollection<Transform>`) exposes the actual manipulated objects, and
   `TransformGroup.Targets` / `TransformHandleManager.GetTargets(handle)` provide the same — there
