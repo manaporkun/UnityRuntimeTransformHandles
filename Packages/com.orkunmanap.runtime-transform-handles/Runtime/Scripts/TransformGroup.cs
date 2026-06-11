@@ -25,6 +25,12 @@ namespace TransformHandles
         /// <summary>Gets the set of transforms in this group.</summary>
         internal HashSet<Transform> Transforms { get; }
 
+        /// <summary>
+        /// The transforms in this group as a read-only, live view (the actual manipulated objects,
+        /// not the pivot). Do not cache across add/remove.
+        /// </summary>
+        public IReadOnlyCollection<Transform> Targets => Transforms;
+
         /// <summary>Gets the mapping of transforms to their mesh renderers (if any).</summary>
         internal Dictionary<Transform, MeshRenderer> RenderersMap { get; }
 

@@ -86,12 +86,32 @@ namespace TransformHandles
         /// <summary>UnityEvent fired when handle is destroyed. Configure in Inspector.</summary>
         public HandleUnityEvent OnHandleDestroyedUnityEvent => onHandleDestroyed;
 
-        /// <summary>The target transform being manipulated. Read-only; set via <see cref="Enable"/>.</summary>
-        public Transform Target { get; private set; }
+        /// <summary>
+        /// The manipulation pivot — the ghost transform the handle moves/rotates/scales around.
+        /// This is NOT the user's selected object; for those, use <see cref="Targets"/>.
+        /// Read-only; set via <see cref="Enable"/>.
+        /// </summary>
+        public Transform Pivot { get; private set; }
 
-        /// <inheritdoc cref="Target"/>
-        [Obsolete("Use Target instead.")]
-        public Transform target => Target;
+        /// <summary>
+        /// The transforms this handle manipulates (the actual selected objects). Read-only,
+        /// reflects the current group membership; empty until the handle is enabled with a target
+        /// or while it is not managed by a <see cref="TransformHandleManager"/>.
+        /// </summary>
+        public System.Collections.Generic.IReadOnlyCollection<Transform> Targets =>
+            Manager != null ? Manager.GetTargets(this) : System.Array.Empty<Transform>();
+
+        /// <summary>
+        /// The manipulation pivot (ghost). Misleadingly named — it returns the pivot, not the
+        /// selected object(s). Use <see cref="Pivot"/> for the pivot and <see cref="Targets"/> for
+        /// the manipulated objects.
+        /// </summary>
+        [Obsolete("Use Pivot for the manipulation pivot, or Targets for the manipulated objects. Target returns the pivot (ghost), not your selected object.")]
+        public Transform Target => Pivot;
+
+        /// <inheritdoc cref="Pivot"/>
+        [Obsolete("Use Pivot instead.")]
+        public Transform target => Pivot;
 
         [SerializeField, FormerlySerializedAs("axes")] private HandleAxes _axes = HandleAxes.XYZ;
         /// <summary>Active axes for the handle. Assigning rebuilds the child handles.</summary>
@@ -248,7 +268,7 @@ namespace TransformHandles
         /// <param name="targetTransform">The transform to manipulate.</param>
         public virtual void Enable(Transform targetTransform)
         {
-            Target = targetTransform;
+            Pivot = targetTransform;
             transform.position = targetTransform.position;
 
             CreateHandles();
@@ -259,7 +279,7 @@ namespace TransformHandles
         /// </summary>
         public virtual void Disable()
         {
-            Target = null;
+            Pivot = null;
             Clear();
         }
 
@@ -322,12 +342,12 @@ namespace TransformHandles
 
         protected virtual void UpdateHandleTransformation()
         {
-            if (!Target) return;
+            if (!Pivot) return;
 
-            transform.position = Target.position;
+            transform.position = Pivot.position;
             if (Space == Space.Self || Type == HandleType.Scale)
             {
-                transform.rotation = Target.rotation;
+                transform.rotation = Pivot.rotation;
             }
             else
             {

@@ -39,7 +39,7 @@ namespace TransformHandles
             var camera = ParentHandle.HandleCamera;
             if (camera == null) return;
 
-            var position = ParentHandle.Target.position;
+            var position = ParentHandle.Pivot.position;
             var handleSize = HandleTransformUtility.GetHandleSize(position, camera);
             var lineTranslation = HandleTransformUtility.CalcLineTranslation(
                 _startMousePosition,
@@ -60,7 +60,7 @@ namespace TransformHandles
             }
 
             Delta = dist;
-            ParentHandle.Target.localScale = _startScale + Vector3.Scale(_startScale, _axis) * Delta;
+            ParentHandle.Pivot.localScale = _startScale + Vector3.Scale(_startScale, _axis) * Delta;
 
             base.Interact(previousPosition);
         }
@@ -69,7 +69,7 @@ namespace TransformHandles
         public override void StartInteraction(Vector3 hitPoint)
         {
             base.StartInteraction(hitPoint);
-            _startScale = ParentHandle.Target.localScale;
+            _startScale = ParentHandle.Pivot.localScale;
             _startMousePosition = InputWrapper.MousePosition;
 
             var camera = ParentHandle.HandleCamera;
