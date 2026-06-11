@@ -1,0 +1,56 @@
+# Normalize line endings for everything git auto-detects as text.
+* text=auto
+
+# Source and config: always LF in the repository.
+*.cs text
+*.shader text
+*.hlsl text
+*.cginc text
+*.asmdef text
+*.asmref text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.xml text
+*.txt text
+*.editorconfig text
+*.gitattributes text
+*.gitignore text
+
+# Unity YAML assets are text (keep them diffable).
+# Note: no merge=unityyaml attribute here — it silently degrades merges to binary for
+# contributors without UnityYAMLMerge configured. See CONTRIBUTING.md to opt in locally.
+*.meta text
+*.unity text
+*.prefab text
+*.mat text
+*.asset text
+*.anim text
+*.controller text
+*.physicMaterial text
+*.physicsMaterial2D text
+
+# Binary assets: never normalize or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.psd binary
+*.tga binary
+*.tif binary
+*.fbx binary
+*.glb binary
+*.gltf binary
+*.obj binary
+*.blend binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.ttf binary
+*.otf binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.unitypackage binary
