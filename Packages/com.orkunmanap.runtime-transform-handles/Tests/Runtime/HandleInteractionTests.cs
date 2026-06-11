@@ -138,8 +138,8 @@ namespace TransformHandles.Tests
             var a = NewObject("a").transform;
             var b = NewObject("b", new Vector3(2f, 0f, 0f)).transform;
             var handle = _manager.CreateHandleFromList(new List<Transform> { a, b });
-            var ghost = handle.Target.GetComponent<Ghost>();
-            Assert.IsNotNull(ghost, "handle.Target must be the group's ghost pivot");
+            var ghost = handle.Pivot.GetComponent<Ghost>();
+            Assert.IsNotNull(ghost, "handle.Pivot must be the group's ghost pivot");
 
             var change = new Vector3(1f, 2f, 3f);
             _manager.UpdateGroupPosition(ghost, change);

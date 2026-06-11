@@ -62,13 +62,15 @@ Handles require a dedicated physics layer (default name `TransformHandle`). Crea
 | `void ChangeHandleSpace(Handle, Space)` | Set a handle's space and re-center the ghost. |
 | `void ChangeHandlePivot(TransformGroup, bool originToCenter)` | Toggle pivot vs. bounds-center origin. |
 | `Camera MainCamera` | Camera used for raycasting (settable; falls back to `Camera.main`). |
+| `IReadOnlyCollection<Transform> GetTargets(Handle)` | The objects a handle manipulates (live, read-only). |
 | `TransformHandleSettings Settings` | Optional settings asset (overrides serialized defaults). |
 
 ### `Handle`
 
 | Member | Description |
 |--------|-------------|
-| `Transform Target` | Manipulated transform (**read-only**; set via `CreateHandle`/`Enable`). |
+| `IReadOnlyCollection<Transform> Targets` | The manipulated objects (**read-only**, live view). |
+| `Transform Pivot` | The manipulation pivot — the ghost the handle moves around (**read-only**; not your object). |
 | `Camera HandleCamera` | Camera for screen math (**read-only**; set when enabled). |
 | `HandleType Type` | Property; assigning rebuilds the child handles. |
 | `HandleAxes Axes` | Property; assigning rebuilds the child handles. |
@@ -79,6 +81,9 @@ Handles require a dedicated physics layer (default name `TransformHandle`). Crea
 | events `OnInteractionStartEvent` / `OnInteractionEvent` / `OnInteractionEndEvent` / `OnHandleDestroyedEvent` | `Action<Handle>`. Inspector-friendly `*UnityEvent` mirrors exist. |
 | `void ApplySettings(TransformHandleSettings)` | Apply scale/appearance from a settings asset. |
 
+> `Handle.Target` is `[Obsolete]` — it returns the **pivot**, not the selected object. Use `Pivot`
+> for the pivot or `Targets` for the manipulated objects.
+>
 > The camelCase spellings of these members (`target`, `type`, `space`, `axes`, `snappingType`,
 > `positionSnap`, `rotationSnap`, `scaleSnap`, `autoScale`, `handleCamera`, `mainCamera`) and the
 > `ChangeHandleType`/`ChangeHandleSpace`/`ChangeAxes` methods are `[Obsolete]` shims — they keep

@@ -55,8 +55,33 @@ namespace TransformHandles.Tests
             var handle = _manager.CreateHandle(target);
 
             Assert.IsNotNull(handle);
-            Assert.IsNotNull(handle.Target, "handle.Target is the ghost pivot, not the user object");
-            Assert.AreNotSame(target, handle.Target);
+            Assert.IsNotNull(handle.Pivot, "handle.Pivot is the manipulation pivot (ghost), not the user object");
+            Assert.AreNotSame(target, handle.Pivot);
+        }
+
+        [Test]
+        public void Targets_contains_the_manipulated_object_and_Pivot_is_separate()
+        {
+            var target = NewObject("target").transform;
+            var handle = _manager.CreateHandle(target);
+
+            CollectionAssert.Contains(handle.Targets, target, "Targets must expose the selected object");
+            Assert.AreEqual(1, handle.Targets.Count);
+            // Pivot is the ghost; the manipulated object is not. (Reference identity, not NUnit
+            // collection equality, which is unreliable on UnityEngine.Object's fake-null operator.)
+            Assert.AreNotSame(target, handle.Pivot, "the pivot is not the manipulated object");
+            Assert.IsNotNull(handle.Pivot.GetComponent<Ghost>(), "Pivot is the ghost pivot");
+            Assert.IsNull(target.GetComponent<Ghost>(), "the manipulated object is not a ghost");
+        }
+
+        [Test]
+        public void Targets_reflects_multi_select_membership()
+        {
+            var a = NewObject("a").transform;
+            var b = NewObject("b", new Vector3(2f, 0f, 0f)).transform;
+            var handle = _manager.CreateHandleFromList(new List<Transform> { a, b });
+
+            CollectionAssert.AreEquivalent(new[] { a, b }, handle.Targets);
         }
 
         [Test]

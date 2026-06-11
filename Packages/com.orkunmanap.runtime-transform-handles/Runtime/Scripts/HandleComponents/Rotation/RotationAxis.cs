@@ -59,7 +59,7 @@ namespace TransformHandles
             }
 
             var hitPoint = cameraRay.GetPoint(hitT);
-            var hitDirection = (hitPoint - ParentHandle.Target.position).normalized;
+            var hitDirection = (hitPoint - ParentHandle.Pivot.position).normalized;
             var x = Vector3.Dot(hitDirection, _tangent);
             var y = Vector3.Dot(hitDirection, _biTangent);
             var angleRadians = Mathf.Atan2(y, x);
@@ -73,12 +73,12 @@ namespace TransformHandles
 
             if (ParentHandle.Space == Space.Self)
             {
-                ParentHandle.Target.localRotation = _startRotation * Quaternion.AngleAxis(angleDegrees, _axis);
+                ParentHandle.Pivot.localRotation = _startRotation * Quaternion.AngleAxis(angleDegrees, _axis);
             }
             else
             {
                 var invertedRotatedAxis = Quaternion.Inverse(_startRotation) * _axis;
-                ParentHandle.Target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
+                ParentHandle.Pivot.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
             }
 
             // Reuse a single Mesh instead of allocating a new one each frame. CreateArc would
@@ -98,21 +98,21 @@ namespace TransformHandles
             base.StartInteraction(hitPoint);
 
             _startRotation = ParentHandle.Space == Space.Self
-                ? ParentHandle.Target.localRotation
-                : ParentHandle.Target.rotation;
+                ? ParentHandle.Pivot.localRotation
+                : ParentHandle.Pivot.rotation;
 
             _rotatedAxis = ParentHandle.Space == Space.Self
                 ? _startRotation * _axis
                 : _axis;
 
-            _axisPlane = new Plane(_rotatedAxis, ParentHandle.Target.position);
+            _axisPlane = new Plane(_rotatedAxis, ParentHandle.Pivot.position);
 
             var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
             var startHitPoint = _axisPlane.Raycast(cameraRay, out var hitT)
                 ? cameraRay.GetPoint(hitT)
                 : _axisPlane.ClosestPointOnPlane(hitPoint);
 
-            _tangent = (startHitPoint - ParentHandle.Target.position).normalized;
+            _tangent = (startHitPoint - ParentHandle.Pivot.position).normalized;
             _biTangent = Vector3.Cross(_rotatedAxis, _tangent);
         }
 
