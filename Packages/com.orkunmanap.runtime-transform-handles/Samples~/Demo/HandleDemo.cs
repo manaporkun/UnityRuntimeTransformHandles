@@ -192,7 +192,9 @@ public class HandleDemo : MonoBehaviour
     private void HandleSelectionInput()
     {
         if (_interacting) return; // don't pick targets mid-drag
-        if (PointerOverUi()) return; // clicks over the uGUI panel must not pick targets
+        // Respect the same toggle the handle manager uses, so flipping it off in the HUD lets
+        // both picking and handle drags pass through the panel (matching the on-screen hint).
+        if (_manager.BlockWhenPointerOverUI && PointerOverUi()) return;
 
         // Left click: select (Shift adds to the current handle's group).
         if (InputWrapper.GetMouseButtonDown(0) && TryPickTarget(out var picked))
