@@ -119,6 +119,9 @@ public class HandleDemo : MonoBehaviour
     private void BuildUiOcclusionOverlay()
     {
 #if TH_UGUI
+        // The guard is opt-in (off by default on the manager); turn it on here so the sample
+        // demonstrates it out of the box. Flip it from the HUD to compare on/off behavior.
+        _manager.BlockWhenPointerOverUI = true;
 #if UNITY_2023_1_OR_NEWER
         var hasEventSystem = Object.FindAnyObjectByType<EventSystem>() != null;
 #else

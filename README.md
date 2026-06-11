@@ -163,16 +163,17 @@ TransformHandleManager.Instance.Settings = mySettings;
 
 If no settings asset is assigned, the manager uses its serialized field values.
 
-### Blocking Interaction Over UI
+### Blocking Interaction Over UI (opt-in)
 
-By default a handle interaction will not start while the pointer is over a uGUI element, so
-clicking a button or panel above the scene does not begin a drag (an in-progress interaction is
-never interrupted). Requires an `EventSystem` and the uGUI package; projects without uGUI are
-unaffected. Toggle in the Inspector or via code, and override `IsPointerOverUI()` for a non-uGUI
-UI stack:
+Optionally, a handle interaction can be prevented from starting while the pointer is over a uGUI
+element, so clicking a button or panel above the scene does not begin a drag (an in-progress
+interaction is never interrupted; touch uses the active finger). It is **off by default** so it
+never silently changes input behavior. Requires an `EventSystem` and the uGUI package; projects
+without uGUI are unaffected. Enable in the Inspector or via code, and override `IsPointerOverUI()`
+for a non-uGUI UI stack:
 
 ```csharp
-TransformHandleManager.Instance.BlockWhenPointerOverUI = false;
+TransformHandleManager.Instance.BlockWhenPointerOverUI = true;
 ```
 
 ## Default Keyboard Shortcuts

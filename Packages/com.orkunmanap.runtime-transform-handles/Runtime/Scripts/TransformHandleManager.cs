@@ -41,10 +41,11 @@ namespace TransformHandles
         [SerializeField] private string handleLayerName = "TransformHandle";
         [SerializeField] private Color highlightColor = Color.white;
 
-        [Tooltip("When enabled, a handle interaction will not start while the pointer is over a " +
-                 "uGUI element (requires an EventSystem in the scene). An interaction already in " +
-                 "progress is never interrupted, even if the pointer moves over UI.")]
-        [SerializeField] private bool blockWhenPointerOverUI = true;
+        [Tooltip("Opt-in: when enabled, a handle interaction will not start while the pointer is " +
+                 "over a uGUI element (requires an EventSystem in the scene). An interaction " +
+                 "already in progress is never interrupted, even if the pointer moves over UI. " +
+                 "Off by default so it never silently changes existing input behavior.")]
+        [SerializeField] private bool blockWhenPointerOverUI;
 
         [Header("Shortcuts (used when no Settings asset is assigned)")]
         [SerializeField] private KeyCode positionShortcut = KeyCode.W;
@@ -65,9 +66,10 @@ namespace TransformHandles
         }
 
         /// <summary>
-        /// When true, a handle interaction will not start while the pointer is over a uGUI element
-        /// (requires the uGUI package and an EventSystem in the scene). An in-progress interaction
-        /// is never interrupted. Defaults to true. Has no effect when uGUI is not installed.
+        /// Opt-in. When true, a handle interaction will not start while the pointer is over a uGUI
+        /// element (requires the uGUI package and an EventSystem in the scene). An in-progress
+        /// interaction is never interrupted. Defaults to false so enabling the package never
+        /// silently changes input behavior. Has no effect when uGUI is not installed.
         /// </summary>
         public bool BlockWhenPointerOverUI
         {
