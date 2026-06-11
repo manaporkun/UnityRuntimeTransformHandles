@@ -41,6 +41,11 @@ namespace TransformHandles
         [SerializeField] private string handleLayerName = "TransformHandle";
         [SerializeField] private Color highlightColor = Color.white;
 
+        [Tooltip("When enabled, a handle interaction will not start while the pointer is over a " +
+                 "uGUI element (requires an EventSystem in the scene). An interaction already in " +
+                 "progress is never interrupted, even if the pointer moves over UI.")]
+        [SerializeField] private bool blockWhenPointerOverUI = true;
+
         [Header("Shortcuts (used when no Settings asset is assigned)")]
         [SerializeField] private KeyCode positionShortcut = KeyCode.W;
         [SerializeField] private KeyCode rotationShortcut = KeyCode.E;
@@ -57,6 +62,17 @@ namespace TransformHandles
         {
             get => settings;
             set => settings = value;
+        }
+
+        /// <summary>
+        /// When true, a handle interaction will not start while the pointer is over a uGUI element
+        /// (requires the uGUI package and an EventSystem in the scene). An in-progress interaction
+        /// is never interrupted. Defaults to true. Has no effect when uGUI is not installed.
+        /// </summary>
+        public bool BlockWhenPointerOverUI
+        {
+            get => blockWhenPointerOverUI;
+            set => blockWhenPointerOverUI = value;
         }
 
         // Properties that check settings first, then fall back to serialized fields
@@ -407,13 +423,37 @@ namespace TransformHandles
                 _hoveredHandle = null;
                 _handleHitPoint = Vector3.zero;
 
-                GetHandle(ref _hoveredHandle, ref _handleHitPoint);
+                // Leaving the hovered handle null while the pointer is over UI both clears the
+                // highlight and prevents MouseInput from starting a drag (it requires a hovered
+                // handle). An interaction already in progress is unaffected — this branch only
+                // runs when not dragging.
+                if (!IsPointerOverUI())
+                {
+                    GetHandle(ref _hoveredHandle, ref _handleHitPoint);
+                }
 
                 HandleOverEffect(_hoveredHandle);
             }
 
             MouseInput();
             KeyboardInput();
+        }
+
+        /// <summary>
+        /// Whether the pointer is currently over a uGUI element that should suppress starting a
+        /// handle interaction. Returns false when <see cref="BlockWhenPointerOverUI"/> is disabled,
+        /// no EventSystem is present, or the uGUI package is not installed. Override to plug in a
+        /// different UI stack.
+        /// </summary>
+        protected virtual bool IsPointerOverUI()
+        {
+            if (!blockWhenPointerOverUI) return false;
+#if TH_UGUI
+            var eventSystem = UnityEngine.EventSystems.EventSystem.current;
+            return eventSystem != null && eventSystem.IsPointerOverGameObject();
+#else
+            return false;
+#endif
         }
 
         protected virtual void GetHandle(ref HandleBase handle, ref Vector3 hitPoint)
