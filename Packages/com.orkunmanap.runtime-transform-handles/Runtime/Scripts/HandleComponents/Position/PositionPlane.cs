@@ -43,7 +43,7 @@ namespace TransformHandles
             _axis2 = axis2;
             _perp = perp;
 
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = ParentHandle.HandleCamera;
 
             DefaultColor = defaultColor;
 
@@ -75,10 +75,10 @@ namespace TransformHandles
             var offset = hitPoint + _interactionOffset - _startPosition;
 
             var axis = _axis1 + _axis2;
-            var snapping = ParentHandle.positionSnap;
+            var snapping = ParentHandle.PositionSnap;
 
             var snap = Vector3.Scale(snapping, axis).magnitude;
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Relative)
+            if (snap != 0 && ParentHandle.SnappingType == SnappingType.Relative)
             {
                 offset.x = SnapUtils.Snap(offset.x, snapping.x);
                 offset.y = SnapUtils.Snap(offset.y, snapping.y);
@@ -87,7 +87,7 @@ namespace TransformHandles
 
             var position = _startPosition + offset;
 
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
+            if (snap != 0 && ParentHandle.SnappingType == SnappingType.Absolute)
             {
                 // Only snap the two in-plane axes; snapping the perpendicular axis jumped the
                 // object off the drag plane. (>0.5 ignores float residuals on the perp axis.)
@@ -96,7 +96,7 @@ namespace TransformHandles
                 if (Mathf.Abs(axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
-            ParentHandle.target.position = position;
+            ParentHandle.Target.position = position;
 
             base.Interact(previousPosition);
         }
@@ -106,7 +106,7 @@ namespace TransformHandles
         {
             var rPerp = GetRotatedAxis(_perp);
 
-            var position = ParentHandle.target.position;
+            var position = ParentHandle.Target.position;
             _plane = new Plane(rPerp, position);
 
             var ray = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
@@ -135,6 +135,14 @@ namespace TransformHandles
                 axis2 = -axis2;
 
             _quadTransform.localPosition = (axis1 + axis2) * PlaneVisualOffset;
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            // Destroy the material instance created in Initialize; renderer.material clones
+            // leak per handle create/destroy cycle otherwise.
+            if (_quadMaterial != null) Destroy(_quadMaterial);
         }
 
         private bool _lastNotVisible;

@@ -37,7 +37,7 @@ namespace TransformHandles
             _axis = axis;
             DefaultColor = defaultColor;
 
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = ParentHandle.HandleCamera;
 
             // ParentHandle was set above; reuse its transform instead of walking the hierarchy again.
             _rotationHandleTransform = ParentHandle.transform;
@@ -59,26 +59,26 @@ namespace TransformHandles
             }
 
             var hitPoint = cameraRay.GetPoint(hitT);
-            var hitDirection = (hitPoint - ParentHandle.target.position).normalized;
+            var hitDirection = (hitPoint - ParentHandle.Target.position).normalized;
             var x = Vector3.Dot(hitDirection, _tangent);
             var y = Vector3.Dot(hitDirection, _biTangent);
             var angleRadians = Mathf.Atan2(y, x);
             var angleDegrees = angleRadians * Mathf.Rad2Deg;
 
-            if (ParentHandle.rotationSnap != 0)
+            if (ParentHandle.RotationSnap != 0)
             {
-                angleDegrees = SnapUtils.Snap(angleDegrees, ParentHandle.rotationSnap);
+                angleDegrees = SnapUtils.Snap(angleDegrees, ParentHandle.RotationSnap);
                 angleRadians = angleDegrees * Mathf.Deg2Rad;
             }
 
-            if (ParentHandle.space == Space.Self)
+            if (ParentHandle.Space == Space.Self)
             {
-                ParentHandle.target.localRotation = _startRotation * Quaternion.AngleAxis(angleDegrees, _axis);
+                ParentHandle.Target.localRotation = _startRotation * Quaternion.AngleAxis(angleDegrees, _axis);
             }
             else
             {
                 var invertedRotatedAxis = Quaternion.Inverse(_startRotation) * _axis;
-                ParentHandle.target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
+                ParentHandle.Target.rotation = _startRotation * Quaternion.AngleAxis(angleDegrees, invertedRotatedAxis);
             }
 
             // Reuse a single Mesh instead of allocating a new one each frame. CreateArc would
@@ -97,22 +97,22 @@ namespace TransformHandles
         {
             base.StartInteraction(hitPoint);
 
-            _startRotation = ParentHandle.space == Space.Self
-                ? ParentHandle.target.localRotation
-                : ParentHandle.target.rotation;
+            _startRotation = ParentHandle.Space == Space.Self
+                ? ParentHandle.Target.localRotation
+                : ParentHandle.Target.rotation;
 
-            _rotatedAxis = ParentHandle.space == Space.Self
+            _rotatedAxis = ParentHandle.Space == Space.Self
                 ? _startRotation * _axis
                 : _axis;
 
-            _axisPlane = new Plane(_rotatedAxis, ParentHandle.target.position);
+            _axisPlane = new Plane(_rotatedAxis, ParentHandle.Target.position);
 
             var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
             var startHitPoint = _axisPlane.Raycast(cameraRay, out var hitT)
                 ? cameraRay.GetPoint(hitT)
                 : _axisPlane.ClosestPointOnPlane(hitPoint);
 
-            _tangent = (startHitPoint - ParentHandle.target.position).normalized;
+            _tangent = (startHitPoint - ParentHandle.Target.position).normalized;
             _biTangent = Vector3.Cross(_rotatedAxis, _tangent);
         }
 
@@ -120,7 +120,7 @@ namespace TransformHandles
         public override void EndInteraction()
         {
             base.EndInteraction();
-            delta = 0;
+            Delta = 0;
         }
 
         private void DrawArc()
@@ -132,6 +132,9 @@ namespace TransformHandles
         {
             base.OnDestroy();
             if (_arcMesh != null) Destroy(_arcMesh);
+            // Destroy the material instance created in Initialize; renderer.material clones
+            // leak per handle create/destroy cycle otherwise.
+            if (_torusMaterial != null) Destroy(_torusMaterial);
         }
 
         /// <inheritdoc/>

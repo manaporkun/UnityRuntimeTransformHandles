@@ -37,7 +37,7 @@ namespace TransformHandles
         public void Initialize(Handle handle)
         {
             ParentHandle = handle;
-            _handleCamera = ParentHandle.handleCamera;
+            _handleCamera = ParentHandle.HandleCamera;
 
             _coneGameObject = coneMeshRenderer.gameObject;
             _lineGameObject = lineMeshRenderer.gameObject;
@@ -75,16 +75,16 @@ namespace TransformHandles
 
             var offset = hitPoint + _interactionOffset - _startPosition;
 
-            var snapping = ParentHandle.positionSnap;
+            var snapping = ParentHandle.PositionSnap;
             var snap = Vector3.Scale(snapping, _axis).magnitude;
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Relative)
+            if (snap != 0 && ParentHandle.SnappingType == SnappingType.Relative)
             {
                 offset = SnapUtils.Snap(offset.magnitude, snap) * offset.normalized;
             }
 
             var position = _startPosition + offset;
 
-            if (snap != 0 && ParentHandle.snappingType == SnappingType.Absolute)
+            if (snap != 0 && ParentHandle.SnappingType == SnappingType.Absolute)
             {
                 // Only snap the axis this handle controls. Snapping all three yanked the
                 // perpendicular axes onto the grid, so dragging X jumped the object in Y/Z.
@@ -94,7 +94,7 @@ namespace TransformHandles
                 if (Mathf.Abs(_axis.z) > 0.5f) position.z = SnapUtils.Snap(position.z, snapping.z);
             }
 
-            ParentHandle.target.position = position;
+            ParentHandle.Target.position = position;
 
             base.Interact(previousPosition);
         }
@@ -104,7 +104,7 @@ namespace TransformHandles
         {
             base.StartInteraction(hitPoint);
 
-            _startPosition = ParentHandle.target.position;
+            _startPosition = ParentHandle.Target.position;
 
             var rAxis = GetRotatedAxis(_axis);
 
@@ -130,6 +130,15 @@ namespace TransformHandles
         {
             if (_coneMaterial.color != DefaultColor) _coneMaterial.color = DefaultColor;
             if (_lineMaterial.color != DefaultColor) _lineMaterial.color = DefaultColor;
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            // Destroy the material instances created in Initialize; renderer.material clones
+            // leak per handle create/destroy cycle otherwise.
+            if (_coneMaterial != null) Destroy(_coneMaterial);
+            if (_lineMaterial != null) Destroy(_lineMaterial);
         }
 
         private bool _lastVisible;

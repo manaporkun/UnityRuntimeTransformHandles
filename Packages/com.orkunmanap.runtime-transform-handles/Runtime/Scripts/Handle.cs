@@ -53,7 +53,7 @@ namespace TransformHandles
 
         [Header("Auto Scale")]
         [SerializeField] private float autoScaleSizeInPixels = DefaultAutoScaleSizeInPixels;
-        [SerializeField] public bool autoScale;
+        [SerializeField, FormerlySerializedAs("autoScale")] private bool _autoScale;
 
         [Header("Appearance")]
         [SerializeField] private float handleScaleMultiplier = 1f;
@@ -87,11 +87,15 @@ namespace TransformHandles
         public HandleUnityEvent OnHandleDestroyedUnityEvent => onHandleDestroyed;
 
         /// <summary>The target transform being manipulated. Read-only; set via <see cref="Enable"/>.</summary>
-        public Transform target { get; private set; }
+        public Transform Target { get; private set; }
+
+        /// <inheritdoc cref="Target"/>
+        [Obsolete("Use Target instead.")]
+        public Transform target => Target;
 
         [SerializeField, FormerlySerializedAs("axes")] private HandleAxes _axes = HandleAxes.XYZ;
         /// <summary>Active axes for the handle. Assigning rebuilds the child handles.</summary>
-        public HandleAxes axes
+        public HandleAxes Axes
         {
             get => _axes;
             set
@@ -103,17 +107,25 @@ namespace TransformHandles
             }
         }
 
+        /// <inheritdoc cref="Axes"/>
+        [Obsolete("Use Axes instead.")]
+        public HandleAxes axes { get => Axes; set => Axes = value; }
+
         [SerializeField, FormerlySerializedAs("space")] private Space _space = Space.Self;
-        /// <summary>Coordinate space for transformations. Scale handles are always <see cref="Space.Self"/>.</summary>
-        public Space space
+        /// <summary>Coordinate space for transformations. Scale handles are always <see cref="UnityEngine.Space.Self"/>.</summary>
+        public Space Space
         {
             get => _space;
-            set => _space = type == HandleType.Scale ? Space.Self : (value == Space.Self ? Space.Self : Space.World);
+            set => _space = Type == HandleType.Scale ? Space.Self : (value == Space.Self ? Space.Self : Space.World);
         }
+
+        /// <inheritdoc cref="Space"/>
+        [Obsolete("Use Space instead.")]
+        public Space space { get => Space; set => Space = value; }
 
         [SerializeField, FormerlySerializedAs("type")] private HandleType _type = HandleType.Position;
         /// <summary>Current handle type (Position, Rotation, Scale, or combinations). Assigning rebuilds the child handles.</summary>
-        public HandleType type
+        public HandleType Type
         {
             get => _type;
             set
@@ -125,24 +137,55 @@ namespace TransformHandles
             }
         }
 
+        /// <inheritdoc cref="Type"/>
+        [Obsolete("Use Type instead.")]
+        public HandleType type { get => Type; set => Type = value; }
+
         [SerializeField, FormerlySerializedAs("snappingType")] private SnappingType _snappingType = SnappingType.Relative;
         /// <summary>Snapping behavior type (Relative or Absolute).</summary>
-        public SnappingType snappingType { get => _snappingType; set => _snappingType = value; }
+        public SnappingType SnappingType { get => _snappingType; set => _snappingType = value; }
+
+        /// <inheritdoc cref="SnappingType"/>
+        [Obsolete("Use SnappingType instead.")]
+        public SnappingType snappingType { get => SnappingType; set => SnappingType = value; }
 
         [SerializeField, FormerlySerializedAs("positionSnap")] private Vector3 _positionSnap = Vector3.zero;
         /// <summary>Position snapping values for each axis.</summary>
-        public Vector3 positionSnap { get => _positionSnap; set => _positionSnap = value; }
+        public Vector3 PositionSnap { get => _positionSnap; set => _positionSnap = value; }
+
+        /// <inheritdoc cref="PositionSnap"/>
+        [Obsolete("Use PositionSnap instead.")]
+        public Vector3 positionSnap { get => PositionSnap; set => PositionSnap = value; }
 
         [SerializeField, FormerlySerializedAs("rotationSnap")] private float _rotationSnap;
         /// <summary>Rotation snapping value in degrees.</summary>
-        public float rotationSnap { get => _rotationSnap; set => _rotationSnap = value; }
+        public float RotationSnap { get => _rotationSnap; set => _rotationSnap = value; }
+
+        /// <inheritdoc cref="RotationSnap"/>
+        [Obsolete("Use RotationSnap instead.")]
+        public float rotationSnap { get => RotationSnap; set => RotationSnap = value; }
 
         [SerializeField, FormerlySerializedAs("scaleSnap")] private Vector3 _scaleSnap = Vector3.zero;
         /// <summary>Scale snapping values for each axis.</summary>
-        public Vector3 scaleSnap { get => _scaleSnap; set => _scaleSnap = value; }
+        public Vector3 ScaleSnap { get => _scaleSnap; set => _scaleSnap = value; }
+
+        /// <inheritdoc cref="ScaleSnap"/>
+        [Obsolete("Use ScaleSnap instead.")]
+        public Vector3 scaleSnap { get => ScaleSnap; set => ScaleSnap = value; }
+
+        /// <summary>Whether the handle keeps a constant size on screen regardless of camera distance.</summary>
+        public bool AutoScale { get => _autoScale; set => _autoScale = value; }
+
+        /// <inheritdoc cref="AutoScale"/>
+        [Obsolete("Use AutoScale instead.")]
+        public bool autoScale { get => AutoScale; set => AutoScale = value; }
 
         /// <summary>Camera used for raycasting and screen-to-world conversions. Read-only; set when the handle is enabled.</summary>
-        public Camera handleCamera { get; private set; }
+        public Camera HandleCamera { get; private set; }
+
+        /// <inheritdoc cref="HandleCamera"/>
+        [Obsolete("Use HandleCamera instead.")]
+        public Camera handleCamera => HandleCamera;
 
         private PositionHandle PositionHandle { get; set; }
         private RotationHandle RotationHandle { get; set; }
@@ -161,7 +204,7 @@ namespace TransformHandles
 
         protected virtual void OnEnable()
         {
-            handleCamera = Manager.mainCamera;
+            HandleCamera = Manager.MainCamera;
         }
 
         protected virtual void OnDisable()
@@ -195,8 +238,8 @@ namespace TransformHandles
         {
             UpdateHandleTransformation();
 
-            if (!autoScale || handleCamera == null) return;
-            transform.PreserveScaleOnScreen(handleCamera.fieldOfView, autoScaleSizeInPixels, handleCamera);
+            if (!AutoScale || HandleCamera == null) return;
+            transform.PreserveScaleOnScreen(HandleCamera.fieldOfView, autoScaleSizeInPixels, HandleCamera);
         }
 
         /// <summary>
@@ -205,7 +248,7 @@ namespace TransformHandles
         /// <param name="targetTransform">The transform to manipulate.</param>
         public virtual void Enable(Transform targetTransform)
         {
-            target = targetTransform;
+            Target = targetTransform;
             transform.position = targetTransform.position;
 
             CreateHandles();
@@ -216,7 +259,7 @@ namespace TransformHandles
         /// </summary>
         public virtual void Disable()
         {
-            target = null;
+            Target = null;
             Clear();
         }
 
@@ -251,40 +294,40 @@ namespace TransformHandles
         /// Changes the handle type (Position, Rotation, Scale, or combinations).
         /// </summary>
         /// <param name="handleType">The new handle type.</param>
-        [Obsolete("Assign the 'type' property instead; its setter rebuilds the child handles.")]
+        [Obsolete("Assign the 'Type' property instead; its setter rebuilds the child handles.")]
         public virtual void ChangeHandleType(HandleType handleType)
         {
-            type = handleType;
+            Type = handleType;
         }
 
         /// <summary>
         /// Changes the coordinate space for transformations.
         /// </summary>
         /// <param name="newSpace">The new coordinate space.</param>
-        [Obsolete("Assign the 'space' property instead; its setter applies the Scale-is-always-Self clamp.")]
+        [Obsolete("Assign the 'Space' property instead; its setter applies the Scale-is-always-Self clamp.")]
         public virtual void ChangeHandleSpace(Space newSpace)
         {
-            space = newSpace;
+            Space = newSpace;
         }
 
         /// <summary>
         /// Changes the active axes for the handle.
         /// </summary>
         /// <param name="handleAxes">The new axes configuration.</param>
-        [Obsolete("Assign the 'axes' property instead; its setter rebuilds the child handles.")]
+        [Obsolete("Assign the 'Axes' property instead; its setter rebuilds the child handles.")]
         public virtual void ChangeAxes(HandleAxes handleAxes)
         {
-            axes = handleAxes;
+            Axes = handleAxes;
         }
 
         protected virtual void UpdateHandleTransformation()
         {
-            if (!target) return;
+            if (!Target) return;
 
-            transform.position = target.position;
-            if (space == Space.Self || type == HandleType.Scale)
+            transform.position = Target.position;
+            if (Space == Space.Self || Type == HandleType.Scale)
             {
-                transform.rotation = target.rotation;
+                transform.rotation = Target.rotation;
             }
             else
             {
@@ -294,7 +337,7 @@ namespace TransformHandles
 
         protected virtual void CreateHandles()
         {
-            switch (type)
+            switch (Type)
             {
                 case HandleType.Position:
                     ActivatePositionHandle();
