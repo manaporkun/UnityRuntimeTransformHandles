@@ -174,6 +174,19 @@ If no settings asset is assigned, the manager uses its serialized field values.
 | X | Toggle World/Local space |
 | Z | Toggle Pivot/Center origin |
 
+## Samples
+
+The package ships an importable demo:
+
+1. Open `Window > Package Manager` and select **Runtime Transform Handles**.
+2. Open the **Samples** tab and import **Runtime Transform Handles Demo**.
+3. Open `Assets/Samples/Runtime Transform Handles/<version>/Runtime Transform Handles Demo/RuntimeTransformHandlesDemo.unity` and enter Play mode.
+
+The demo spawns its own targets and exercises every handle type, axis mask, coordinate space,
+snapping mode, multi-object grouping, auto-scaling, and the interaction event system through an
+on-screen control panel (see the sample's own README for the controls table). The imported copy
+under `Assets/Samples/` is regenerable — it can be deleted and reimported at any time.
+
 ## Package Structure
 
 ```
