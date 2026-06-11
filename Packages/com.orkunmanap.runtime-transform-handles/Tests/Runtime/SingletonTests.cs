@@ -15,7 +15,13 @@ namespace TransformHandles.Tests
         public void Cleanup()
         {
             // DestroyImmediate -> OnDestroy nulls the static _instance, isolating each test.
+            // FindObjectsOfType is deprecated from 2023.1; mirror the runtime guard so the
+            // suite compiles warning-free on both the 2021.3 floor and current Unity.
+#if UNITY_2023_1_OR_NEWER
+            foreach (var s in Object.FindObjectsByType<TestSingleton>(FindObjectsSortMode.None))
+#else
             foreach (var s in Object.FindObjectsOfType<TestSingleton>())
+#endif
             {
                 Object.DestroyImmediate(s.gameObject);
             }

@@ -64,7 +64,7 @@ namespace TransformHandles.Tests.Editor
         }
 
         [Test]
-        public void LineVisualScale_stops_at_cube_inner_face_for_tube_mesh()
+        public void LineScaleForCubeReach_stops_line_at_cube_inner_face()
         {
             const float cubeRestDistance = 0.75f;
             const float cubeHalfExtent = 0.1f;
@@ -73,11 +73,29 @@ namespace TransformHandles.Tests.Editor
             foreach (var scaleFactor in new[] { 0.5f, 1f, 1.5f, 2f })
             {
                 var cubeReach = cubeRestDistance * scaleFactor;
-                var lineReach = cubeReach - cubeHalfExtent;
-                var lineScaleY = lineReach / lineMeshLength;
-                Assert.AreEqual(lineReach, lineMeshLength * lineScaleY, 1e-5f);
-                Assert.Less(lineReach, cubeReach);
+                var lineScaleY = HandleTransformUtility.LineScaleForCubeReach(
+                    cubeReach, cubeHalfExtent, lineMeshLength);
+
+                // The scaled line must end exactly one cube half-extent short of the cube
+                // center — at the inner face — and never reach into the cube.
+                var lineEnd = lineMeshLength * lineScaleY;
+                Assert.AreEqual(cubeReach - cubeHalfExtent, lineEnd, 1e-5f);
+                Assert.Less(lineEnd, cubeReach);
             }
+        }
+
+        [Test]
+        public void LineScaleForCubeReach_clamps_at_zero_when_cube_overlaps_origin()
+        {
+            // Reach smaller than the cube's half extent would yield a negative line length;
+            // the line must collapse to zero instead of flipping inside-out.
+            Assert.AreEqual(0f, HandleTransformUtility.LineScaleForCubeReach(0.05f, 0.1f, 0.8f));
+        }
+
+        [Test]
+        public void LineScaleForCubeReach_returns_zero_for_degenerate_line_mesh()
+        {
+            Assert.AreEqual(0f, HandleTransformUtility.LineScaleForCubeReach(0.75f, 0.1f, 0f));
         }
     }
 }
