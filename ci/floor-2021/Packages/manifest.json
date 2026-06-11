@@ -2,6 +2,7 @@
   "dependencies": {
     "com.orkunmanap.runtime-transform-handles": "file:../../../Packages/com.orkunmanap.runtime-transform-handles",
     "com.unity.test-framework": "1.1.33",
+    "com.unity.ugui": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
     "com.unity.modules.animation": "1.0.0",

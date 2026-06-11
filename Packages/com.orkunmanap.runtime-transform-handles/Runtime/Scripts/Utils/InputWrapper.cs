@@ -74,6 +74,29 @@ namespace TransformHandles.Utils
         }
 
         /// <summary>
+        /// Pointer id of the primary active touch, for passing to
+        /// <c>EventSystem.IsPointerOverGameObject(int)</c>. Returns -1 when no touch is active
+        /// (-1 is the mouse/default pointer id, so the result also covers the mouse case).
+        /// Only meaningful while <see cref="HasActiveTouch"/> is true.
+        /// </summary>
+        public static int PrimaryTouchPointerId
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
+                EnsureTouchInitialized();
+                if (Touch.activeTouches.Count > 0)
+                    return Touch.activeTouches[0].touchId;
+                return -1;
+#else
+                if (Input.touchCount > 0)
+                    return Input.GetTouch(0).fingerId;
+                return -1;
+#endif
+            }
+        }
+
+        /// <summary>
         /// Gets the current pointer position (mouse or touch) in screen coordinates.
         /// Prioritizes touch input on touch devices when a touch is active.
         /// </summary>
