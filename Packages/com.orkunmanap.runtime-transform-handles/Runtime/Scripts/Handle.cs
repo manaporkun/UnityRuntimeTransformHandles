@@ -250,8 +250,8 @@ namespace TransformHandles
             onInteractionEnd?.RemoveAllListeners();
             onHandleDestroyed?.RemoveAllListeners();
 
-            if (Manager == null) return;
-            Manager.RemoveHandle(this);
+            var manager = TransformHandleManager.ExistingInstance;
+            if (manager != null) manager.RemoveHandle(this);
         }
 
         protected virtual void LateUpdate()
