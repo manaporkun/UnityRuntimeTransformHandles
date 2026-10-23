@@ -9,6 +9,9 @@ namespace TransformHandles.Utils
     {
         private static T _instance;
 
+        // Teardown must never invoke the lazy Instance getter and resurrect a manager.
+        internal static T ExistingInstance => _instance;
+
         public static T Instance
         {
             get
