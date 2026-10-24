@@ -93,13 +93,25 @@ namespace TransformHandles
         /// </summary>
         public Transform Pivot { get; private set; }
 
+        // Unity still considers this object live while OnDestroy callbacks are running.
+        internal bool IsBeingDestroyed { get; private set; }
+
         /// <summary>
         /// The transforms this handle manipulates (the actual selected objects). Read-only,
         /// reflects the current group membership; empty until the handle is enabled with a target
         /// or while it is not managed by a <see cref="TransformHandleManager"/>.
         /// </summary>
-        public System.Collections.Generic.IReadOnlyCollection<Transform> Targets =>
-            Manager != null ? Manager.GetTargets(this) : System.Array.Empty<Transform>();
+        public System.Collections.Generic.IReadOnlyCollection<Transform> Targets
+        {
+            get
+            {
+                // Preserve the old lazy-getter quit behavior while never creating a manager.
+                if (ApplicationQuitManager.ApplicationQuitting) return System.Array.Empty<Transform>();
+
+                var manager = TransformHandleManager.ExistingInstance;
+                return manager != null ? manager.GetTargets(this) : System.Array.Empty<Transform>();
+            }
+        }
 
         /// <summary>
         /// The manipulation pivot (ghost). Misleadingly named — it returns the pivot, not the
@@ -121,7 +133,11 @@ namespace TransformHandles
             set
             {
                 if (_axes == value) return;
+                var cancelledUniform = UniformGroupScale;
+                if (cancelledUniform) TransformHandleManager.ExistingInstance?.CancelInteraction(this);
+                if (this == null) return;
                 _axes = value;
+                if (cancelledUniform && (Pivot == null || !isActiveAndEnabled)) return;
                 Clear();
                 CreateHandles();
             }
@@ -130,6 +146,36 @@ namespace TransformHandles
         /// <inheritdoc cref="Axes"/>
         [Obsolete("Use Axes instead.")]
         public HandleAxes axes { get => Axes; set => Axes = value; }
+
+        /// <summary>Optional member whose world orientation defines Local axes. Call
+        /// ChangeHandleSpace after assigning to synchronize the idle pivot.</summary>
+        public Transform LocalSpaceReference { get; set; }
+
+        private bool _uniformGroupScale;
+        /// <summary>Opt-in common-center proportional scaling for multi-target Scale handles.
+        /// Requires XYZ axes; partial masks expose no scale controls. Combined types retain legacy behavior.</summary>
+        public bool UniformGroupScale
+        {
+            get => _uniformGroupScale;
+            set
+            {
+                if (_uniformGroupScale == value) return;
+                TransformHandleManager.ExistingInstance?.CancelInteraction(this);
+                if (this == null) return;
+                _uniformGroupScale = value;
+                if (Pivot == null || !isActiveAndEnabled) return;
+                Clear();
+                CreateHandles();
+            }
+        }
+
+        internal void RefreshGroupScaleControls()
+        {
+            if (UniformGroupScale && ScaleHandle != null && ScaleHandle.gameObject.activeSelf)
+                ScaleHandle.Initialize(this);
+        }
+
+        internal bool UsesUniformGroupScale => UniformGroupScale && Type == HandleType.Scale && Targets.Count > 1;
 
         [SerializeField, FormerlySerializedAs("space")] private Space _space = Space.Self;
         /// <summary>Coordinate space for transformations. Scale handles are always <see cref="UnityEngine.Space.Self"/>.</summary>
@@ -151,7 +197,11 @@ namespace TransformHandles
             set
             {
                 if (_type == value) return;
+                var cancelledUniform = UniformGroupScale;
+                if (cancelledUniform) TransformHandleManager.ExistingInstance?.CancelInteraction(this);
+                if (this == null) return;
                 _type = value;
+                if (cancelledUniform && (Pivot == null || !isActiveAndEnabled)) return;
                 Clear();
                 CreateHandles();
             }
@@ -211,8 +261,6 @@ namespace TransformHandles
         private RotationHandle RotationHandle { get; set; }
         private ScaleHandle ScaleHandle { get; set; }
 
-        private static TransformHandleManager Manager => TransformHandleManager.Instance;
-
         protected virtual void Awake()
         {
             PositionHandle = GetComponentInChildren<PositionHandle>();
@@ -224,41 +272,91 @@ namespace TransformHandles
 
         protected virtual void OnEnable()
         {
-            HandleCamera = Manager.MainCamera;
+            var manager = ApplicationQuitManager.ApplicationQuitting
+                ? null
+                : TransformHandleManager.ExistingInstance;
+
+            HandleCamera = manager != null ? manager.MainCamera : null;
+            if (manager != null) manager.TryRestoreHandle(this);
         }
 
         protected virtual void OnDisable()
         {
-            Disable();
+            // Non-creating lookup: destruction must not resurrect a manager. Cancel before
+            // Disable() clears Pivot so a Unity-initiated destroy/unload still delivers one end
+            // event while the axis and listeners are alive.
+            var manager = TransformHandleManager.ExistingInstance;
+            try
+            {
+                if (manager != null) manager.CancelInteraction(this);
+            }
+            catch (Exception exception)
+            {
+                // Contain a throwing consumer end callback so Unity-initiated destruction still
+                // completes and never leaves the handle half-disabled.
+                Debug.LogException(exception, this);
+            }
+            finally
+            {
+                // A callback may have re-enabled the handle by setting either requested flag.
+                // Unity's composite isActiveAndEnabled can lag for SetActive(true) until activation
+                // completes, so use the requested flags to decide whether the trailing clear is safe.
+                if (this != null && (!enabled || !gameObject.activeSelf)) Disable();
+            }
         }
 
         protected void OnDestroy()
         {
-            // Invoke destroyed events before cleanup
-            OnHandleDestroyedEvent?.Invoke(this);
-            onHandleDestroyed?.Invoke(this);
+            IsBeingDestroyed = true;
+            try
+            {
+                // Preserve delivery order and stop-on-first-exception behavior.
+                OnHandleDestroyedEvent?.Invoke(this);
+                onHandleDestroyed?.Invoke(this);
+            }
+            finally
+            {
+                try
+                {
+                    // Subscriber errors must not bypass the existing listener cleanup.
+                    OnInteractionStartEvent = null;
+                    OnInteractionEvent = null;
+                    OnInteractionEndEvent = null;
+                    OnHandleDestroyedEvent = null;
 
-            // Clear event subscribers to prevent memory leaks
-            OnInteractionStartEvent = null;
-            OnInteractionEvent = null;
-            OnInteractionEndEvent = null;
-            OnHandleDestroyedEvent = null;
-
-            // Clear UnityEvent listeners
-            onInteractionStart?.RemoveAllListeners();
-            onInteraction?.RemoveAllListeners();
-            onInteractionEnd?.RemoveAllListeners();
-            onHandleDestroyed?.RemoveAllListeners();
-
-            var manager = TransformHandleManager.ExistingInstance;
-            if (manager != null) manager.RemoveHandle(this);
+                    onInteractionStart?.RemoveAllListeners();
+                    onInteraction?.RemoveAllListeners();
+                    onInteractionEnd?.RemoveAllListeners();
+                    onHandleDestroyed?.RemoveAllListeners();
+                }
+                finally
+                {
+                    // Resolve after callbacks: they may have removed or destroyed the manager.
+                    var manager = TransformHandleManager.ExistingInstance;
+                    if (manager != null) manager.RemoveHandle(this);
+                }
+            }
         }
 
         protected virtual void LateUpdate()
         {
-            UpdateHandleTransformation();
+            SynchronizeVisualTransform();
+        }
 
-            if (!AutoScale || HandleCamera == null) return;
+        // Creation and recentering can happen after this frame's LateUpdate. Prepare the
+        // visible root synchronously, using exactly the same math as the regular frame update.
+        internal void SynchronizeVisualTransform()
+        {
+            if (this == null || Pivot == null) return;
+            UpdateHandleTransformation();
+            // Factory population can rotate the pivot after the plane components initialized.
+            if (this != null && PositionHandle != null)
+            {
+                PositionHandle.XPlane?.RefreshVisualPlacement();
+                PositionHandle.YPlane?.RefreshVisualPlacement();
+                PositionHandle.ZPlane?.RefreshVisualPlacement();
+            }
+            if (this == null || !AutoScale || HandleCamera == null) return;
             transform.PreserveScaleOnScreen(HandleCamera.fieldOfView, autoScaleSizeInPixels, HandleCamera);
         }
 
@@ -268,6 +366,10 @@ namespace TransformHandles
         /// <param name="targetTransform">The transform to manipulate.</param>
         public virtual void Enable(Transform targetTransform)
         {
+            // Non-creating camera refresh; P0-d owns the lazy OnEnable accessor.
+            var manager = TransformHandleManager.ExistingInstance;
+            if (manager != null) HandleCamera = manager.MainCamera;
+
             Pivot = targetTransform;
             transform.position = targetTransform.position;
 
@@ -275,12 +377,39 @@ namespace TransformHandles
         }
 
         /// <summary>
-        /// Disables the handle and clears the target.
+        /// Disables the handle and clears the target. Ownership is retained; this is an explicit
+        /// local suspension, not a manager detach.
         /// </summary>
         public virtual void Disable()
         {
+            var manager = TransformHandleManager.ExistingInstance;
+            if (manager != null)
+            {
+                try
+                {
+                    manager.CancelInteraction(this);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, this);
+                }
+            }
+
+            // A cancel callback may have destroyed this handle. Do not touch a fake-null object.
+            if (this == null) return;
+
             Pivot = null;
             Clear();
+        }
+
+        internal void RefreshCamera(Camera camera)
+        {
+            HandleCamera = camera;
+
+            // Reinitialize existing axes only for a live, restored handle. A suspended handle
+            // gets the new camera on its next Enable/restore.
+            if (camera == null || !isActiveAndEnabled || Pivot == null) return;
+            CreateHandles();
         }
 
         /// <summary>
@@ -388,6 +517,7 @@ namespace TransformHandles
                 default:
                     throw new ArgumentOutOfRangeException();
             }
+            SynchronizeVisualTransform();
         }
 
         private void ActivatePositionHandle()

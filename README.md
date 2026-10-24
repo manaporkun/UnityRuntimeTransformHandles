@@ -189,16 +189,10 @@ TransformHandleManager.Instance.BlockWhenPointerOverUI = true;
 
 ## Samples
 
-The package ships an importable demo:
-
-1. Open `Window > Package Manager` and select **Runtime Transform Handles**.
-2. Open the **Samples** tab and import **Runtime Transform Handles Demo**.
-3. Open `Assets/Samples/Runtime Transform Handles/<version>/Runtime Transform Handles Demo/RuntimeTransformHandlesDemo.unity` and enter Play mode.
-
-The demo spawns its own targets and exercises every handle type, axis mask, coordinate space,
-snapping mode, multi-object grouping, auto-scaling, and the interaction event system through an
-on-screen control panel (see the sample's own README for the controls table). The imported copy
-under `Assets/Samples/` is regenerable — it can be deleted and reimported at any time.
+Examples are distributed in the separate optional **Runtime Transform Handles Demos** package.
+Core users do not need it. See [installation and migration](Packages/com.orkunmanap.runtime-transform-handles.demos/README.md).
+Import individual examples from that package's Samples tab, then run Tools > Transform Handles > Setup Layer.
+Existing imported Assets copies are user-owned; back up custom changes outside Assets before migration.
 
 ## Package Structure
 
@@ -226,7 +220,6 @@ Packages/com.orkunmanap.runtime-transform-handles/
 │   │   └── TransformHandleSettings.cs       # ScriptableObject settings
 │   └── Shader/                              # Handle and origin shaders (Built-in + URP)
 ├── Tests/                                   # EditMode + PlayMode test assemblies
-├── Samples~/Demo/                           # Importable demo sample (Package Manager)
 ├── Documentation~/                          # index.md (architecture + API) + migration guide
 └── package.json
 ```
@@ -323,3 +316,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 If you encounter any issues or have questions, please [open an issue](https://github.com/manaporkun/UnityRuntimeTransformHandles/issues) on GitHub.
+
+Development checkpoint and next demo work: [development handoff](docs/DEVELOPMENT-HANDOFF.md).

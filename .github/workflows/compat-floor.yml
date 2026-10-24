@@ -11,12 +11,16 @@ on:
       - main
     paths:
       - "Packages/com.orkunmanap.runtime-transform-handles/**"
-      - "ci/floor-2021/**"
+      - "Packages/com.orkunmanap.runtime-transform-handles.demos/**"
+      - "Assets/Editor/**"
+      - "ci/**"
       - ".github/workflows/compat-floor.yml"
   pull_request:
     paths:
       - "Packages/com.orkunmanap.runtime-transform-handles/**"
-      - "ci/floor-2021/**"
+      - "Packages/com.orkunmanap.runtime-transform-handles.demos/**"
+      - "Assets/Editor/**"
+      - "ci/**"
       - ".github/workflows/compat-floor.yml"
 
 permissions: {}
@@ -75,6 +79,11 @@ jobs:
           restore-keys: |
             FloorLibrary-
 
+      - name: Prepare fresh test evidence
+        run: |
+          python3 -m unittest discover -s ci -p 'test_*.py'
+          python3 ci/verify-unity-results.py prepare --project ci/floor-2021 --package Packages/com.orkunmanap.runtime-transform-handles --out artifacts/evidence --unity 2021.3.45f1 --input 0
+
       - name: Run tests
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4
         env:
@@ -87,8 +96,15 @@ jobs:
           projectPath: ci/floor-2021
           unityVersion: 2021.3.45f1
           testMode: all
+          customParameters: -transformHandlesIsolatedTests
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           checkName: Floor (2021.3) test results
+
+      - name: Collect and verify test evidence
+        if: always()
+        run: |
+          python3 ci/verify-unity-results.py collect --out artifacts/evidence --play-xml artifacts/playmode-results.xml --edit-xml artifacts/editmode-results.xml --play-log artifacts/playmode.log --edit-log artifacts/editmode.log
+          python3 ci/verify-unity-results.py verify --out artifacts/evidence
 
       - name: Upload test results
         if: always()

@@ -1,0 +1,30 @@
+{
+  "author": {
+    "name": "Orkun Manap",
+    "url": "https://manap.dev"
+  },
+  "license": "MIT",
+  "unity": "2021.3",
+  "unityRelease": "0f1",
+  "name": "com.orkunmanap.runtime-transform-handles.demos",
+  "version": "0.1.0-preview.1",
+  "displayName": "Runtime Transform Handles Demos",
+  "description": "Optional, independently imported scenarios for Runtime Transform Handles.",
+  "dependencies": {
+    "com.orkunmanap.runtime-transform-handles": "3.3.0",
+    "com.unity.ugui": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Runtime Transform Handles Demo",
+      "description": "Full-featured demo: spawns its own targets and exercises every handle type, axis mask, space, snapping mode, multi-object grouping, auto-scaling, and the interaction event system through an on-screen control panel.",
+      "path": "Samples~/Demo"
+    },
+    {
+      "displayName": "Level Editor",
+      "description": "A resettable prop workshop with single-object tools, World/Local group movement and rotation, and shared-center uniform group scaling.",
+      "path": "Samples~/LevelEditor"
+    }
+  ]
+}

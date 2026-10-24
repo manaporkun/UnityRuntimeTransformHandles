@@ -13,10 +13,12 @@ on:
       - main
     paths:
       - "Packages/**"
+      - "ci/test-level-editor-input.cjs"
       - ".github/workflows/min-api-lint.yml"
   pull_request:
     paths:
       - "Packages/**"
+      - "ci/test-level-editor-input.cjs"
       - ".github/workflows/min-api-lint.yml"
 
 permissions:
@@ -33,7 +35,7 @@ jobs:
       - name: Scan for unguarded post-2021.3 APIs
         run: |
           set -uo pipefail
-          PKG="Packages/com.orkunmanap.runtime-transform-handles"
+          PACKAGES=("Packages/com.orkunmanap.runtime-transform-handles" "Packages/com.orkunmanap.runtime-transform-handles.demos")
 
           # APIs introduced after 2021.3.0 (Find*ByType: 2021.3.18f1 / 2022.2). Add more here as
           # the floor concern grows. FindObjectOfType (the pre-2021.3 API) is intentionally allowed.
@@ -55,7 +57,7 @@ jobs:
                   printf "%s:%d:%s\n", file, NR, $0
               }
             ' "$f"
-          done < <(find "$PKG" -name '*.cs' -print0))
+          done < <(find "${PACKAGES[@]}" -name '*.cs' -print0))
 
           if [ -n "$HITS" ]; then
             echo "::error::Unguarded post-2021.3 API usage (wrap in '#if UNITY_2023_1_OR_NEWER ... #else <FindObjectOfType> #endif'):"
@@ -68,12 +70,12 @@ jobs:
       - name: Reject UTF-8 BOM in package .meta files
         run: |
           set -uo pipefail
-          PKG="Packages/com.orkunmanap.runtime-transform-handles"
+          PACKAGES=("Packages/com.orkunmanap.runtime-transform-handles" "Packages/com.orkunmanap.runtime-transform-handles.demos")
           BOM=$(while IFS= read -r -d '' f; do
             if [ "$(head -c 3 "$f" | xxd -p)" = "efbbbf" ]; then
               echo "$f"
             fi
-          done < <(find "$PKG" -name '*.meta' -print0))
+          done < <(find "${PACKAGES[@]}" -name '*.meta' -print0))
 
           if [ -n "$BOM" ]; then
             echo "::error::UTF-8 BOM in Unity .meta files can break script GUIDs after reimport:"
@@ -82,3 +84,6 @@ jobs:
           fi
 
           echo "Meta lint passed: no UTF-8 BOM in package .meta files."
+
+      - name: Check WebGL sample input bridge
+        run: node ci/test-level-editor-input.cjs

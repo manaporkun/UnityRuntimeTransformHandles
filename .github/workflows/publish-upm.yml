@@ -48,6 +48,7 @@ jobs:
               - 'Packages/**'
               - 'Assets/**'
               - 'ProjectSettings/**'
+              - 'ci/**'
               - '.github/workflows/publish-upm.yml'
 
       - name: Check Unity credentials
@@ -74,6 +75,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Validate package boundaries
+        run: |
+          python3 -m unittest discover -s ci -p 'test_*.py'
+          python3 ci/verify-package-boundaries.py
 
       - name: Validate manifest & structure
         run: |
@@ -123,7 +129,11 @@ jobs:
   # before it reaches main. Skips neutrally (not red) when Unity credentials are
   # unavailable (Dependabot/forks) and on docs-only PRs; pushes to main always test.
   test:
-    name: Tests (EditMode + PlayMode)
+    name: Tests (input ${{ matrix.input }})
+    strategy:
+      fail-fast: false
+      matrix:
+        input: [0, 1]
     needs: preflight
     if: >-
       needs.preflight.outputs.has-unity-secrets == 'true' &&
@@ -145,9 +155,27 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: Library
-          key: Library-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
+          key: Library-input${{ matrix.input }}-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-
+            Library-input${{ matrix.input }}-
+
+      - name: Select input backend
+        env:
+          INPUT_MODE: ${{ matrix.input }}
+        run: |
+          python3 - <<'PYINPUT'
+          import os, re
+          from pathlib import Path
+          p = Path('ProjectSettings/ProjectSettings.asset')
+          content, count = re.subn(r'(?m)^  activeInputHandler: [01]$', '  activeInputHandler: ' + os.environ['INPUT_MODE'], p.read_text())
+          assert count == 1, 'expected exactly one input setting'
+          p.write_text(content)
+          PYINPUT
+
+      - name: Prepare fresh test evidence
+        run: |
+          python3 -m unittest discover -s ci -p 'test_*.py'
+          python3 ci/verify-unity-results.py prepare --project . --package Packages/com.orkunmanap.runtime-transform-handles --out artifacts/evidence --unity 6000.3.16f1 --input ${{ matrix.input }}
 
       - name: Run tests
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4
@@ -160,13 +188,21 @@ jobs:
         with:
           unityVersion: 6000.3.16f1
           testMode: all
+          customParameters: -transformHandlesIsolatedTests
           githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Unity 6 input ${{ matrix.input }} results
+
+      - name: Collect and verify test evidence
+        if: always()
+        run: |
+          python3 ci/verify-unity-results.py collect --out artifacts/evidence --play-xml artifacts/playmode-results.xml --edit-xml artifacts/editmode-results.xml --play-log artifacts/playmode.log --edit-log artifacts/editmode.log
+          python3 ci/verify-unity-results.py verify --out artifacts/evidence
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: test-results
+          name: test-results-input${{ matrix.input }}
           path: artifacts
           if-no-files-found: ignore
 
@@ -280,7 +316,7 @@ jobs:
             fi
 
             # Full messages (%B) so `BREAKING CHANGE:` footers are seen, not just subjects.
-            COMMITS=$(git log $RANGE --format=%B)
+            COMMITS=$(git log $RANGE --format=%B -- "$PACKAGE_PATH")
 
             # Release notes: prefer the curated [Unreleased] section of the CHANGELOG. If it has
             # real content it becomes the release entries verbatim (and is consumed below when the
@@ -300,7 +336,7 @@ jobs:
               # sed '/./,$!d' strips the leading blank lines left by the heading separator.
               printf '%s\n' "$UNRELEASED_BODY" | sed '/./,$!d' > /tmp/release_entries.md
             else
-              git log $RANGE --no-merges --pretty=tformat:"%s" \
+              git log $RANGE --no-merges --pretty=tformat:"%s" -- "$PACKAGE_PATH" \
                 | grep -vE '^chore: bump version to' > /tmp/subjects.txt || true
               awk '
                 {
@@ -346,7 +382,7 @@ jobs:
             elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
               # Housekeeping types bump only when SHIPPING code/manifest changed (not Tests/ or Samples~/),
               # otherwise adding a test would cut a pointless release.
-              if git log $RANGE --name-only --pretty=format: | sort -u \
+              if git log $RANGE --name-only --pretty=format: -- "$PACKAGE_PATH" | sort -u \
                    | grep -vE "/Tests/|/Samples~/" \
                    | grep -qE "\.cs$|package\.json$"; then
                 BUMP="patch"

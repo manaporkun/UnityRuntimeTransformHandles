@@ -24,12 +24,5 @@
   "unityRelease": "0f1",
   "dependencies": {
     "com.unity.modules.physics": "1.0.0"
-  },
-  "samples": [
-    {
-      "displayName": "Runtime Transform Handles Demo",
-      "description": "Full-featured demo: spawns its own targets and exercises every handle type, axis mask, space, snapping mode, multi-object grouping, auto-scaling, and the interaction event system through an on-screen control panel.",
-      "path": "Samples~/Demo"
-    }
-  ]
+  }
 }

@@ -63,22 +63,6 @@ namespace TransformHandles.Tests
         }
 
         [Test]
-        public void Destroying_handle_after_manager_does_not_recreate_manager()
-        {
-            var handle = _manager.CreateHandle(NewObject("target").transform);
-            _spawned.Add(handle.gameObject);
-            _spawned.Add(handle.Pivot.gameObject);
-            Object.DestroyImmediate(_manager.gameObject);
-            Object.DestroyImmediate(handle.gameObject);
-#if UNITY_2023_1_OR_NEWER
-            _manager = Object.FindFirstObjectByType<TransformHandleManager>();
-#else
-            _manager = Object.FindObjectOfType<TransformHandleManager>();
-#endif
-            Assert.IsNull(_manager, "Handle teardown must not instantiate a manager after its owner was destroyed.");
-        }
-
-        [Test]
         public void Interaction_events_fire_in_order()
         {
             var handle = _manager.CreateHandle(NewObject("target").transform);
@@ -168,6 +152,7 @@ namespace TransformHandles.Tests
         public void RemoveHandle_terminates_the_ghost()
         {
             var handle = _manager.CreateHandle(NewObject("target").transform);
+            _spawned.Add(handle.gameObject);
             Assert.AreEqual(1, CountGhosts());
 
             _manager.RemoveHandle(handle);

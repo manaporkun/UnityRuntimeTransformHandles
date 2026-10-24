@@ -47,9 +47,17 @@ namespace TransformHandles
             if (_torusMaterial == null) _torusMaterial = torusMeshRenderer.material;
         }
 
+        private bool EnsureCamera()
+        {
+            _handleCamera = ParentHandle != null ? ParentHandle.HandleCamera : null;
+            return _handleCamera != null;
+        }
+
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
+            if (!EnsureCamera()) return;
+
             var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
 
             if (!_axisPlane.Raycast(cameraRay, out var hitT))
@@ -96,6 +104,7 @@ namespace TransformHandles
         public override void StartInteraction(Vector3 hitPoint)
         {
             base.StartInteraction(hitPoint);
+            if (!EnsureCamera()) return;
 
             _startRotation = ParentHandle.Space == Space.Self
                 ? ParentHandle.Pivot.localRotation

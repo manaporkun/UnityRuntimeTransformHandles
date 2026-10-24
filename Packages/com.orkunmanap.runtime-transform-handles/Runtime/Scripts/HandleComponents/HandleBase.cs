@@ -52,6 +52,15 @@ namespace TransformHandles
                 Material.color = DefaultColor;
         }
 
+        /// <summary>Emphasizes the default hue without accumulating changes across hover frames.</summary>
+        public virtual void SetHighlightedColor()
+        {
+            Color.RGBToHSV(DefaultColor, out var hue, out var saturation, out var value);
+            var color = Color.HSVToRGB(hue, saturation, value * .85f);
+            color.a = Mathf.Lerp(DefaultColor.a, 1f, .4f);
+            SetColor(color);
+        }
+
         /// <summary>
         /// Sets the component to the specified color.
         /// </summary>

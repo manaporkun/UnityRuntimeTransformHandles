@@ -6,7 +6,9 @@ is organized, how releases work, and what a pull request needs to pass.
 ## Repository layout
 
 - **The package** lives at `Packages/com.orkunmanap.runtime-transform-handles/` — runtime code,
-  editor code, tests, sample, and docs. This is what consumers install.
+  editor code, tests and docs. This is what consumers install.
+- **Optional demos** live at `Packages/com.orkunmanap.runtime-transform-handles.demos/`; each sample
+  is imported independently. Core never references this package.
 - **The repository root** is a Unity development project (currently tracking a recent Unity
   release) that embeds the package for development, the demo scene, and the WebGL showcase.
 - **`ci/floor-2021/`** is a minimal Unity 2021.3 project used only by CI to verify the declared
@@ -50,8 +52,8 @@ always better.
 On every push to `main`, the publish workflow:
 
 1. Validates the package manifest and structure (no Unity license needed).
-2. Runs EditMode + PlayMode tests on the current Unity version, plus the 2021.3 floor job.
-3. Computes the version bump from the commits since the last release, updates `package.json`
+2. Runs EditMode + PlayMode tests on the current Unity version, under both input settings. The 2021.3 floor workflow runs separately and is not a publish dependency.
+3. Computes the version bump from Core-affecting commits since the last release, updates `package.json`
    and `CHANGELOG.md`, and pushes a `chore: bump version to X.Y.Z [skip ci]` commit.
 4. Splits the package directory onto the `upm` branch, tags `vX.Y.Z`, and creates a GitHub
    Release.
