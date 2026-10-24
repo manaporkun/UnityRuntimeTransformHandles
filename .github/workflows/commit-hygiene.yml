@@ -1,0 +1,74 @@
+name: Commit Hygiene
+
+# Commit messages must not credit AI assistants or tools: GitHub surfaces those as
+# co-authors, which puts tool accounts on the repository's contributor list. The policy
+# lives in .githooks/check-message.sh so this job and the local hook cannot drift apart.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  commit-hygiene:
+    name: Commit hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_AFTER_SHA: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+          CHECK=.githooks/check-message.sh
+          tmp=$(mktemp -d)
+          failed=0
+
+          check_message() { # check_message <label> <sha>
+            local label=$1 sha=$2
+            git show -s --format=%B "$sha" > "$tmp/msg"
+            if ! "$CHECK" "$tmp/msg"; then
+              echo "::error title=Commit hygiene::$label $sha credits an AI assistant or tool."
+              failed=1
+            fi
+          }
+
+          case "$EVENT_NAME" in
+            pull_request)
+              # The PR title becomes the squash commit on main, so it is part of the policy.
+              printf '%s\n' "$PR_TITLE" > "$tmp/pr-title"
+              if ! "$CHECK" "$tmp/pr-title"; then
+                echo "::error title=Commit hygiene::The PR title becomes the squash commit message; remove the tool attribution."
+                failed=1
+              fi
+              while IFS= read -r sha; do
+                [ -n "$sha" ] && check_message commit "$sha"
+              done < <(git rev-list "$PR_BASE_SHA..$PR_HEAD_SHA")
+              ;;
+            *)
+              # Whole history of the pushed tip, not just the new commits: merging an older
+              # branch can reintroduce commits that history hygiene already removed.
+              while IFS= read -r sha; do
+                [ -n "$sha" ] && check_message commit "$sha"
+              done < <(git rev-list "${PUSH_AFTER_SHA:-HEAD}")
+              ;;
+          esac
+
+          exit "$failed"

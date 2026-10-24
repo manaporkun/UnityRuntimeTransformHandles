@@ -88,3 +88,6 @@ crashlytics-build.properties
 # Web demo build output
 /web/
 
+# Local-only notes: planning, review and assistant output never belongs in the repo.
+/.local/
+

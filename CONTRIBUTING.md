@@ -12,6 +12,8 @@ is organized, how releases work, and what a pull request needs to pass.
 - **`ci/floor-2021/`** is a minimal Unity 2021.3 project used only by CI to verify the declared
   minimum Unity version, the legacy Input Manager path, and URP-free installs. Don't open it
   with a newer editor.
+- **`.local/`** is gitignored scratch space for planning, review and assistant output. Keep
+  notes there, not in the repository root.
 
 ## Branch model
 
@@ -35,6 +37,27 @@ Release automation derives everything from commit messages on `main`
 
 Since PRs are squash-merged, **the PR title must be a Conventional Commit** — it becomes the
 commit on `main`.
+
+## Commit hygiene
+
+Commit messages describe the change and nothing else. Do not credit an AI assistant or tool:
+no "generated with" footers, no `Co-Authored-By` trailers naming one, no tool name in the
+subject or body. GitHub turns those into co-authors and puts tool accounts on the
+contributor list.
+
+The rules live in `.githooks/check-message.sh` and are enforced twice:
+
+- **Locally** — enable the hook once per clone:
+
+  ```sh
+  git config core.hooksPath .githooks
+  ```
+
+- **In CI** — the Commit Hygiene job checks every commit in a pull request, the PR title
+  (it becomes the squash commit), and the full history of `main` on each push. That last
+  check is deliberate: merging an old branch can bring removed commits back.
+
+Set `SKIP_COMMIT_HYGIENE=1` only when replaying history on purpose.
 
 ## Changelog
 
@@ -79,6 +102,21 @@ There is nothing to do manually — merging to `main` releases.
 | `compat-floor.yml` | package tests on Unity 2021.3 without Input System or URP |
 | `min-api-lint.yml` | static scan for unguarded post-2021.3 APIs, `.meta` BOM check |
 | `webgl-pages.yml` | WebGL demo build + GitHub Pages deploy |
+| `commit-hygiene.yml` | commit messages and PR titles carry no AI-assistant/tool attribution |
+
+## Rewritten history (2026-10-24)
+
+`main`, `develop` and `upm` were rewritten once to remove assistant/tool attribution from
+commit messages. Trees are unchanged, and tag and branch names are unchanged, so `#upm` and
+`#vX.Y.Z` installs keep working. Existing clones need:
+
+```sh
+git fetch --force --tags
+git reset --hard origin/main   # on branches you had not pushed
+```
+
+Old commit SHAs, and pull request timeline entries that pointed at them, no longer resolve.
+
 
 ## Optional: smarter merges for Unity YAML files
 
