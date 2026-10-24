@@ -1,0 +1,11 @@
+#!/bin/sh
+# Local commit-msg hook: rejects messages that credit an AI assistant or tool.
+#
+# Opt in once per clone:
+#   git config core.hooksPath .githooks
+#
+# The policy lives in check-message.sh so this hook and the Commit Hygiene CI job
+# enforce exactly the same rules.
+set -eu
+
+exec "$(dirname "$0")/check-message.sh" "$1"

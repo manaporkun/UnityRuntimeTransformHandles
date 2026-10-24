@@ -54,3 +54,7 @@
 *.dylib binary
 *.a binary
 *.unitypackage binary
+
+# Shell scripts must keep LF so their shebang works in a Windows checkout.
+*.sh text eol=lf
+.githooks/* text eol=lf
