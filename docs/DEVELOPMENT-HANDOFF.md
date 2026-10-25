@@ -2,10 +2,24 @@
 
 This branch is a development checkpoint, not a published package release. It contains the accumulated lifecycle fixes, Precision visuals, optional-package split, Level Editor UI/input work and group transforms. Continue from this branch rather than rebuilding the changes from older task branches.
 
+## Latest checkpoint: Demo Browser (2026-10-25)
+
+The optional `DemoBrowser` sample adds a UI Toolkit gallery for Modular Building, Level Editor and the original showcase. Start its scene first and include the desired demo scenes in Build Settings. Cards resolve unique full scene paths from the build; missing demos are omitted. No cross-sample assembly or asset references were introduced, and Core is unchanged.
+
+Each workspace has a bottom-right **Demos** button. Returning loads the actual gallery scene and discards workspace edits. A frame separates completed teardown from another load, preventing deferred destruction of the old manager from affecting a new workspace. The Browser preserves its UI and owns an EventSystem when needed; it recreates input after a borrowed scene-local system disappears.
+
+Navigation claims its press before Core updates and keeps it through release. The legacy showcase's test-panel toggle cannot bypass navigation; gestures starting on navigation cannot later orbit its camera. Showcase teardown now releases owned handles, settings, manager and material instances and restores borrowed manager state. Its local target material uses a pipeline-independent shader so cubes render correctly in the combined URP player. Level Editor recognizes Toolkit raycasts and tolerates its canvas being destroyed before OnDisable during scene unload.
+
+`BuildScript.PrepareDemoBrowserWebGL` imports all four samples; run `BuildScript.BuildDemoBrowserWebGL` after compilation in a separate CLI invocation. Existing imports are preserved. Individual build methods and the public Pages workflow are unchanged. See the [Browser README](../Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/DemoBrowser/README.md) for consumer and build instructions.
+
+Validation: the complete imported sample suite passes 86 tests on Unity 2021.3.0f1 Legacy, 86 on Unity 6000.3.16f1 Legacy, and 88 on Unity 6000.3.16f1 Input System. This includes transitions while selected/dragging, returning repeatedly, borrowed manager restoration, EventSystem recovery, duplicate-load rejection, and same-frame navigation input with stale EventSystem hover. A clean Browser-only 2021 consumer without other sample imports passes its three applicable gallery/resolution tests. All 29 Python CI tests, package boundaries, minimum-API/meta checks and wheel bridge checks pass. The Built-in 2021 host retains the original showcase's known missing optional URP camera-script warning; it does not affect the Browser-only import.
+
+The combined WebGL build passes Chromium checks at 1440×900 and Retina 960×640: gallery layout, all three workspaces, selected-target exits, Modular Building plane dragging, and returns to the gallery. The showcase target colors render correctly. With the showcase UI guard off, dragging from navigation with middle mouse and scrolling over navigation leave the scene pixels unchanged. Browser error/page-error/request-failure arrays are empty. The same three inherited URP hidden-shader diagnostics remain at log level; no physical Mac trackpad check was performed.
+
 ## Package boundaries and current behavior
 
 - Core: `Packages/com.orkunmanap.runtime-transform-handles`. Stable package identity; runtime handles, assets, editor setup, tests and API documentation. No dependency on demos.
-- Optional demos: `Packages/com.orkunmanap.runtime-transform-handles.demos`. Independently importable original feature showcase, Level Editor and Modular Building under `Samples~`. Keep application-specific UI and scenario rules here.
+- Optional demos: `Packages/com.orkunmanap.runtime-transform-handles.demos`. Independently importable original feature showcase, Level Editor, Modular Building and Demo Browser under `Samples~`. Keep application-specific UI and scenario rules here.
 - Level Editor: Shift-click toggles members; Move/Rotate use World or Local axes. Local references the last selected surviving object. Rotation uses the shared mean of object pivots. Group Scale exposes the center only and scales object sizes and pivot offsets together. Single-object scaling retains axis controls.
 - `Handle.LocalSpaceReference` and `Handle.UniformGroupScale` are opt-in Core controls. Uniform group scaling requires a pure Scale handle, multiple targets and XYZ axes; partial masks disable its controls. Defaults preserve existing consumer behavior. See Core README/API docs for details.
 - Left drag orbits, right drag pans, scroll zooms. UI and handle gestures consume selection/camera input. Level Editor uses a size popover; Modular Building exposes the same size controls in its UI Toolkit inspector. Both support 64–512 rendering pixels, default 192; Retina pixel ratio is not silently folded into that value.

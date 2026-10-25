@@ -383,8 +383,9 @@ namespace TransformHandles.Samples.LevelEditor
             if (!_initialized) return;
             ClearSelection();
             _sizePanelOpen = _closeSizePanelPending = false;
-            _selectionCard.gameObject.SetActive(false);
-            _sizeBackdrop.gameObject.SetActive(false);
+            // Scene unloading may destroy the separately owned canvas before this callback.
+            if (_selectionCard != null) _selectionCard.gameObject.SetActive(false);
+            if (_sizeBackdrop != null) _sizeBackdrop.gameObject.SetActive(false);
             if (_canvas != null) _canvas.SetActive(false);
             if (_ownedEventSystem != null) _ownedEventSystem.SetActive(false);
             if (_manager != null)
@@ -421,7 +422,7 @@ namespace TransformHandles.Samples.LevelEditor
             // Query the current position instead of EventSystem's potentially previous-frame hover cache.
             _uiHits.Clear();
             system.RaycastAll(new PointerEventData(system) { position = InputWrapper.PointerPosition }, _uiHits);
-            return _uiHits.Any(hit => hit.module is GraphicRaycaster);
+            return _uiHits.Any(hit => hit.module is GraphicRaycaster || hit.module is UnityEngine.UIElements.PanelRaycaster);
         }
 
         private void SetMaterial(Renderer renderer, Color color, bool grid)

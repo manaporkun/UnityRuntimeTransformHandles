@@ -34,6 +34,14 @@ public class HandleDemo : MonoBehaviour
     private Camera _camera;
     private TransformHandleManager _manager;
     private TransformHandleSettings _settings;
+    private TransformHandleManager _ownedManager;
+    private Camera _previousCamera;
+    private TransformHandleSettings _previousSettings;
+    private bool _previousUiBlock, _navigationPress;
+    private readonly List<Material> _ownedMaterials = new List<Material>();
+#if TH_UGUI
+    private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
+#endif
 
     private readonly List<Transform> _targets = new List<Transform>();
     private readonly Dictionary<Transform, Handle> _targetToHandle = new Dictionary<Transform, Handle>();
@@ -74,7 +82,12 @@ public class HandleDemo : MonoBehaviour
             _camera = go.AddComponent<Camera>();
         }
 
+        bool ownsManager = !Resources.FindObjectsOfTypeAll<TransformHandleManager>().Any(m => m.gameObject.scene.IsValid());
         _manager = TransformHandleManager.Instance;
+        if (ownsManager) _ownedManager = _manager;
+        _previousCamera = _manager.MainCamera;
+        _previousSettings = _manager.Settings;
+        _previousUiBlock = _manager.BlockWhenPointerOverUI;
         _manager.MainCamera = _camera;
 
         // Build a runtime settings asset (no .asset file needed) to demo Settings injection.
@@ -86,13 +99,20 @@ public class HandleDemo : MonoBehaviour
 
     private void Start()
     {
+        // Keep the showcase usable beside either Built-in or URP workspaces. A local
+        // referenced shader also survives player stripping without pipeline dependencies.
+        var targetMaterial = Resources.Load<Material>("HandleDemoTarget");
         for (var i = 0; i < targetCount; i++)
         {
             var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
             cube.name = $"Target_{i}";
             cube.AddComponent<DemoTarget>();
             cube.transform.position = new Vector3((i - (targetCount - 1) * 0.5f) * spacing, 0.5f, 0f);
-            cube.GetComponent<Renderer>().material.color = Palette[i % Palette.Length];
+            var renderer = cube.GetComponent<Renderer>();
+            var material = targetMaterial != null ? new Material(targetMaterial) : renderer.material;
+            renderer.sharedMaterial = material;
+            _ownedMaterials.Add(material);
+            material.color = Palette[i % Palette.Length];
             _targets.Add(cube.transform);
         }
 
@@ -160,8 +180,11 @@ public class HandleDemo : MonoBehaviour
         label.text = "uGUI panel — clicks here must NOT move objects\n(toggle the guard in the HUD)";
         label.alignment = TextAnchor.MiddleCenter;
         label.color = Color.white;
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                     ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+#if UNITY_2022_2_OR_NEWER
+        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+#else
+        label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+#endif
         var labelRect = label.rectTransform;
         labelRect.anchorMin = Vector2.zero;
         labelRect.anchorMax = Vector2.one;
@@ -184,8 +207,33 @@ public class HandleDemo : MonoBehaviour
 #endif
     }
 
+    private bool PointerOverNavigation()
+    {
+#if TH_UGUI
+        var system = EventSystem.current;
+        if (system == null) return false;
+        if (system.currentInputModule == null) return true;
+        _uiHits.Clear();
+        system.RaycastAll(new PointerEventData(system) { position = InputWrapper.PointerPosition }, _uiHits);
+        return _uiHits.Any(hit => hit.module is UnityEngine.UIElements.PanelRaycaster);
+#else
+        return false;
+#endif
+    }
+
     private void Update()
     {
+        // The showcase toggle controls its test panel, never application navigation.
+        bool overNavigation = PointerOverNavigation();
+        if (overNavigation && (InputWrapper.GetMouseButtonDown(0) || InputWrapper.GetMouseButtonDown(1) || InputWrapper.GetMouseButtonDown(2)))
+            _navigationPress = true;
+        if (_navigationPress)
+        {
+            if (!InputWrapper.GetMouseButton(0) && !InputWrapper.GetMouseButton(1) && !InputWrapper.GetMouseButton(2))
+                _navigationPress = false;
+            return;
+        }
+        if (overNavigation) return;
         HandleSelectionInput();
         OrbitCamera();
     }
@@ -374,6 +422,25 @@ public class HandleDemo : MonoBehaviour
 
     private void OnDestroy()
     {
+        foreach (var handle in _targetToHandle.Values.Distinct().ToArray())
+        {
+            if (handle == null) continue;
+            handle.OnInteractionStartEvent -= OnStart;
+            handle.OnInteractionEvent -= OnStay;
+            handle.OnInteractionEndEvent -= OnEnd;
+            handle.OnHandleDestroyedEvent -= OnDestroyed;
+            if (_manager != null) _manager.RemoveHandle(handle);
+            if (handle != null) Destroy(handle.gameObject);
+        }
+        if (_manager != null)
+        {
+            _manager.MainCamera = _previousCamera;
+            _manager.Settings = _previousSettings;
+            _manager.BlockWhenPointerOverUI = _previousUiBlock;
+        }
+        if (_ownedManager != null) Destroy(_ownedManager.gameObject);
+        if (_settings != null) Destroy(_settings);
+        foreach (var material in _ownedMaterials) if (material != null) Destroy(material);
         if (_panelTex != null) Destroy(_panelTex);
         if (_skin != null) Destroy(_skin);
     }

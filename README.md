@@ -194,6 +194,10 @@ Core users do not need it. See [installation and migration](Packages/com.orkunma
 Import individual examples from that package's Samples tab, then run Tools > Transform Handles > Setup Layer.
 Existing imported Assets copies are user-owned; back up custom changes outside Assets before migration.
 
+### Demo gallery
+
+Import the optional [Demo Browser](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/DemoBrowser/README.md) to open all included demo scenes from one UI Toolkit gallery. Each workspace has a Demos button to return; leaving resets that scene. The repository supports a combined WebGL build while preserving individual demo builds and independent sample imports.
+
 ### Modular Building sample
 
 Modular Building uses UI Toolkit with an editable UXML/USS layout. See the [sample setup](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md). Core remains independent of demo UI.

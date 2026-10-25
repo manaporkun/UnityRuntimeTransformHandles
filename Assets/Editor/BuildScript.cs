@@ -64,6 +64,41 @@ public static class BuildScript
                 "Let script compilation and domain reload finish, then run the build again in a new Editor invocation. " +
                 "For clean Modular Building CLI builds, run BuildScript.PrepareModularBuildingWebGL first.");
 
+        BuildScenes(outputPath, new[] { scenePath });
+    }
+
+    [MenuItem("Tools/Build/Prepare Demo Browser")]
+    public static void PrepareDemoBrowserWebGL()
+    {
+        ResolveBrowserScenes();
+        Debug.Log("Demo Browser samples imported. Build in a new Editor invocation after compilation.");
+    }
+
+    [MenuItem("Tools/Build/Demo Browser WebGL")]
+    public static void BuildDemoBrowserWebGL()
+    {
+        if (Application.isBatchMode && EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
+            throw new InvalidOperationException("Start Unity with -buildTarget WebGL before executing this build method.");
+        var scenes = ResolveBrowserScenes();
+        foreach (var name in new[] { "DemoBrowser", "ModularBuilding", "LevelEditor", "Demo" })
+            if (!AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == "TransformHandles.Samples." + name))
+                throw new InvalidOperationException("Run PrepareDemoBrowserWebGL, allow compilation, then build in a new Editor invocation.");
+        BuildScenes(GetCommandLineArgument("-buildPath") ?? "Build/DemoBrowserWebGL", scenes);
+    }
+
+    private static string[] ResolveBrowserScenes()
+    {
+        return new[]
+        {
+            ResolveSampleScenePath("Demo Browser", "DemoBrowser", "DemoBrowser"),
+            ResolveSampleScenePath("Modular Building", "ModularBuilding", "ModularBuilding"),
+            ResolveSampleScenePath("Level Editor", "LevelEditor", "LevelEditor"),
+            ResolveSampleScenePath("Runtime Transform Handles Demo", "Demo", "RuntimeTransformHandlesDemo")
+        };
+    }
+
+    private static void BuildScenes(string outputPath, string[] scenes)
+    {
         var previousTemplate = PlayerSettings.WebGL.template;
         var previousCompressionFormat = PlayerSettings.WebGL.compressionFormat;
         var previousDecompressionFallback = PlayerSettings.WebGL.decompressionFallback;
@@ -83,7 +118,7 @@ public static class BuildScript
 
         var buildPlayerOptions = new BuildPlayerOptions
         {
-            scenes = new[] { scenePath },
+            scenes = scenes,
             locationPathName = absoluteOutputPath,
             target = BuildTarget.WebGL,
             options = BuildOptions.None

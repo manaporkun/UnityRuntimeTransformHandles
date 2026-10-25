@@ -1,7 +1,7 @@
 # Runtime Transform Handles Demos
 
 Optional examples for Runtime Transform Handles. Core does not depend on this package.
-Import **Level Editor** for the Prop Workshop: select, move, rotate, scale and reset six props, with World/Local group movement and rotation, plus shared-center uniform group scaling. Import **Modular Building** for a wall-and-corner arrangement scene with a fixed 1-unit horizontal grid, 90-degree yaw, Reset and the same camera/handle-size controls. All three samples are separate imports through Package Manager > Samples.
+Import **Level Editor** for the Prop Workshop: select, move, rotate, scale and reset six props, with World/Local group movement and rotation, plus shared-center uniform group scaling. Import **Modular Building** for a wall-and-corner arrangement scene with a fixed 1-unit horizontal grid, 90-degree yaw, Reset and the same camera/handle-size controls. The three workspaces are separate imports through Package Manager > Samples. Import **[Demo Browser](Samples~/DemoBrowser/README.md)** as an optional fourth sample to navigate between included workspaces in one player. Returning to the gallery resets the departed workspace.
 The original showcase's known URP magenta targets, stale shortcut HUD and shader diagnostics are not fixed by relocation.
 
 ## Install
@@ -42,6 +42,6 @@ The new path uses Runtime Transform Handles Demos as the package display name.
 The build helper rejects duplicate GUIDs rather than overwriting a customized import.
 
 Removing the demos package does not remove Assets copies. Keep Core and explicit project dependencies
-on com.unity.ugui and com.unity.modules.imgui when retaining imports. Retained Modular Building imports also need com.unity.modules.uielements. Input System remains optional. When using its backend, use 1.1.1 or later for these demos; the retained original showcase also calls the runtime UI default-actions API and is not compatible with Input System 1.0.
+on com.unity.ugui and com.unity.modules.imgui when retaining imports. Retained demo imports also need com.unity.modules.uielements for Toolkit navigation hit testing; Modular Building and Demo Browser render their controls with it. Input System remains optional. When using its backend, use 1.1.1 or later for these demos; the retained original showcase also calls the runtime UI default-actions API and is not compatible with Input System 1.0.
 To remove examples entirely, explicitly remove their imported folders after backing up changes.
 This sample relocation is a distribution breaking change; preserve old version pins when needed.

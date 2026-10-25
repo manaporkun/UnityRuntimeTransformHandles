@@ -2,6 +2,7 @@
 
 Open `RuntimeTransformHandlesDemo.unity` and press **Play**. The scene is self-contained:
 `HandleDemo` spawns its own target cubes, ensures a camera, and draws an on-screen control panel.
+The sample-local `Resources/HandleDemoTarget.mat` uses a pipeline-independent shader so the targets also render in the combined URP demo build. Runtime material instances are released when leaving the scene.
 
 > First run only: create the physics layer the handles raycast against —
 > `Tools > Transform Handles > Setup Layer`.

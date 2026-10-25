@@ -31,6 +31,11 @@
       "displayName": "Modular Building",
       "description": "Arrange supplied wall and corner modules with horizontal grid movement and quarter-turn rotation.",
       "path": "Samples~/ModularBuilding"
+    },
+    {
+      "displayName": "Demo Browser",
+      "description": "A single entry point for all imported demo scenes, with an optional UI Toolkit gallery.",
+      "path": "Samples~/DemoBrowser"
     }
   ]
 }

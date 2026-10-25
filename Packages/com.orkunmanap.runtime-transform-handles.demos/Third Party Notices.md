@@ -59,11 +59,11 @@ Except for the font assets listed below, all meshes (`cone`, `torus`, `tube`), m
 distributed under the package's MIT license (see `LICENSE.md`). Portions derive from the Runtime
 Transform Handle project credited above (also MIT).
 
-## Liberation Sans (Modular Building only)
+## Liberation Sans (Modular Building and Demo Browser)
 
-`Samples~/ModularBuilding/Fonts/LiberationSans.ttf` is distributed under the SIL Open Font License 1.1, not the package MIT license.
+`Samples~/ModularBuilding/Fonts/LiberationSans.ttf` and `Samples~/DemoBrowser/Fonts/LiberationSans.ttf` are distributed under the SIL Open Font License 1.1, not the package MIT license.
 Copyright (c) 2010 Google Corporation and (c) 2012 Red Hat, Inc.
 The complete license and reserved font names are included in
-`Samples~/ModularBuilding/Fonts/LiberationSans - OFL.txt`.
+each sample’s `Fonts/LiberationSans - OFL.txt`.
 
 UI Toolkit is supplied by Unity; this package does not redistribute Unity engine code or built-in theme resources.
