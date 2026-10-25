@@ -228,7 +228,9 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
         [Test]
         public void SizePopoverWorksWithoutSelectionAndPreservesPreferenceAfterClose()
         {
-            Assert.IsFalse(Get<RectTransform>("_contextBar").gameObject.activeSelf);
+            Assert.IsTrue(Get<RectTransform>("_contextBar").gameObject.activeSelf);
+            Assert.AreEqual("Select a wall or corner", Get<Text>("_selectionLabel").text);
+            Assert.IsFalse(Get<Text>("_modeLabel").gameObject.activeSelf);
             Assert.IsTrue(Get<Button>("_sizeToggleButton").interactable);
             Call("ToggleSizePanel");
             Get<Slider>("_sizeSlider").value = 320;
@@ -401,6 +403,81 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
             if (!managerFirst) _demo.ActiveHandle.InteractionStart();
             _demo.ActiveHandle.InteractionEnd();
             Assert.IsFalse((bool)Call("CanSelectOnRelease", Vector3.zero, false));
+        }
+
+        [UnityTest]
+        public IEnumerator HelpDismissalConsumesThePressAndEscapeKeepsSelection()
+        {
+            Select(); Call("ToggleHelpPanel");
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var backdrop = Get<Button>("_helpBackdrop");
+            var canvas = Get<GameObject>("_canvas");
+            var point = new Vector2(Screen.width * .1f, Screen.height * .5f);
+            var hits = new List<RaycastResult>();
+            canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(EventSystem.current) {position = point}, hits);
+            Assert.IsTrue(hits.Exists(h => h.gameObject == backdrop.gameObject));
+            Call("BeginSelectionPress", Time.frameCount, (Vector3)point, true);
+            Call("HandleEscape", Time.frameCount);
+            Assert.AreEqual(1, _demo.SelectionCount);
+            Assert.IsTrue(backdrop.gameObject.activeInHierarchy, "Dismissal must still block Core input until LateUpdate.");
+            Assert.IsFalse((bool)Call("CanSelectOnRelease", (Vector3)point, false));
+            Navigate(point, 0, 0);
+            Assert.AreEqual(-1, Get<int>("_navigationButton"));
+            Call("ApplyDeferredPanelClose");
+            hits.Clear();
+            canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(EventSystem.current) {position = point}, hits);
+            Assert.IsFalse(hits.Exists(h => h.gameObject == backdrop.gameObject));
+            Call("HandleEscape", Time.frameCount + 1);
+            Assert.AreEqual(0, _demo.SelectionCount);
+        }
+
+        [Test]
+        public void HelpAndSizeRequireSeparatePressesAndDisableClearsHelp()
+        {
+            Assert.IsTrue(Get<Button>("_helpToggleButton").interactable, "Help works without a selection.");
+            Call("ToggleHelpPanel");
+            Call("ToggleSizePanel");
+            Assert.IsFalse(Get<bool>("_sizePanelOpen"));
+            Assert.IsTrue(Get<bool>("_helpPanelOpen"));
+            Call("ApplyDeferredPanelClose");
+            Call("ToggleSizePanel");
+            Assert.IsTrue(Get<bool>("_sizePanelOpen"));
+            Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            Call("ToggleHelpPanel");
+            Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            Call("ApplyDeferredPanelClose");
+            Call("ToggleHelpPanel");
+            _demo.enabled = false;
+            Assert.IsFalse(Get<Button>("_helpBackdrop").gameObject.activeInHierarchy);
+            Assert.IsFalse(Get<RectTransform>("_helpCard").gameObject.activeSelf);
+            _demo.enabled = true;
+            Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            Select(); _demo.ActiveHandle.InteractionStart();
+            Call("ToggleHelpPanel"); Call("RefreshUi");
+            Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            Assert.IsFalse(Get<Button>("_helpToggleButton").interactable);
+        }
+
+        [UnityTest]
+        public IEnumerator HelpTextFitsAndSceneGuidanceLivesInsideCards()
+        {
+            Call("ToggleHelpPanel");
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            foreach (var message in new[] {"Select a wall or corner and arrange your layout.",
+                "Drag the handle to place this module.", "Scene reset. Handle size preference is kept."})
+            {
+                Set("_notice", message); Call("RefreshUi");
+                foreach (var label in Get<RectTransform>("_helpCard").GetComponentsInChildren<Text>())
+                    Assert.LessOrEqual(label.preferredHeight, label.rectTransform.rect.height + .1f, label.text);
+            }
+            var status = Get<Text>("_status");
+            Assert.IsTrue(status.transform.IsChildOf(Get<RectTransform>("_helpCard")));
+            Assert.IsNull(Get<GameObject>("_canvas").transform.Find("Shortcuts"));
+            var strip = Get<RectTransform>("_contextBar");
+            Assert.GreaterOrEqual(Get<RectTransform>("_helpCard").anchoredPosition.y,
+                strip.anchoredPosition.y + 72 + 12);
         }
 
         [Test]

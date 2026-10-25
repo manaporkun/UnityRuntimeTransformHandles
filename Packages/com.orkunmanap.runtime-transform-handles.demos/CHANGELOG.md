@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Modular Building now groups guidance in an on-demand Help card and keeps a compact selection strip at the bottom.
 - Independently importable Modular Building sample: compound wall/corner selection, fixed horizontal grid and quarter-turn rotation, Reset, responsive controls and PlayMode coverage.
 - Optional demos package; the original showcase retains its asset GUIDs and scene name.
 

@@ -43,12 +43,15 @@ namespace TransformHandles.Samples.ModularBuilding
         private Vector3 _pressPosition, _releasePosition;
         private bool _releaseBlocked;
         private GameObject _canvas, _ownedEventSystem;
-        private Text _status, _selectionLabel, _modeLabel, _snapLabel;
+        private Text _status, _selectionLabel, _modeLabel, _constraintLabel;
         private Button _moveButton, _rotateButton, _resetButton;
         private Font _font;
         private RectTransform _toolbar, _toolRow, _selectionCard, _contextBar;
         private Button _sizeToggleButton, _sizeCloseButton, _sizeBackdrop;
         private Text _projectLabel;
+        private RectTransform _helpCard, _contextSeparator;
+        private Button _helpToggleButton, _helpCloseButton, _helpBackdrop;
+        private bool _helpPanelOpen, _closeHelpPanelPending;
         private bool _sizePanelOpen, _closeSizePanelPending;
         private bool _narrowLayout;
         private string _uiState;
@@ -219,7 +222,7 @@ namespace TransformHandles.Samples.ModularBuilding
             _selection.Clear();
             _selection.Add(target);
             RebuildHandle();
-            _notice = "Drag a handle to place this module. W Move · E Rotate";
+            _notice = "Drag the handle to place this module.";
         }
 
         private Transform ResolveModule(Transform hit)
@@ -331,6 +334,9 @@ namespace TransformHandles.Samples.ModularBuilding
             if (!_initialized) return;
             ClearSelection();
             _sizePanelOpen = _closeSizePanelPending = false;
+            _helpPanelOpen = _closeHelpPanelPending = false;
+            _helpCard.gameObject.SetActive(false);
+            _helpBackdrop.gameObject.SetActive(false);
             _selectionCard.gameObject.SetActive(false);
             _sizeBackdrop.gameObject.SetActive(false);
             if (_canvas != null) _canvas.SetActive(false);
@@ -543,23 +549,20 @@ namespace TransformHandles.Samples.ModularBuilding
             _moveButton = AddButton(_toolRow, "Move", 6, 8, 156, () => SetMode(HandleType.Position), moveIcon);
             _rotateButton = AddButton(_toolRow, "Rotate", 6, 64, 156, () => SetMode(HandleType.Rotation), rotateIcon);
 
-            _contextBar = Panel("Selection context", new Vector2(.5f, 0), new Vector2(0, 140), new Vector2(600, 72));
+            _contextBar = Panel("Selection context", new Vector2(.5f, 0), new Vector2(0, 24), new Vector2(600, 72));
             AddPanelOutline(_contextBar);
             _selectionLabel = Label(_contextBar, "No selection", 18, 10, PrimaryText, 20, 52);
             _selectionLabel.alignment = TextAnchor.MiddleLeft;
             _selectionLabel.supportRichText = false;
             _selectionLabel.rectTransform.sizeDelta = new Vector2(210, 52);
-            UiImage(_contextBar, "Selection separator", new Color(.90f, .91f, .93f), new Vector2(236, -14), new Vector2(1, 44));
+            _contextSeparator = UiImage(_contextBar, "Selection separator", new Color(.90f, .91f, .93f), new Vector2(236, -14), new Vector2(1, 44)).rectTransform;
             _modeLabel = Label(_contextBar, "Move", 250, 20, MutedText, 20, 32);
             _modeLabel.rectTransform.sizeDelta = new Vector2(84, 32);
             _modeLabel.alignment = TextAnchor.MiddleLeft;
-            var constraint = Label(_contextBar, "1 unit grid · 90° turns", 340, 20, MutedText, 20, 32);
-            constraint.rectTransform.sizeDelta = new Vector2(246, 32);
+            _constraintLabel = Label(_contextBar, "1 unit grid · 90° turns", 340, 20, MutedText, 20, 32);
+            _constraintLabel.rectTransform.sizeDelta = new Vector2(246, 32);
 
-            _status = FooterLabel(_notice, 80, 56, 20);
-            _snapLabel = FooterLabel("", 46, 30, 20);
-            var help = FooterLabel("Left-drag   Orbit     Right-drag   Pan     Scroll   Zoom", 10, 32, 18);
-            help.name = "Shortcuts";
+            BuildHelpUi();
 
             // This backdrop remains active until LateUpdate on dismissal, after Core input.
             var backdrop = Panel("Size panel backdrop", Vector2.zero, Vector2.zero, Vector2.zero);
@@ -598,21 +601,77 @@ namespace TransformHandles.Samples.ModularBuilding
             outline.effectDistance = new Vector2(1, -1);
         }
 
-        private Text FooterLabel(string text, float bottom, float height, int size)
+        private void BuildHelpUi()
         {
-            var label = Label(_canvas.transform, text, 0, 0, MutedText, size, height);
-            var rect = label.rectTransform;
-            rect.anchorMin = Vector2.zero; rect.anchorMax = new Vector2(1, 0);
-            rect.pivot = new Vector2(.5f, 0);
-            rect.anchoredPosition = new Vector2(0, bottom);
-            rect.sizeDelta = new Vector2(-64, height);
-            label.alignment = TextAnchor.MiddleCenter;
-            return label;
+            var launcher = Panel("Help launcher", new Vector2(1, 0), new Vector2(-24, 24), new Vector2(112, 48));
+            AddPanelOutline(launcher);
+            _helpToggleButton = AddButton(launcher, "?  Help", 0, 0, 112, ToggleHelpPanel);
+            _buttons.Remove(_helpToggleButton);
+            ((RectTransform)_helpToggleButton.transform).sizeDelta = new Vector2(112, 48);
+            _helpToggleButton.GetComponentInChildren<Text>().rectTransform.sizeDelta = new Vector2(112, 48);
+
+            var backdrop = Panel("Help backdrop", Vector2.zero, Vector2.zero, Vector2.zero);
+            backdrop.anchorMax = Vector2.one;
+            backdrop.GetComponent<Image>().color = Color.clear;
+            _helpBackdrop = backdrop.gameObject.AddComponent<Button>();
+            _helpBackdrop.transition = Selectable.Transition.None;
+            _helpBackdrop.onClick.AddListener(RequestCloseHelpPanel);
+            _helpCard = Panel("Workshop help", new Vector2(1, 0), new Vector2(-24, 108), new Vector2(360, 344));
+            AddPanelOutline(_helpCard);
+            Label(_helpCard, "Workshop controls", 22, 18, PrimaryText, 22);
+            _helpCloseButton = AddButton(_helpCard, "×", 310, 0, 44, RequestCloseHelpPanel);
+            _buttons.Remove(_helpCloseButton);
+            HelpRow("Move / Rotate", "W / E", 64);
+            HelpRow("Orbit", "Left-drag", 96);
+            HelpRow("Pan", "Right-drag", 128);
+            HelpRow("Zoom", "Scroll", 160);
+            UiImage(_helpCard, "Help separator", new Color(.90f, .91f, .93f), new Vector2(22, -198), new Vector2(316, 1));
+            _status = Label(_helpCard, _notice, 22, 212, PrimaryText, 20, 48);
+            _status.supportRichText = false;
+            _status.rectTransform.sizeDelta = new Vector2(316, 48);
+            var note = Label(_helpCard, "Modules can overlap. Reset restores the layout.", 22, 274, MutedText, 20, 48);
+            note.rectTransform.sizeDelta = new Vector2(316, 48);
+            _helpCard.gameObject.SetActive(false);
+            _helpBackdrop.gameObject.SetActive(false);
+        }
+
+        private void HelpRow(string action, string gesture, float top)
+        {
+            var name = Label(_helpCard, action, 22, top, PrimaryText, 20, 28);
+            name.rectTransform.sizeDelta = new Vector2(166, 28);
+            var shortcut = Label(_helpCard, gesture, 194, top, MutedText, 20, 28);
+            shortcut.rectTransform.sizeDelta = new Vector2(144, 28);
+            shortcut.alignment = TextAnchor.UpperRight;
+        }
+
+        private void ToggleHelpPanel()
+        {
+            if (_dragging) return;
+            // A dismissal click only closes the current popup; never open another in the same press.
+            if (_sizePanelOpen) { RequestCloseSizePanel(); return; }
+            if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
+            CancelNavigation();
+            _pressBlocked = _pressCancelled = true;
+            _helpPanelOpen = true;
+            _closeHelpPanelPending = false;
+            _helpBackdrop.gameObject.SetActive(true);
+            _helpCard.gameObject.SetActive(true);
+            RefreshUi();
+        }
+
+        private void RequestCloseHelpPanel()
+        {
+            if (!_helpPanelOpen) return;
+            _pressBlocked = _pressCancelled = true;
+            _releaseBlocked = true;
+            CancelNavigation();
+            _closeHelpPanelPending = true;
         }
 
         private void ToggleSizePanel()
         {
             if (_dragging) return;
+            if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
             if (_sizePanelOpen) { RequestCloseSizePanel(); return; }
             CancelNavigation();
             _pressBlocked = _pressCancelled = true;
@@ -636,16 +695,25 @@ namespace TransformHandles.Samples.ModularBuilding
 
         private void ApplyDeferredPanelClose()
         {
-            if (!_closeSizePanelPending) return;
-            _closeSizePanelPending = _sizePanelOpen = false;
-            _selectionCard.gameObject.SetActive(false);
-            _sizeBackdrop.gameObject.SetActive(false);
+            if (_closeSizePanelPending)
+            {
+                _closeSizePanelPending = _sizePanelOpen = false;
+                _selectionCard.gameObject.SetActive(false);
+                _sizeBackdrop.gameObject.SetActive(false);
+            }
+            if (_closeHelpPanelPending)
+            {
+                _closeHelpPanelPending = _helpPanelOpen = false;
+                _helpCard.gameObject.SetActive(false);
+                _helpBackdrop.gameObject.SetActive(false);
+            }
         }
 
         private void HandleEscape(int frame)
         {
             if (SuppressShortcuts(frame)) return;
             if (_sizePanelOpen) RequestCloseSizePanel();
+            else if (_helpPanelOpen) RequestCloseHelpPanel();
             else ClearSelection();
         }
 
@@ -812,24 +880,32 @@ namespace TransformHandles.Samples.ModularBuilding
             _sizeSlider.interactable = !_dragging;
             _sizeInput.interactable = !_dragging;
             var selectionName = _selection.Count == 1 && _selection[0] != null ? _selection[0].name : "";
-            var state = $"{selectionName}|{_mode}|{_dragging}|{_handle != null}|{_notice}|{_handleSizePixels}|{_sizePanelOpen}";
+            var state = $"{selectionName}|{_mode}|{_dragging}|{_handle != null}|{_notice}|{_handleSizePixels}|{_sizePanelOpen}|{_helpPanelOpen}";
             if (_uiState == state) return;
             _uiState = state;
-            SetSelectionLabel(_selection.Count == 0 ? "No selection" : selectionName);
-            _contextBar.gameObject.SetActive(_selection.Count > 0);
+            var selected = _selection.Count > 0;
+            _contextBar.sizeDelta = selected ? new Vector2(600, 72) : new Vector2(340, 56);
+            _selectionLabel.rectTransform.sizeDelta = selected ? new Vector2(210, 52) : new Vector2(304, 36);
+            _selectionLabel.alignment = selected ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
+            SetSelectionLabel(selected ? selectionName : "Select a wall or corner");
+            _modeLabel.gameObject.SetActive(selected);
+            _constraintLabel.gameObject.SetActive(selected);
+            _contextSeparator.gameObject.SetActive(selected);
             _modeLabel.text = _mode == HandleType.Position ? "Move" : "Rotate";
             foreach (var button in _buttons) button.interactable = !_dragging && _handle != null;
             _resetButton.interactable = !_dragging;
             _sizeToggleButton.interactable = !_dragging;
             _sizeCloseButton.interactable = true;
+            _helpToggleButton.interactable = !_dragging;
+            _helpCloseButton.interactable = true;
             _sizeToggleButton.GetComponentInChildren<Text>().text = "Handle size · " + _handleSizePixels + " px";
             StyleButton(_moveButton, _mode == HandleType.Position);
             StyleButton(_rotateButton, _mode == HandleType.Rotation);
             StyleButton(_resetButton, false);
             StyleButton(_sizeToggleButton, _sizePanelOpen);
             StyleButton(_sizeCloseButton, false);
-            _snapLabel.text = "Supplied modules · Overlaps allowed · Reset to start again";
-            _snapLabel.supportRichText = false;
+            StyleButton(_helpToggleButton, _helpPanelOpen);
+            StyleButton(_helpCloseButton, false);
             _status.text = _notice;
         }
         private static void StyleButton(Button button, bool active)
