@@ -85,7 +85,9 @@ namespace TransformHandles.Tests.Editor
                 Assert.That(material.GetFloat("_PlaneBorderWidth"), Is.InRange(.02f, .06f));
                 Assert.That(material.GetFloat("_PlaneBorderOpacity"), Is.GreaterThan(.9f));
                 Assert.That(material.color.a, Is.InRange(.3f, .4f));
-                Assert.AreEqual(material.color, new SerializedObject(plane).FindProperty("defaultColor").colorValue);
+                var serializedColor = new SerializedObject(plane).FindProperty("defaultColor").colorValue;
+                Assert.That(Vector4.Distance(material.color, serializedColor), Is.LessThan(.000001f),
+                    material.name + " must preserve all RGBA channels within float import precision.");
             }
             var settings = TransformHandleSettings.CreateDefault();
             try { Assert.IsFalse(settings.PreserveHandleColorOnHover); }

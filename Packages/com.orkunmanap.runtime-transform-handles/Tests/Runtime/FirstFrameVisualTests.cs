@@ -5,6 +5,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 namespace TransformHandles.Tests
@@ -211,28 +212,54 @@ namespace TransformHandles.Tests
         {
             var target = NewObject("Late target", new Vector3(5, 2, 8)).transform;
             var creator = NewObject("Late creator", Vector3.zero).AddComponent<LateVisualCreator>();
-            creator.Create = () => _manager.CreateHandle(target);
+            var previousTexture = _camera.targetTexture;
+            var renderTexture = new RenderTexture(64, 64, 24);
+            _camera.targetTexture = renderTexture;
+            Handle prepared = null;
+            var creationFrame = -1;
+            var observedFrame = -1;
             var observed = false;
-            Camera.CameraCallback callback = camera =>
+            creator.Create = () =>
             {
-                if (camera != _camera || creator.Created == null) return;
-                AssertVisual(creator.Created, target.position, Quaternion.identity);
-                observed = true;
+                creationFrame = Time.frameCount;
+                prepared = _manager.CreateHandle(target);
+                // Batch mode can omit a Game View render. Built-in supports explicit rendering
+                // here, in the same LateUpdate, before another frame can repair a stale root.
+                if (GraphicsSettings.currentRenderPipeline == null) _camera.Render();
+                return prepared;
             };
-            Camera.onPreRender += callback;
+            Action<Camera> observe = camera =>
+            {
+                if (camera != _camera || prepared == null || observed) return;
+                observed = true;
+                observedFrame = Time.frameCount;
+                AssertVisual(prepared, target.position, Quaternion.identity);
+            };
+            Camera.CameraCallback builtinCallback = camera => observe(camera);
+            Action<ScriptableRenderContext, Camera> srpCallback = (context, camera) => observe(camera);
+            Camera.onPreRender += builtinCallback;
+            RenderPipelineManager.beginCameraRendering += srpCallback;
             try
             {
                 yield return null;
                 Assert.IsNotNull(creator.Created);
-                // Explicit rendering works in a graphics-enabled batch player without WaitForEndOfFrame.
-                if (!observed) _camera.Render();
-                Assert.IsTrue(observed, "A real Built-in camera render must observe the first prepared handle.");
+                Assert.IsTrue(observed, "A real camera-render callback must observe the first prepared handle.");
+                Assert.AreEqual(creationFrame, observedFrame,
+                    "The first render must observe the creation frame before another LateUpdate can repair it.");
                 var first = creator.Created.transform.position;
                 yield return null;
                 Assert.AreEqual(first, creator.Created.transform.position);
             }
-            finally { Camera.onPreRender -= callback; }
+            finally
+            {
+                Camera.onPreRender -= builtinCallback;
+                RenderPipelineManager.beginCameraRendering -= srpCallback;
+                _camera.targetTexture = previousTexture;
+                renderTexture.Release();
+                Object.DestroyImmediate(renderTexture);
+            }
         }
+
     }
 
     public sealed class DetachingVisualHandle : Handle
