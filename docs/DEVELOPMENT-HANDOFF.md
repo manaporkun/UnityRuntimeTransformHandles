@@ -52,7 +52,7 @@ Done when: a new consumer can install Core alone or opt into the demos without h
 - [x] Keep README, API docs, changelogs and migration notes aligned with the final release scope.
 - [x] Run the repository's local gates from the final revision. Follow `ci/README.md` for exact-suite evidence; a successful Unity process alone is insufficient.
 - [x] Obtain independent final review and address findings before presenting the diff to the owner.
-- [ ] Prepare a Conventional Commit PR title and concise description explaining Core/optional-Demos distribution, behavior changes and validation; flag the distribution breaking change.
+- [x] Prepare a Conventional Commit PR title and concise description explaining Core/optional-Demos distribution, behavior changes and validation; flag the distribution breaking change.
 - [ ] Verify actual remote CI status for the final PR revision and resolve failures before marking it ready. Remote CI success has not been established in this handoff.
 - [ ] Obtain approval before merge or release; inspect main-branch publishing workflows before taking either action.
 
@@ -70,7 +70,7 @@ Done when: the reviewed final revision has green required checks, accurate relea
 
 Done when: the submission package and media accurately represent the tested product, and the owner has approved the final presentation.
 
-**Next acceptance gates:** confirm remote checks for the final draft PR revision, complete the physical Mac trackpad check and obtain owner review. Do not merge, publish or start another demo.
+**Next acceptance gates:** confirm the final revision checks on [draft PR](https://github.com/manaporkun/UnityRuntimeTransformHandles/pull/53), complete the physical Mac trackpad check and obtain owner review. Do not merge, publish or start another demo.
 
 ### Release plan approved; implementation validated locally
 
@@ -146,7 +146,7 @@ URP development diagnostic record. Physical trackpad remains open.
 Disposable artifacts, consumers, XML/logs, per-run verification and screenshots live under
 `/tmp/rth-release-final-qc-20261025-r3`. The commands and acceptance contract are in
 [release preparation](RELEASE-PREPARATION.md) and `ci/README.md`. Local success is not remote CI
-success; consult the final draft PR's actual checks. No merge, public deployment or release occurred.
+success; consult the [draft PR's actual checks](https://github.com/manaporkun/UnityRuntimeTransformHandles/pull/53/checks). The PR uses a breaking Conventional Commit title and remains draft for owner acceptance. No merge, public deployment or release occurred.
 
 ## Previous checkpoint: Lamp Assembly (2026-10-25)
 
