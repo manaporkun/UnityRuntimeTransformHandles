@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+
+- Added the independent Product Configurator sample: composite desktop products, constrained group transforms, atomic bounded placement, finish choices and Demo Browser integration.
 - Shared white UI Toolkit presentation across all workspaces: common header navigation, scrollable inspector, Help, typography and pixel-size controls.
 - Showcase advanced-tool foldouts, owned-only reset/clear behavior, a separate input-test region and standalone input/lifecycle regressions.
 - Canonical demo stylesheet synchronization and CI drift checks while retaining independent sample imports.

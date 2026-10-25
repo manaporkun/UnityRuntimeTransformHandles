@@ -87,6 +87,8 @@ namespace TransformHandles.Samples.DemoBrowser
             AddCard(paths, "ModularBuilding", "01", "Modular workshop", "Build a wall study", "Arrange walls and corners on a one-unit grid. Move and turn each piece.");
             AddCard(paths, "LevelEditor", "02", "Prop workshop", "Compose a small scene", "Select several props. Explore World and Local movement, rotation and scale.");
             AddCard(paths, "RuntimeTransformHandlesDemo", "03", "Handle showcase", "Explore every tool", "Try handle types, axis constraints, snapping and interaction events.");
+            AddCard(paths, "ProductConfigurator", "04", "Product configurator", "Make the desk your own", "Arrange a monitor, lamp and tray. Explore surface constraints and finish choices.");
+            _cards.EnableInClassList("many-workspaces", _availablePaths.Count > 3);
             _status.text = _availablePaths.Count == 0
                 ? "No demo scenes in this build. Import a demo and add its scene to Build Settings."
                 : "Choose a workspace. Returning here resets that demo’s scene.";

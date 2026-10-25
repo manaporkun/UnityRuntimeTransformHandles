@@ -33,6 +33,11 @@
       "path": "Samples~/ModularBuilding"
     },
     {
+      "displayName": "Product Configurator",
+      "description": "Arrange desktop products with bounded planar placement, group transforms and finish choices.",
+      "path": "Samples~/ProductConfigurator"
+    },
+    {
       "displayName": "Demo Browser",
       "description": "A single entry point for all imported demo scenes, with an optional UI Toolkit gallery.",
       "path": "Samples~/DemoBrowser"

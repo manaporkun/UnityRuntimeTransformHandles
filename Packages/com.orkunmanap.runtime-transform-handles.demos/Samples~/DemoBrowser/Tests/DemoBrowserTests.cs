@@ -33,7 +33,7 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
         {
             var previous = UnityEditor.EditorBuildSettings.scenes;
             UnityEditor.SessionState.SetString(BackupKey, string.Join("\n", previous.Select(scene => (scene.enabled ? "1" : "0") + scene.path)));
-            UnityEditor.EditorBuildSettings.scenes = new[] { "DemoBrowser", "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo" }
+            UnityEditor.EditorBuildSettings.scenes = new[] { "DemoBrowser", "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo", "ProductConfigurator" }
                 .Select(FindScene).Where(path => !string.IsNullOrEmpty(path))
                 .Select(path => new UnityEditor.EditorBuildSettingsScene(path, true)).ToArray();
         }
@@ -69,7 +69,7 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
             Assert.NotNull(browser);
             var root = browser.GetComponentInChildren<UIDocument>().rootVisualElement;
             var paths = Enumerable.Range(0, SceneManager.sceneCountInBuildSettings).Select(SceneUtility.GetScenePathByBuildIndex).ToArray();
-            int expected = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo" }
+            int expected = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo", "ProductConfigurator" }
                 .Count(name => DemoBrowser.ResolveScenePath(paths, name) != null);
             Assert.AreEqual(expected, root.Q("cards").childCount);
             if (expected == 0)
@@ -80,9 +80,9 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
         [UnityTest]
         public IEnumerator RepeatedTransitionsReleaseManagersAndKeepOneEventSystem()
         {
-            var names = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo" };
+            var names = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo", "ProductConfigurator" };
             var paths = names.Select(FindScene).ToArray();
-            if (paths.Any(string.IsNullOrEmpty)) Assert.Ignore("Import all three optional demos to exercise scene transitions.");
+            if (paths.Any(string.IsNullOrEmpty)) Assert.Ignore("Import all four optional demos to exercise scene transitions.");
             yield return SceneManager.LoadSceneAsync(_browserPath);
             yield return null;
             var browser = UnityEngine.Object.FindObjectOfType<DemoBrowser>();
@@ -98,7 +98,7 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
                 Assert.NotNull(Camera.main);
                 // Leave with a selected target and an active Core interaction, not an empty scene.
                 var controller = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>()
-                    .First(item => item.GetType().Name == "ModularBuildingDemo" || item.GetType().Name == "LevelEditorDemo" || item.GetType().Name == "HandleDemo");
+                    .First(item => item.GetType().Name == "ModularBuildingDemo" || item.GetType().Name == "LevelEditorDemo" || item.GetType().Name == "HandleDemo" || item.GetType().Name == "ProductConfiguratorDemo");
                 var type = controller.GetType();
                 var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
                 var field = type.GetField("targets", flags) ?? type.GetField("modules", flags);
@@ -107,6 +107,13 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
                     var target = ((Transform[])field.GetValue(controller))[0];
                     var select = type.GetMethod("SelectTarget", flags);
                     select.Invoke(controller, select.GetParameters().Length == 1 ? new object[] { target } : new object[] { target, false });
+                }
+                else if (type.Name == "ProductConfiguratorDemo")
+                {
+                    var parts = (System.Array)type.GetField("products", flags).GetValue(controller);
+                    var part = parts.GetValue(0);
+                    var target = (Transform)part.GetType().GetField("root").GetValue(part);
+                    type.GetMethod("SelectTarget", flags).Invoke(controller, new object[] { target, false });
                 }
                 else type.GetMethod("SelectSingle", flags).Invoke(controller, new object[] { GameObject.Find("Target_0").transform });
                 yield return null;
@@ -154,7 +161,7 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
         [UnityTest]
         public IEnumerator RestoresBorrowedManagerWithoutDestroyingItsOwner()
         {
-            var paths = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo" }.Select(FindScene).ToArray();
+            var paths = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo", "ProductConfigurator" }.Select(FindScene).ToArray();
             if (paths.Any(string.IsNullOrEmpty)) Assert.Ignore("Import all workspaces for borrowed-manager coverage.");
             var owner = new GameObject("Borrowed manager camera");
             UnityEngine.Object.DontDestroyOnLoad(owner);
@@ -273,7 +280,7 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
         [UnityTest]
         public IEnumerator HeaderNavigationRebindsAfterEveryControllerReenable()
         {
-            var paths = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo" }.Select(FindScene).ToArray();
+            var paths = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo", "ProductConfigurator" }.Select(FindScene).ToArray();
             if (paths.Any(string.IsNullOrEmpty)) Assert.Ignore("Import all workspaces for header lifecycle coverage.");
             yield return SceneManager.LoadSceneAsync(_browserPath);
             yield return null;
@@ -282,7 +289,7 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
             {
                 browser.OpenDemo(path); yield return WaitForScene(path, browser);
                 var controller = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>().Single(item =>
-                    item.GetType().Name == "ModularBuildingDemo" || item.GetType().Name == "LevelEditorDemo" || item.GetType().Name == "HandleDemo");
+                    item.GetType().Name == "ModularBuildingDemo" || item.GetType().Name == "LevelEditorDemo" || item.GetType().Name == "HandleDemo" || item.GetType().Name == "ProductConfiguratorDemo");
                 var document = UnityEngine.Object.FindObjectsOfType<UIDocument>().Single(doc => doc.rootVisualElement.Q<Button>("demo-gallery") != null);
                 var previous = document.rootVisualElement.Q<Button>("demo-gallery");
                 Assert.IsTrue(previous.ClassListContains("available"));

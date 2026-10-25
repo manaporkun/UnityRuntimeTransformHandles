@@ -66,3 +66,5 @@ Copyright (c) 2010 Google Corporation and (c) 2012 Red Hat, Inc.
 The complete license and reserved font names are included in each sample's `Fonts/LiberationSans - OFL.txt`.
 
 UI Toolkit is supplied by Unity; this package does not redistribute Unity engine code or built-in theme resources.
+
+Product Configurator includes the same sample-local Liberation Sans font under its bundled OFL license in `Samples~/ProductConfigurator/Fonts/LiberationSans - OFL.txt`. Its product meshes and materials are authored for this repository.

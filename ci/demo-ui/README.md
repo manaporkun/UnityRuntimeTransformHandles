@@ -1,6 +1,6 @@
 # Shared demo presentation
 
-`DemoTheme.uss` is the canonical style source for the four optional samples. It defines the workspace header, scrollable inspector, typography, tools, Help and input states. Scenario UXML and small scenario-specific styles stay in their own samples. Workspace classes are scoped under `.demo-shell`; the gallery uses `.demo-gallery`.
+`DemoTheme.uss` is the canonical style source for the five optional samples. It defines the workspace header, scrollable inspector, typography, tools, Help and input states. Scenario UXML and small scenario-specific styles stay in their own samples. Workspace classes are scoped under `.demo-shell`; the gallery uses `.demo-gallery`.
 
 After changing the canonical theme, run:
 

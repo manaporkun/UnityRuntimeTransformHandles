@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SAMPLES = ('Demo', 'LevelEditor', 'ModularBuilding', 'DemoBrowser')
+SAMPLES = ('Demo', 'LevelEditor', 'ModularBuilding', 'DemoBrowser', 'ProductConfigurator')
 
 
 def sync(root=ROOT, check=False):
@@ -25,4 +25,4 @@ if __name__ == '__main__':
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     sync(check=args.check)
-    print('PASS: shared theme matches all four independent samples')
+    print('PASS: shared theme matches all five independent samples')

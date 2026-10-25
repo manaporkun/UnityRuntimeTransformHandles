@@ -86,12 +86,13 @@
 /* Keep runtime controls consistent with the workspace, including narrow panels. */
 .demo-shell .tools .tool-icon { flex-shrink: 0; }
 .demo-shell .tool-button { font-size: 16px; }
-.demo-shell .inspector .unity-scroller--vertical { width: 10px; min-width: 10px; margin: 12px 4px 12px 0; background-color: transparent; }
+.demo-gallery .unity-scroller--vertical, .demo-shell .inspector .unity-scroller--vertical { width: 10px; min-width: 10px; margin: 12px 4px 12px 0; background-color: transparent; }
+.demo-gallery .unity-scroller__low-button, .demo-gallery .unity-scroller__high-button,
 .demo-shell .inspector .unity-scroller__low-button,
 .demo-shell .inspector .unity-scroller__high-button { display: none; }
-.demo-shell .inspector .unity-scroller .unity-base-slider__tracker { border-width: 0; background-color: transparent; }
-.demo-shell .inspector .unity-scroller .unity-base-slider__dragger { width: 6px; min-width: 6px; margin-left: 0; margin-right: 0; border-width: 0; border-radius: 4px; background-color: rgb(211, 216, 224); }
-.demo-shell .inspector .unity-scroller .unity-base-slider__dragger:hover { background-color: rgb(165, 175, 190); }
+.demo-gallery .unity-scroller .unity-base-slider__tracker, .demo-shell .inspector .unity-scroller .unity-base-slider__tracker { border-width: 0; background-color: transparent; }
+.demo-gallery .unity-scroller .unity-base-slider__dragger, .demo-shell .inspector .unity-scroller .unity-base-slider__dragger { width: 6px; min-width: 6px; margin-left: 0; margin-right: 0; border-width: 0; border-radius: 4px; background-color: rgb(211, 216, 224); }
+.demo-gallery .unity-scroller .unity-base-slider__dragger:hover, .demo-shell .inspector .unity-scroller .unity-base-slider__dragger:hover { background-color: rgb(165, 175, 190); }
 .demo-shell Toggle > .unity-base-field__label { min-width: 0; flex-shrink: 1; flex-grow: 1; white-space: normal; margin-right: 10px; }
 .demo-shell Toggle > .unity-base-field__input { flex-shrink: 0; }
 .demo-shell Toggle .unity-toggle__checkmark { width: 20px; height: 20px; border-radius: 5px; border-width: 1px; border-color: rgb(196, 204, 216); background-color: rgb(249, 250, 252); }

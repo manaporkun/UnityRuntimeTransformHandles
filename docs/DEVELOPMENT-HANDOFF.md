@@ -2,7 +2,21 @@
 
 This branch is a development checkpoint, not a published package release. It contains the accumulated lifecycle fixes, Precision visuals, optional-package split, Level Editor UI/input work and group transforms. Continue from this branch rather than rebuilding the changes from older task branches.
 
-## Latest checkpoint: consistent demo workspaces (2026-10-25)
+## Latest checkpoint: Product Configurator (2026-10-25)
+
+The new independently imported `Samples~/ProductConfigurator` adds a beveled desktop, monitor, lamp and accessory tray with a sample-local pipeline-independent material/shader setup. It is the fourth workspace and fifth optional sample. Core remains unchanged. The scene can be used alone or opened through Demo Browser; the combined build imports it, and separate `PrepareProductConfiguratorWebGL` / `BuildProductConfiguratorWebGL` repository-host helpers are available.
+
+The controller follows the Modular Building lifecycle and Level Editor group selection. Product records contain root/name/finish-renderer references; cached child mesh bounds define conservative full-product surface containment. Movement is constrained to XZ, rotation to Y, with World/Local movement axes and last-selected group reference. There is no Scale or snapping. Groups rotate around the mean of product roots. Finish choices affect designated bodies only, preserve fixed detail materials and survive disable/re-enable. Reset restores layout, finishes and camera/tool defaults while keeping pixel-size preference.
+
+An invalid release restores every selected product to its drag-start pose. Interrupted interactions cancel even when their last preview was valid; manager disable/navigation, focus loss and destroyed selection members restore survivors. Handle callbacks are detached before removal to avoid recursive cancellation. Controls never destroy handles owned by another controller. Bounds/settings/model validation is sample-local. The scene assumes a fixed horizontal desk and unparented unit-scale yaw-only product roots; collision solving, stacking, runtime geometry changes, catalog/spawning, saving, Undo and mobile controls remain out of scope.
+
+Shared-theme copies now cover five samples. The gallery uses two columns for four installed workspaces, and its scrollbars use the shared visual language. Placement feedback stays beside the selection above scrolling settings. Sample-local assets and scroll-bridge symbols preserve independent imports.
+
+Validation: all imported sample tests pass 115/115 on Unity 2021.3.0f1 Legacy, 115/115 on Unity 6000.3.16f1 Legacy and 118/118 on Unity 6000.3.16f1 Input System. The isolated Product Configurator 2021 import passes 22/22, including actual Core group translation/yaw, manager-owned cancellation, atomic bounds rollback, real supplied-scene geometry and material lifetime. Python CI tests (31), five-sample boundaries, theme drift, minimum API/meta and all three scroll bridges pass. Results are local, not a claim of remote CI success.
+
+The combined WebGL player was checked at 1440×900 and Retina 960×640: four-card gallery, composite selection, finish changes and the mixed-selection indicator, actual group yaw, invalid placement preview and rollback, Help dismissal and gallery return. Browser error, page-error and failed-request arrays were empty. Existing URP hidden-shader diagnostics remain at log level. The standalone Product Configurator WebGL build also passes startup, rendering and selection checks with no browser errors; its Demos header slot is hidden. No physical Mac trackpad validation was performed.
+
+## Previous checkpoint: consistent demo workspaces (2026-10-25)
 
 All three workspaces now use UI Toolkit with the same white header, scrollable inspector, typography, transform controls, pixel-size field and Help presentation. Level Editor no longer creates a uGUI canvas; the original showcase no longer uses IMGUI. The Browser binds each scene's named `demo-gallery` header button, including after controller disable/re-enable. Standalone imports hide that slot. Core is unchanged.
 

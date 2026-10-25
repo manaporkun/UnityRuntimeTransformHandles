@@ -53,6 +53,18 @@ public static class BuildScript
             "Modular Building", "ModularBuilding", "ModularBuilding");
     }
 
+    public static void PrepareProductConfiguratorWebGL()
+    {
+        ResolveSampleScenePath("Product Configurator", "ProductConfigurator", "ProductConfigurator");
+        Debug.Log("Product Configurator imported. Run BuildProductConfiguratorWebGL in a new Editor invocation after compilation.");
+    }
+
+    public static void BuildProductConfiguratorWebGL()
+    {
+        BuildWebGL(GetCommandLineArgument("-buildPath") ?? "Build/ProductConfiguratorWebGL",
+            "Product Configurator", "ProductConfigurator", "ProductConfigurator");
+    }
+
     private static void BuildWebGL(string outputPath, string sampleName, string sampleFolder, string sceneName)
     {
         if (Application.isBatchMode && EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
@@ -80,7 +92,7 @@ public static class BuildScript
         if (Application.isBatchMode && EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
             throw new InvalidOperationException("Start Unity with -buildTarget WebGL before executing this build method.");
         var scenes = ResolveBrowserScenes();
-        foreach (var name in new[] { "DemoBrowser", "ModularBuilding", "LevelEditor", "Demo" })
+        foreach (var name in new[] { "DemoBrowser", "ModularBuilding", "LevelEditor", "Demo", "ProductConfigurator" })
             if (!AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == "TransformHandles.Samples." + name))
                 throw new InvalidOperationException("Run PrepareDemoBrowserWebGL, allow compilation, then build in a new Editor invocation.");
         BuildScenes(GetCommandLineArgument("-buildPath") ?? "Build/DemoBrowserWebGL", scenes);
@@ -93,7 +105,8 @@ public static class BuildScript
             ResolveSampleScenePath("Demo Browser", "DemoBrowser", "DemoBrowser"),
             ResolveSampleScenePath("Modular Building", "ModularBuilding", "ModularBuilding"),
             ResolveSampleScenePath("Level Editor", "LevelEditor", "LevelEditor"),
-            ResolveSampleScenePath("Runtime Transform Handles Demo", "Demo", "RuntimeTransformHandlesDemo")
+            ResolveSampleScenePath("Runtime Transform Handles Demo", "Demo", "RuntimeTransformHandlesDemo"),
+            ResolveSampleScenePath("Product Configurator", "ProductConfigurator", "ProductConfigurator")
         };
     }
 

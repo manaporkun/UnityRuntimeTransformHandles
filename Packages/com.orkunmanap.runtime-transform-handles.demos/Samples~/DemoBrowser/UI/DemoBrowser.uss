@@ -2,7 +2,7 @@
 * { -unity-font: url("../Fonts/LiberationSans.ttf"); color: rgb(38, 42, 49); }
 .gallery { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgb(246, 247, 249); }
 .gallery-scroll { flex-grow: 1; }
-.content { padding: 72px 48px 36px 48px; max-width: 1280px; align-self: center; width: 100%; }
+.content { padding: 48px 48px 28px 48px; max-width: 1280px; align-self: center; width: 100%; }
 .eyebrow { font-size: 14px; color: rgb(113, 119, 130); margin-bottom: 18px; }
 .heading { font-size: 44px; -unity-font-style: bold; margin-bottom: 14px; white-space: normal; }
 .intro { font-size: 20px; color: rgb(105, 111, 122); margin-bottom: 38px; white-space: normal; }
@@ -17,3 +17,11 @@
 #description { font-size: 18px; color: rgb(108, 115, 127); white-space: normal; flex-grow: 1; margin-bottom: 36px; }
 #open { font-size: 17px; color: rgb(44, 99, 169); white-space: normal; }
 .status { font-size: 16px; color: rgb(113, 119, 130); margin-top: 20px; white-space: normal; }
+
+/* Four installed workspaces form a balanced two-column gallery. */
+.many-workspaces .demo-card { flex-basis: 40%; padding: 22px; }
+.many-workspaces #number { margin-bottom: 12px; }
+.many-workspaces #title { font-size: 23px; margin-bottom: 8px; }
+.many-workspaces #subtitle { margin-bottom: 12px; }
+.many-workspaces #description { font-size: 17px; margin-bottom: 18px; }
+.many-workspaces #open { font-size: 16px; }

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-for (const sample of ['LevelEditor', 'ModularBuilding']) {
+for (const sample of ['LevelEditor', 'ModularBuilding', 'ProductConfigurator']) {
 const listeners = new Set();
 let registrations = 0;
 const canvas = {
@@ -58,18 +58,21 @@ const shared = { Module: { canvas: {
     addEventListener(_, listener) { active.add(listener); },
     removeEventListener(_, listener) { active.delete(listener); }
 }}, LibraryManager: { library: {} }, mergeInto: Object.assign };
-for (const sample of ['LevelEditor', 'ModularBuilding']) {
+for (const sample of ['LevelEditor', 'ModularBuilding', 'ProductConfigurator']) {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname,
         `../Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/${sample}/Plugins/${sample}Input.jslib`), 'utf8'), shared);
 }
 const both = shared.LibraryManager.library;
-assert.equal(Object.keys(both).length, 6);
-both.TH_LevelEditorReadScroll(); both.TH_ModularBuildingReadScroll();
-assert.equal(active.size, 2);
+assert.equal(Object.keys(both).length, 9);
+both.TH_LevelEditorReadScroll(); both.TH_ModularBuildingReadScroll(); both.TH_ProductConfiguratorReadScroll();
+assert.equal(active.size, 3);
 for (const listener of active) listener({deltaY: 50, deltaMode: 0});
 both.TH_LevelEditorReleaseScroll();
-assert.equal(active.size, 1);
+assert.equal(active.size, 2);
+assert.equal(both.TH_ProductConfiguratorReadScroll(), -.5);
 assert.equal(both.TH_ModularBuildingReadScroll(), -.5);
 both.TH_ModularBuildingReleaseScroll();
+assert.equal(active.size, 1);
+both.TH_ProductConfiguratorReleaseScroll();
 assert.equal(active.size, 0);
 console.log('PASS: co-import wheel symbols and cleanup are independent');

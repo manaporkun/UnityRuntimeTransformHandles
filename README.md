@@ -196,9 +196,13 @@ Existing imported Assets copies are user-owned; back up custom changes outside A
 
 ### Demo gallery
 
-All three workspaces use the same UI Toolkit header and scrollable inspector. **Demos** is in the header when running the combined player; **Reset scene** and **Help** stay in consistent positions. Advanced showcase tools and the event log remain available in foldouts.
+All four workspaces use the same UI Toolkit header and scrollable inspector. **Demos** is in the header when running the combined player; **Reset scene** and **Help** stay in consistent positions. Advanced showcase tools and the event log remain available in foldouts.
 
 Import the optional [Demo Browser](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/DemoBrowser/README.md) to open all included demo scenes from one UI Toolkit gallery. Each workspace has a Demos button to return; leaving resets that scene. The repository supports a combined WebGL build while preserving individual demo builds and independent sample imports.
+
+### Product Configurator sample
+
+The optional **Product Configurator** sample adds a desk collection with bounded placement, group movement/rotation and finish choices, using the common UI Toolkit design. It is available independently and through Demo Browser. See [sample instructions](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ProductConfigurator/README.md).
 
 ### Modular Building sample
 
