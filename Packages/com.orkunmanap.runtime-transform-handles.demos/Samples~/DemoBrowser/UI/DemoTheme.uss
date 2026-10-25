@@ -1,0 +1,103 @@
+.demo-shell {
+    flex-grow: 1;
+    color: rgb(43, 47, 54);
+    font-size: 20px;
+    -unity-font: url("../Fonts/LiberationSans.ttf");
+}
+.demo-shell Label { margin: 0; padding: 0; -unity-text-align: middle-left; }
+.demo-shell Button { margin: 0; border-width: 0; border-radius: 8px; padding: 0 16px; height: 44px; background-color: rgba(0, 0, 0, 0); color: rgb(71, 77, 87); -unity-font-style: normal; }
+.demo-shell Button:hover { background-color: rgb(241, 244, 248); }
+.demo-shell Button:active { background-color: rgb(226, 233, 242); }
+.demo-shell Button:focus { border-width: 1px; border-color: rgb(67, 120, 204); }
+.demo-shell Button:disabled { opacity: 0.42; }
+.demo-shell .header { height: 64px; padding: 0 24px; flex-direction: row; align-items: center; justify-content: space-between; background-color: rgb(255, 255, 255); border-bottom-width: 1px; border-bottom-color: rgb(226, 229, 234); }
+.demo-shell .identity, .demo-shell .header-actions { flex-direction: row; align-items: center; }
+.demo-shell .app-title { font-size: 24px; }
+.demo-shell .project-name { margin-left: 24px; color: rgb(115, 121, 132); font-size: 18px; }
+.demo-shell .header-actions Button { margin-left: 8px; }
+.demo-shell .inspector { position: absolute; top: 88px; left: 24px; width: 320px; bottom: 24px; padding: 0; background-color: rgb(255, 255, 255); border-width: 1px; border-color: rgb(224, 228, 234); border-radius: 12px; }
+.demo-shell .eyebrow { color: rgb(125, 132, 143); font-size: 16px; margin-bottom: 10px; }
+.demo-shell .selection-name { font-size: 25px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.demo-shell .description { white-space: normal; color: rgb(111, 119, 131); font-size: 18px; }
+.demo-shell .selection-hint { margin-top: 10px; min-height: 46px; }
+.demo-shell .tools { flex-direction: row; padding: 4px; margin-top: 22px; margin-bottom: 22px; background-color: rgb(245, 247, 250); border-radius: 9px; }
+.demo-shell .tool-button { flex-grow: 1; flex-basis: 0; padding: 0 4px; flex-direction: row; align-items: center; justify-content: center; height: 48px; font-size: 18px; }
+.demo-shell .tool-button.selected { color: rgb(36, 100, 196); background-color: rgb(230, 239, 253); }
+.demo-shell .tool-button.selected:hover { background-color: rgb(218, 233, 253); }
+.demo-shell .tool-icon { width: 20px; height: 20px; margin-right: 7px; -unity-background-image-tint-color: rgb(71, 77, 87); }
+.demo-shell .tool-button.selected .tool-icon { -unity-background-image-tint-color: rgb(36, 100, 196); }
+.demo-shell .constraints, .demo-shell .size-row, .demo-shell .range-labels, .demo-shell .help-row, .demo-shell .help-heading { flex-direction: row; justify-content: space-between; align-items: center; }
+.demo-shell .constraints { margin-top: 10px; font-size: 18px; }
+.demo-shell .muted { color: rgb(111, 119, 131); }
+.demo-shell .divider { height: 1px; margin-top: 24px; margin-bottom: 24px; background-color: rgb(231, 234, 239); }
+.demo-shell .section-title { font-size: 20px; }
+.demo-shell .size-value { flex-direction: row; align-items: center; height: 42px; border-width: 1px; border-color: rgb(219, 224, 232); border-radius: 7px; background-color: rgb(249, 250, 252); padding-right: 9px; }
+.demo-shell #size-input { width: 57px; margin: 0; padding: 0; }
+.demo-shell #size-input .unity-text-field__input { background-color: rgba(0, 0, 0, 0); border-width: 0; padding: 8px 3px 8px 6px; margin: 0; color: rgb(43, 47, 54); -unity-text-align: middle-right; }
+.demo-shell .size-value.editing { border-color: rgb(67, 120, 204); }
+.demo-shell .unit { font-size: 16px; color: rgb(111, 119, 131); }
+.demo-shell #size-slider { height: 32px; margin: 16px 0 0 0; }
+.demo-shell #size-slider .unity-base-slider__tracker { height: 4px; border-width: 0; background-color: rgb(222, 228, 238); border-radius: 2px; }
+.demo-shell #size-slider .unity-base-slider__dragger { width: 18px; height: 18px; border-radius: 9px; border-width: 0; background-color: rgb(36, 100, 196); }
+.demo-shell .range-labels { margin-top: 2px; color: rgb(125, 132, 143); font-size: 16px; }
+.demo-shell .size-hint { margin-top: 16px; }
+.demo-shell .help-backdrop { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.demo-shell .help-card { position: absolute; right: 24px; top: 80px; width: 340px; padding: 24px; background-color: rgb(255, 255, 255); border-width: 1px; border-color: rgb(224, 228, 234); border-radius: 12px; }
+.demo-shell .help-heading { margin-bottom: 16px; }
+.demo-shell .close-button { font-size: 26px; width: 36px; height: 36px; padding: 0; }
+.demo-shell .help-row { min-height: 38px; font-size: 18px; }
+.demo-shell .status { color: rgb(71, 77, 87); }
+.demo-shell .help-note { margin-top: 18px; }
+.demo-shell .hidden { display: none; }
+.demo-shell.compact .header { padding-left: 16px; padding-right: 16px; }
+.demo-shell.compact .project-name { display: none; }
+.demo-shell.compact .inspector { top: 80px; left: 16px; width: 300px; padding: 0; }
+.demo-shell.compact .help-card { right: 16px; }
+
+.demo-shell .inspector .unity-scroll-view__content-container { padding: 24px; }
+.demo-shell .inspector .unity-scroll-view__content-viewport { min-width: 0; }
+.demo-shell .inspector .unity-scroll-view__content-container > * { flex-shrink: 0; }
+.demo-shell .demo-gallery-link { display: none; margin-right: 16px; padding: 0 12px 0 0; color: rgb(111, 119, 131); }
+.demo-shell .demo-gallery-link.available { display: flex; }
+.demo-shell .header .identity { flex-shrink: 1; min-width: 0; }
+.demo-shell .header .app-title { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.demo-shell .header .header-actions { flex-shrink: 0; }
+.demo-shell .tools { flex-shrink: 0; }
+.demo-shell .tools .tool-icon { width: 18px; height: 18px; margin-right: 4px; }
+.demo-shell .constraint-button { height: 38px; padding: 0 10px; font-size: 18px; background-color: rgb(245, 247, 250); }
+.demo-shell .context-note { font-size: 16px; white-space: normal; color: rgb(111, 119, 131); margin-top: 14px; }
+.demo-shell .inspector-status { font-size: 16px; white-space: normal; color: rgb(111, 119, 131); margin-top: 20px; }
+.demo-shell Foldout { margin: 20px 0 0 0; padding: 0; font-size: 18px; }
+.demo-shell Foldout > Toggle { margin-bottom: 12px; }
+.demo-shell .unity-foldout__content { margin-left: 0; }
+.demo-shell .advanced-field { margin: 8px 0; font-size: 16px; flex-direction: column; align-items: stretch; }
+.demo-shell .advanced-field > .unity-base-field__label { margin: 0 0 8px 0; padding: 0; min-width: 0; white-space: normal; }
+.demo-shell .advanced-field > .unity-base-field__input { min-height: 32px; }
+.demo-shell Toggle { margin: 10px 0; font-size: 16px; white-space: normal; }
+.demo-shell .action-row { flex-direction: row; flex-wrap: wrap; margin-top: 14px; }
+.demo-shell .action-row Button { font-size: 16px; padding: 0 10px; }
+.demo-shell .event-log { font-size: 14px; white-space: normal; color: rgb(111, 119, 131); }
+.demo-shell .test-region { position: absolute; right: 24px; top: 88px; width: 300px; padding: 20px; border-width: 1px; border-color: rgb(219, 224, 232); border-radius: 12px; background-color: rgba(255,255,255,.9); }
+.demo-shell .test-region Label { white-space: normal; font-size: 16px; }
+.demo-shell .help-card { max-height: 80%; }
+.demo-shell .help-row Label { white-space: normal; flex-shrink: 1; }
+.demo-gallery { -unity-font: url("../Fonts/LiberationSans.ttf"); color: rgb(43,47,54); }
+
+/* Keep runtime controls consistent with the workspace, including narrow panels. */
+.demo-shell .tools .tool-icon { flex-shrink: 0; }
+.demo-shell .tool-button { font-size: 16px; }
+.demo-shell .inspector .unity-scroller--vertical { width: 10px; min-width: 10px; margin: 12px 4px 12px 0; background-color: transparent; }
+.demo-shell .inspector .unity-scroller__low-button,
+.demo-shell .inspector .unity-scroller__high-button { display: none; }
+.demo-shell .inspector .unity-scroller .unity-base-slider__tracker { border-width: 0; background-color: transparent; }
+.demo-shell .inspector .unity-scroller .unity-base-slider__dragger { width: 6px; min-width: 6px; margin-left: 0; margin-right: 0; border-width: 0; border-radius: 4px; background-color: rgb(211, 216, 224); }
+.demo-shell .inspector .unity-scroller .unity-base-slider__dragger:hover { background-color: rgb(165, 175, 190); }
+.demo-shell Toggle > .unity-base-field__label { min-width: 0; flex-shrink: 1; flex-grow: 1; white-space: normal; margin-right: 10px; }
+.demo-shell Toggle > .unity-base-field__input { flex-shrink: 0; }
+.demo-shell Toggle .unity-toggle__checkmark { width: 20px; height: 20px; border-radius: 5px; border-width: 1px; border-color: rgb(196, 204, 216); background-color: rgb(249, 250, 252); }
+.demo-shell Toggle:checked .unity-toggle__checkmark { background-color: rgb(230, 239, 253); border-color: rgb(67, 120, 204); -unity-background-image-tint-color: rgb(36, 100, 196); }
+.demo-shell Foldout > Toggle .unity-toggle__checkmark { border-width: 0; background-color: transparent; }
+.demo-shell .advanced-field .unity-base-popup-field__input { padding: 6px 10px; border-width: 1px; border-color: rgb(219, 224, 232); border-radius: 7px; background-color: rgb(249, 250, 252); color: rgb(43, 47, 54); }
+.demo-shell .advanced-field .unity-base-popup-field__input:focus { border-color: rgb(67, 120, 204); }
+.demo-shell .advanced-field .unity-base-slider__tracker { height: 4px; border-width: 0; border-radius: 2px; background-color: rgb(222, 228, 238); }
+.demo-shell .advanced-field .unity-base-slider__dragger { width: 16px; height: 16px; border-width: 0; border-radius: 8px; background-color: rgb(36, 100, 196); }

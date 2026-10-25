@@ -2,7 +2,7 @@
 
 Optional examples for Runtime Transform Handles. Core does not depend on this package.
 Import **Level Editor** for the Prop Workshop: select, move, rotate, scale and reset six props, with World/Local group movement and rotation, plus shared-center uniform group scaling. Import **Modular Building** for a wall-and-corner arrangement scene with a fixed 1-unit horizontal grid, 90-degree yaw, Reset and the same camera/handle-size controls. The three workspaces are separate imports through Package Manager > Samples. Import **[Demo Browser](Samples~/DemoBrowser/README.md)** as an optional fourth sample to navigate between included workspaces in one player. Returning to the gallery resets the departed workspace.
-The original showcase's known URP magenta targets, stale shortcut HUD and shader diagnostics are not fixed by relocation.
+The workspaces share a white UI Toolkit header, scrollable inspector, Help panel and pixel-size control. Showcase-only tools live in foldouts. The showcase uses a pipeline-independent target material.
 
 ## Install
 
@@ -27,8 +27,8 @@ before publishing. Core-only installs can continue using the existing Core #upm 
 Select **Runtime Transform Handles Demos** in Package Manager and import the desired sample.
 Run **Tools > Transform Handles > Setup Layer** before Play. No URP or Input System dependency is
 added by this package; UI dependencies belong to demos, not Core.
-**Modular Building** uses built-in UI Toolkit with a sample-local UXML/USS layout and font.
-It does not require TextMeshPro or an Essential Resources import. See its
+All four samples use built-in UI Toolkit with sample-local UXML/USS layouts and fonts.
+They do not require TextMeshPro or an Essential Resources import. See its
 [setup instructions](Samples~/ModularBuilding/README.md).
 
 ## Migrate an existing showcase

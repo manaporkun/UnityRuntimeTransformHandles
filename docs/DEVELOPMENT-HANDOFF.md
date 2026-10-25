@@ -2,7 +2,19 @@
 
 This branch is a development checkpoint, not a published package release. It contains the accumulated lifecycle fixes, Precision visuals, optional-package split, Level Editor UI/input work and group transforms. Continue from this branch rather than rebuilding the changes from older task branches.
 
-## Latest checkpoint: Demo Browser (2026-10-25)
+## Latest checkpoint: consistent demo workspaces (2026-10-25)
+
+All three workspaces now use UI Toolkit with the same white header, scrollable inspector, typography, transform controls, pixel-size field and Help presentation. Level Editor no longer creates a uGUI canvas; the original showcase no longer uses IMGUI. The Browser binds each scene's named `demo-gallery` header button, including after controller disable/re-enable. Standalone imports hide that slot. Core is unchanged.
+
+The canonical stylesheet is `ci/demo-ui/DemoTheme.uss`. Run `python3 ci/sync-demo-ui.py` after editing it; CI checks that all four independent sample copies match. Local layouts, fonts, icons and panel settings keep every sample independently importable. See `ci/demo-ui/README.md` for the header-slot contract. This updates package sources, never consumer-owned imported Assets.
+
+Showcase keeps its advanced handle types, axis masks, snapping, runtime settings and event log in foldouts. Pixel size is separate from its original scale multiplier. Reset restores owned target poses and tool/camera defaults, preserves pixel preference and never destroys another controller's handles. Only the explicit test region can bypass UI blocking; normal controls and Help consume their entire gesture. Existing Level Editor multi-selection and World/Local transform behavior remain covered.
+
+The full sample suite passes 93/93 on Unity 2021.3.0f1 Legacy, 93/93 on Unity 6000.3.16f1 Legacy, and 96/96 on Unity 6000.3.16f1 Input System. Clean independent 2021 imports pass Showcase 5/5, Level Editor 45/45, Modular Building 36/36, and Browser's three applicable gallery tests. All 31 Python CI tests pass. New tests cover scene-header rebinding, pixel input cancellation, owned-only reset, actual camera movement, settings/scale interaction and UI gesture ownership.
+
+The combined WebGL build was checked in Chromium at 1440×900 and Retina 960×640. The shared layouts, advanced dropdowns, inspector wheel/scrollbar dragging, Help dismissal and scene-header navigation render and respond correctly. Automated Unity tests cover text focus and the bypassable test-region gesture rules. No physical Mac trackpad validation was performed.
+
+## Previous checkpoint: Demo Browser (2026-10-25)
 
 The optional `DemoBrowser` sample adds a UI Toolkit gallery for Modular Building, Level Editor and the original showcase. Start its scene first and include the desired demo scenes in Build Settings. Cards resolve unique full scene paths from the build; missing demos are omitted. No cross-sample assembly or asset references were introduced, and Core is unchanged.
 
@@ -22,7 +34,7 @@ The combined WebGL build passes Chromium checks at 1440×900 and Retina 960×640
 - Optional demos: `Packages/com.orkunmanap.runtime-transform-handles.demos`. Independently importable original feature showcase, Level Editor, Modular Building and Demo Browser under `Samples~`. Keep application-specific UI and scenario rules here.
 - Level Editor: Shift-click toggles members; Move/Rotate use World or Local axes. Local references the last selected surviving object. Rotation uses the shared mean of object pivots. Group Scale exposes the center only and scales object sizes and pivot offsets together. Single-object scaling retains axis controls.
 - `Handle.LocalSpaceReference` and `Handle.UniformGroupScale` are opt-in Core controls. Uniform group scaling requires a pure Scale handle, multiple targets and XYZ axes; partial masks disable its controls. Defaults preserve existing consumer behavior. See Core README/API docs for details.
-- Left drag orbits, right drag pans, scroll zooms. UI and handle gestures consume selection/camera input. Level Editor uses a size popover; Modular Building exposes the same size controls in its UI Toolkit inspector. Both support 64–512 rendering pixels, default 192; Retina pixel ratio is not silently folded into that value.
+- Left drag orbits, right drag pans, scroll zooms. UI and handle gestures consume selection/camera input. All three demos expose size controls in their UI Toolkit inspectors. They support 64–512 rendering pixels, default 192; Retina pixel ratio is not silently folded into that value.
 - Precision handles keep axis-colored hover and picking volumes. Native remains available. Handle creation synchronizes visuals immediately to avoid an origin-to-target flash.
 - Ownership, target destruction, disable/re-enable, callback reentrancy and Editor session restoration have regression coverage. Re-enabling a GameObject inside its OnDisable callback is unsupported by Unity; defer activation until the next frame. Component.enabled reactivation is separately covered.
 

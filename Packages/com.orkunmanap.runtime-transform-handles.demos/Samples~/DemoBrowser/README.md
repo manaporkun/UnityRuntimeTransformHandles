@@ -6,11 +6,11 @@ An optional UI Toolkit gallery for opening the three demo workspaces in one play
 
 1. Add `DemoBrowser.unity` and your imported demo scenes to the enabled scenes in Build Settings (Build Profiles in Unity 6).
 2. Open `DemoBrowser.unity` and enter Play Mode.
-3. Open a workspace. Use **Demos** in the lower-right corner to return to the gallery. Returning discards that workspace's changes.
+3. Open a workspace. Use **Demos** in the header to return to the gallery. Returning discards that workspace's changes.
 
 The gallery shows only included scenes named `ModularBuilding`, `LevelEditor`, or `RuntimeTransformHandlesDemo`. It resolves their full build paths, supports custom import folders, and rejects duplicate filenames rather than opening an arbitrary match. Keep these scene filenames when relocating samples. With no demo scenes included, it shows setup guidance.
 
-The Browser owns a persistent UI document and EventSystem. Demo scenes load individually; the gallery scene separates successive workspaces so the previous workspace's handles and manager finish their cleanup. Navigation claims its mouse press before the handle manager processes input, including when the showcase's UI test toggle is off. A navigation press cancels an active handle drag. It does not change the underlying standalone demo controls.
+The Browser owns a persistent gallery document and EventSystem. Each workspace declares the same `demo-gallery` header button; the Browser binds that slot and detects rebuilt UI trees after controller re-enable. Standalone samples hide the slot. Demo scenes load individually; the gallery scene separates successive workspaces so the previous workspace's handles and manager finish their cleanup. Navigation claims its mouse press before the handle manager processes input, including when the showcase's UI test toggle is off. A navigation press cancels an active handle drag. It does not change the underlying standalone demo controls.
 
 ## Build all demos from this repository
 

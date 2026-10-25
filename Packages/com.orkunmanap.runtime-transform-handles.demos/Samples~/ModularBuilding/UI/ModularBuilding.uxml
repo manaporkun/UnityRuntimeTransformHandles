@@ -1,8 +1,9 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="ModularBuilding.uss" />
-    <ui:VisualElement name="workshop" class="workshop" picking-mode="Ignore">
+    <ui:VisualElement name="workshop" class="demo-shell" picking-mode="Ignore">
         <ui:VisualElement name="header" class="header">
             <ui:VisualElement class="identity" picking-mode="Ignore">
+                <ui:Button name="demo-gallery" text="‹ Demos" class="demo-gallery-link" />
                 <ui:Label text="Modular workshop" class="app-title" />
                 <ui:Label text="Wall study" class="project-name" />
             </ui:VisualElement>
@@ -11,7 +12,7 @@
                 <ui:Button name="help-toggle" text="Help" class="quiet-button" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="inspector" class="inspector">
+        <ui:ScrollView name="inspector" class="inspector" horizontal-scroller-visibility="Hidden">
             <ui:Label text="SELECTION" class="eyebrow" />
             <ui:Label name="selection-name" text="Select a module" class="selection-name" />
             <ui:Label name="selection-hint" text="Click a wall or corner in the scene." class="description selection-hint" />
@@ -44,7 +45,7 @@
                 <ui:Label text="64" /><ui:Label text="512" />
             </ui:VisualElement>
             <ui:Label text="Adjust to your display." class="description size-hint" />
-        </ui:VisualElement>
+        </ui:ScrollView>
         <ui:VisualElement name="help-backdrop" class="help-backdrop hidden">
             <ui:VisualElement name="help-card" class="help-card">
                 <ui:VisualElement class="help-heading">

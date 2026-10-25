@@ -14,11 +14,17 @@ on:
     paths:
       - "Packages/**"
       - "ci/test-level-editor-input.cjs"
+      - "ci/sync-demo-ui.py"
+      - "ci/demo-ui/**"
+      - "ci/test_demo_ui.py"
       - ".github/workflows/min-api-lint.yml"
   pull_request:
     paths:
       - "Packages/**"
       - "ci/test-level-editor-input.cjs"
+      - "ci/sync-demo-ui.py"
+      - "ci/demo-ui/**"
+      - "ci/test_demo_ui.py"
       - ".github/workflows/min-api-lint.yml"
 
 permissions:
@@ -87,3 +93,8 @@ jobs:
 
       - name: Check WebGL sample input bridge
         run: node ci/test-level-editor-input.cjs
+
+      - name: Verify shared demo theme
+        run: |
+          python3 ci/sync-demo-ui.py --check
+          python3 -m unittest discover -s ci -p test_demo_ui.py

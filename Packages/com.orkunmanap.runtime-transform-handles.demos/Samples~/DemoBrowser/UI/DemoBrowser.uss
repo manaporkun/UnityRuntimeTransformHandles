@@ -1,3 +1,4 @@
+@import url("DemoTheme.uss");
 * { -unity-font: url("../Fonts/LiberationSans.ttf"); color: rgb(38, 42, 49); }
 .gallery { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgb(246, 247, 249); }
 .gallery-scroll { flex-grow: 1; }
@@ -16,7 +17,3 @@
 #description { font-size: 18px; color: rgb(108, 115, 127); white-space: normal; flex-grow: 1; margin-bottom: 36px; }
 #open { font-size: 17px; color: rgb(44, 99, 169); white-space: normal; }
 .status { font-size: 16px; color: rgb(113, 119, 130); margin-top: 20px; white-space: normal; }
-.navigation { position: absolute; right: 24px; bottom: 24px; }
-#back { font-size: 18px; height: 44px; padding: 0 22px; background-color: white; border-color: rgb(217, 222, 230); border-width: 1px; border-radius: 22px; }
-#back:hover { background-color: rgb(235, 241, 249); }
-#back:focus { border-color: rgb(62, 116, 185); }

@@ -1,6 +1,6 @@
 # Level Editor: Prop Workshop
 
-Import **Level Editor** from Runtime Transform Handles Demos in Package Manager, run **Tools > Transform Handles > Setup Layer**, then open `LevelEditor.unity` and press Play. This sample supports Built-in and URP rendering without requiring URP. It requires Core, uGUI and the IMGUI module through the optional Demos package. The Input System is optional; when using its backend, this sample requires version 1.1.1 or later for runtime UI default actions. Core's compatibility requirements are unchanged.
+Import **Level Editor** from Runtime Transform Handles Demos in Package Manager, run **Tools > Transform Handles > Setup Layer**, then open `LevelEditor.unity` and press Play. This sample supports Built-in and URP rendering without requiring URP. It requires Core, uGUI and UI Toolkit through the optional Demos package. The Input System is optional; when using its backend, this sample requires version 1.1.1 or later for runtime UI default actions. Core's compatibility requirements are unchanged.
 
 Click a prop to select it. Shift-click adds or removes props. W/E/R select Move/Rotate/Scale; X switches World/Local. Drag a handle axis or plane. Left-drag orbits the camera and the wheel zooms. Escape ends the gesture and clears selection, keeping the last valid layout. Reset restores the initial transforms; there is no undo or persistence.
 
@@ -29,7 +29,7 @@ as before. The original showcase and Core appearance defaults are unchanged.
 
 The **Handle size** slider and integer field accept **64–512 px**, initially **192 px**. This sets
 `Handle.AutoScaleSizeInPixels` directly and enables `AutoScale` on this sample's handle. Values are
-rendering pixels, independent of CanvasScaler; on Retina/high-DPI displays, choose a larger value
+rendering pixels, independent of UI Toolkit panel scaling; on Retina/high-DPI displays, choose a larger value
 if needed. The number is not silently multiplied by UI scale or device pixel ratio.
 
 The preference survives selection, grouping, tool changes, invalid-scale recovery, Reset and
@@ -49,8 +49,10 @@ Camera gestures cannot start over UI or during numeric editing/manipulation. A d
 
 The sample's `Plugins/LevelEditorInput.jslib` retains raw browser wheel magnitude on WebGL, where the engine's input path can quantize tiny deltas. It reads only the player canvas and leaves Unity UI events intact. The listener detaches on disable/destruction and pending input clears on focus changes. Native players continue using their Unity input backend. No Core browser plugin is required.
 
-### Compact editor layout
+### Shared workspace layout
 
-Move/Rotate/Scale sit in a labeled left tool rail. Selection, World/Local and Snap controls appear in the bottom context bar; status and snapping explanations remain visible independently. Long selection names are abbreviated in the bar. The header's **Handle size · N px** button opens the existing size slider and number field, including when nothing is selected.
+The UI Toolkit header places **Demos** (when launched from Demo Browser), the workspace name, **Reset scene** and **Help** in the same positions as the other demos. The scrollable left inspector contains selection, Move/Rotate/Scale, World/Local, Snap and always-visible handle-size controls. Status and snapping explanations stay inside the inspector. Long selection names use ellipsis and a tooltip without interpreting rich text.
 
-Click Close or outside the size panel to commit valid input and dismiss it. The dismissal press is consumed and cannot select, orbit or start a handle drag underneath. Escape first cancels numeric editing, a subsequent Escape closes the panel, and another clears selection. Closing the panel removes its raycast blocker; disabling the controller closes it while preserving the selected size.
+Help contains the keyboard and camera instructions. Clicking outside Help consumes the entire dismissal press. Escape cancels numeric editing first, then closes Help, then clears selection. Enter or focus loss commits valid size input. Disable/re-enable rebuilds the UI bindings and closes Help while keeping the size preference.
+
+Edit `UI/LevelEditor.uxml` and scenario styles in `UI/LevelEditor.uss`. The common `UI/DemoTheme.uss` is generated from the repository theme; see `ci/demo-ui/README.md`. Imported samples have local assets and remain independent.

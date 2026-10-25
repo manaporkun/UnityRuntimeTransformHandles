@@ -23,7 +23,9 @@ namespace TransformHandles.Samples.DemoBrowser
         private UIDocument _document;
         private PanelSettings _panel;
         private GameObject _eventSystem;
-        private VisualElement _gallery, _navigation, _cards;
+        private VisualElement _gallery, _cards;
+        private Button _navigation;
+        private UIDocument _navigationDocument;
         private Label _status;
         private bool _loading, _claimedPress;
         private int _releasedFrame = -1;
@@ -49,10 +51,8 @@ namespace TransformHandles.Samples.DemoBrowser
             var root = _document.rootVisualElement;
             root.pickingMode = PickingMode.Ignore;
             _gallery = root.Q("gallery");
-            _navigation = root.Q("navigation");
             _cards = root.Q("cards");
             _status = root.Q<Label>("status");
-            root.Q<Button>("back").clicked += ReturnToGallery;
             PopulateGallery();
             SceneManager.sceneLoaded += SceneLoaded;
             ShowGallery(true);
@@ -125,7 +125,7 @@ namespace TransformHandles.Samples.DemoBrowser
         {
             _loading = true;
             _cards.SetEnabled(false);
-            _navigation.SetEnabled(false);
+            _navigation?.SetEnabled(false);
             _status.text = "Opening workspace…";
             AsyncOperation operation = null;
             try { operation = SceneManager.LoadSceneAsync(path, LoadSceneMode.Single); }
@@ -138,7 +138,7 @@ namespace TransformHandles.Samples.DemoBrowser
             ReleaseManager();
             _loading = false;
             _cards.SetEnabled(true);
-            _navigation.SetEnabled(true);
+            _navigation?.SetEnabled(true);
             _status.text = operation == null ? "Could not open this workspace. Try again." : "Returning here resets the demo’s scene.";
         }
 
@@ -151,15 +151,21 @@ namespace TransformHandles.Samples.DemoBrowser
         private void ShowGallery(bool visible)
         {
             _gallery.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-            _navigation.style.display = visible ? DisplayStyle.None : DisplayStyle.Flex;
+            RefreshNavigation();
         }
 
         private void Update()
         {
             if (_document == null) return;
-            var position = RuntimePanelUtils.ScreenToPanel(_document.rootVisualElement.panel,
+            RefreshNavigation();
+            if (_navigation == null || _navigation.panel == null)
+            {
+                if (_claimedPress && !_loading) ReleaseManager();
+                return;
+            }
+            var position = RuntimePanelUtils.ScreenToPanel(_navigation.panel,
                 new Vector2(InputWrapper.PointerPosition.x, Screen.height - InputWrapper.PointerPosition.y));
-            bool overNavigation = _navigation.resolvedStyle.display != DisplayStyle.None && _navigation.worldBound.Contains(position);
+            bool overNavigation = _navigation.enabledInHierarchy && _navigation.worldBound.Contains(position);
             if (overNavigation && (InputWrapper.GetMouseButtonDown(0) || InputWrapper.GetMouseButtonDown(1) || InputWrapper.GetMouseButtonDown(2)))
             {
                 _claimedPress = true;
@@ -177,6 +183,45 @@ namespace TransformHandles.Samples.DemoBrowser
             else if (Time.frameCount > _releasedFrame) ReleaseManager();
         }
 
+        // Each independent sample declares the same named slot; no sample assembly is referenced.
+        // UIDocument recreates its tree on re-enable, so sceneLoaded alone is not sufficient.
+        private void RefreshNavigation()
+        {
+            if (SceneManager.GetActiveScene().path == _galleryPath)
+            {
+                UnbindNavigation();
+                _navigationDocument = null;
+                return;
+            }
+            if (_navigationDocument == null)
+            {
+                foreach (var document in FindObjectsOfType<UIDocument>())
+                {
+                    if (document == _document || document.rootVisualElement == null) continue;
+                    if (document.rootVisualElement.Q<Button>("demo-gallery") == null) continue;
+                    _navigationDocument = document;
+                    break;
+                }
+            }
+            var button = _navigationDocument != null && _navigationDocument.isActiveAndEnabled
+                ? _navigationDocument.rootVisualElement?.Q<Button>("demo-gallery") : null;
+            if (button == _navigation) return;
+            UnbindNavigation();
+            _navigation = button;
+            if (_navigation == null) return;
+            _navigation.AddToClassList("available");
+            _navigation.SetEnabled(!_loading);
+            _navigation.clicked += ReturnToGallery;
+        }
+
+        private void UnbindNavigation()
+        {
+            if (_navigation == null) return;
+            _navigation.clicked -= ReturnToGallery;
+            _navigation.RemoveFromClassList("available");
+            _navigation = null;
+        }
+
         private void ReleaseManager()
         {
             if (_suspendedManager != null) _suspendedManager.enabled = true;
@@ -189,6 +234,7 @@ namespace TransformHandles.Samples.DemoBrowser
         {
             if (_instance != this) return;
             SceneManager.sceneLoaded -= SceneLoaded;
+            UnbindNavigation();
             ReleaseManager();
             if (_panel != null) Destroy(_panel);
             _instance = null;

@@ -40,3 +40,7 @@ Unity -batchmode -quit -buildTarget WebGL -projectPath PROJECT \
 ```
 
 Install WebGL Build Support and use the repository's WebGL template/build helper. Serve OUTPUT over HTTP. The public Pages entry point remains the original showcase. Before replacing an existing sample import, back up customizations and remove the old copy explicitly to avoid duplicate GUIDs and assemblies.
+
+### Shared UI theme
+
+The header and scrollable inspector use the same theme as Prop Workshop and Handle Showcase. When opened from Demo Browser, the header includes **Demos**; standalone imports hide that button. `UI/DemoTheme.uss` is a local generated copy of the repository's canonical theme. Scenario-specific styles remain in `UI/ModularBuilding.uss`. No runtime cross-sample dependency is required.

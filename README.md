@@ -196,6 +196,8 @@ Existing imported Assets copies are user-owned; back up custom changes outside A
 
 ### Demo gallery
 
+All three workspaces use the same UI Toolkit header and scrollable inspector. **Demos** is in the header when running the combined player; **Reset scene** and **Help** stay in consistent positions. Advanced showcase tools and the event log remain available in foldouts.
+
 Import the optional [Demo Browser](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/DemoBrowser/README.md) to open all included demo scenes from one UI Toolkit gallery. Each workspace has a Demos button to return; leaving resets that scene. The repository supports a combined WebGL build while preserving individual demo builds and independent sample imports.
 
 ### Modular Building sample

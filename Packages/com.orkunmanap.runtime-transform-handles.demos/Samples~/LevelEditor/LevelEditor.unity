@@ -917,10 +917,9 @@ MonoBehaviour:
   floorRenderer: {fileID: 861189538}
   targetMaterial: {fileID: 2100000, guid: fdcd39e7f0007423ba280d7640bd50ce, type: 2}
   interactionSettings: {fileID: 11400000, guid: a6d8ff2baabd142bca66dde253f8808d, type: 2}
-  panelSprite: {fileID: 21300000, guid: 75ca76f0817d4a6097c49c06aaa03081, type: 3}
-  moveIcon: {fileID: 21300000, guid: 82bdbfbe32fc48bb87dce85683f74d5f, type: 3}
-  rotateIcon: {fileID: 21300000, guid: d19734ab47f74d26a0bc7b63837c7ade, type: 3}
-  scaleIcon: {fileID: 21300000, guid: 419dd4b4b5d44be5ad8554f256104ec4, type: 3}
+  uiLayout: {fileID: 9197481963319205126, guid: 7857112474294183845c398066d4c59b, type: 3}
+  uiPanelSettings: {fileID: 11400000, guid: a2adc01748144e3fa1e0cffde3f86489, type: 2}
+
 --- !u!4 &2111331167
 Transform:
   m_ObjectHideFlags: 0

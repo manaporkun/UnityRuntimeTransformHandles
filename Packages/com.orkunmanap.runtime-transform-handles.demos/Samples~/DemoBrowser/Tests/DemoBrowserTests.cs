@@ -207,12 +207,14 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
             manager.BlockWhenPointerOverUI = false;
             var controller = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>().Single(item => item.GetType().Name == "HandleDemo");
             var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            controller.GetType().GetField("_blockTest", flags).SetValue(controller, false);
             controller.GetType().GetMethod("SelectSingle", flags).Invoke(controller, new object[] { GameObject.Find("Target_0").transform });
             yield return null;
             var axis = UnityEngine.Object.FindObjectOfType<Handle>().GetComponentInChildren<PositionPlane>();
             Assert.IsTrue((bool)typeof(TransformHandleManager).GetMethod("BeginInteraction", flags).Invoke(manager, new object[] { axis, axis.transform.position }));
-            var root = browser.GetComponentInChildren<UIDocument>().rootVisualElement;
-            var center = root.Q("navigation").worldBound.center;
+            var root = UnityEngine.Object.FindObjectsOfType<UIDocument>()
+                .Single(doc => doc.rootVisualElement.Q<Button>("demo-gallery") != null).rootVisualElement;
+            var center = root.Q("demo-gallery").worldBound.center;
             float scale = Screen.width / root.resolvedStyle.width;
             var point = new Vector2(center.x * scale, Screen.height - center.y * scale);
             var original = UnityEngine.InputSystem.InputSystem.settings;
@@ -241,20 +243,20 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
                     var camera = Camera.main.transform;
                     var position = camera.position; var rotation = camera.rotation;
                     UnityEngine.InputSystem.InputSystem.QueueStateEvent(mouse, new UnityEngine.InputSystem.LowLevel.MouseState
-                        { position = new Vector2(200, 200), delta = new Vector2(100, 100), scroll = new Vector2(0, 120) }
+                        { position = new Vector2(Screen.width * .7f, Screen.height * .25f), delta = new Vector2(100, 100), scroll = new Vector2(0, 120) }
                         .WithButton(button));
                     UnityEngine.InputSystem.InputSystem.Update();
                     browserUpdate.Invoke(browser, null); demoUpdate.Invoke(controller, null);
                     Assert.IsFalse(manager.enabled);
                     Assert.AreEqual(position, camera.position); Assert.AreEqual(rotation, camera.rotation);
-                    UnityEngine.InputSystem.InputSystem.QueueStateEvent(mouse, new UnityEngine.InputSystem.LowLevel.MouseState { position = new Vector2(200, 200) });
+                    UnityEngine.InputSystem.InputSystem.QueueStateEvent(mouse, new UnityEngine.InputSystem.LowLevel.MouseState { position = new Vector2(Screen.width * .7f, Screen.height * .25f) });
                     UnityEngine.InputSystem.InputSystem.Update();
                     browserUpdate.Invoke(browser, null); demoUpdate.Invoke(controller, null);
                     Assert.IsFalse(manager.enabled, "Release frame is still claimed.");
                     yield return null;
                     browserUpdate.Invoke(browser, null);
                     Assert.IsTrue(manager.enabled);
-                    Assert.IsFalse(manager.BlockWhenPointerOverUI, "The showcase toggle must retain its value.");
+                    Assert.IsFalse((bool)controller.GetType().GetField("_blockTest", flags).GetValue(controller), "The experiment toggle must retain its value.");
                 }
             }
             finally
@@ -267,6 +269,47 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
             yield return WaitForScene(_browserPath, browser);
         }
 #endif
+
+        [UnityTest]
+        public IEnumerator HeaderNavigationRebindsAfterEveryControllerReenable()
+        {
+            var paths = new[] { "ModularBuilding", "LevelEditor", "RuntimeTransformHandlesDemo" }.Select(FindScene).ToArray();
+            if (paths.Any(string.IsNullOrEmpty)) Assert.Ignore("Import all workspaces for header lifecycle coverage.");
+            yield return SceneManager.LoadSceneAsync(_browserPath);
+            yield return null;
+            var browser = UnityEngine.Object.FindObjectOfType<DemoBrowser>();
+            foreach (var path in paths)
+            {
+                browser.OpenDemo(path); yield return WaitForScene(path, browser);
+                var controller = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>().Single(item =>
+                    item.GetType().Name == "ModularBuildingDemo" || item.GetType().Name == "LevelEditorDemo" || item.GetType().Name == "HandleDemo");
+                var document = UnityEngine.Object.FindObjectsOfType<UIDocument>().Single(doc => doc.rootVisualElement.Q<Button>("demo-gallery") != null);
+                var previous = document.rootVisualElement.Q<Button>("demo-gallery");
+                Assert.IsTrue(previous.ClassListContains("available"));
+                controller.enabled = false; yield return null;
+                Assert.IsFalse(previous.ClassListContains("available"));
+                controller.enabled = true; yield return null;
+                var button = document.rootVisualElement.Q<Button>("demo-gallery");
+                Assert.AreNotSame(previous, button);
+                Assert.IsTrue(button.ClassListContains("available"));
+#if UNITY_6000_0_OR_NEWER
+                // Adding the available class schedules a style/layout pass. Focus only after
+                // the reconstructed button has become visible to the panel.
+                yield return null;
+                Assert.Greater(button.worldBound.width, 0, path);
+                button.Focus();
+                Assert.AreSame(button, button.panel.focusController.focusedElement, path);
+                Assert.IsTrue(button.enabledInHierarchy, path);
+                using (var evt = NavigationSubmitEvent.GetPooled()) button.SendEvent(evt);
+                Assert.IsTrue((bool)typeof(DemoBrowser).GetField("_loading", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(browser), "Header did not invoke navigation: " + path);
+#else
+                using (var evt = MouseDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0, mousePosition = button.worldBound.center })) button.SendEvent(evt);
+                using (var evt = MouseUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 0, mousePosition = button.worldBound.center })) button.SendEvent(evt);
+#endif
+                yield return WaitForScene(_browserPath, browser);
+                Assert.AreEqual(1, UnityEngine.Object.FindObjectsOfType<EventSystem>().Length);
+            }
+        }
 
         private static IEnumerator WaitForScene(string path, DemoBrowser browser)
         {

@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Shared white UI Toolkit presentation across all workspaces: common header navigation, scrollable inspector, Help, typography and pixel-size controls.
+- Showcase advanced-tool foldouts, owned-only reset/clear behavior, a separate input-test region and standalone input/lifecycle regressions.
+- Canonical demo stylesheet synchronization and CI drift checks while retaining independent sample imports.
 - Pipeline-independent showcase target material so its cubes render correctly alongside URP workspaces in the combined player.
 - Optional Demo Browser: a UI Toolkit gallery, in-player return navigation, and a combined WebGL build for the three independently imported workspaces.
 - Scene-transition regression coverage for active handles, input ownership, and borrowed EventSystems; showcase teardown now releases its owned manager, settings, handles, and materials.

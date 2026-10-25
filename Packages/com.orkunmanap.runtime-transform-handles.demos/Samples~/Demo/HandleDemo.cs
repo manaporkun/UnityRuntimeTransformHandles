@@ -5,7 +5,8 @@ using TransformHandles.Utils;
 using UnityEngine;
 #if TH_UGUI
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
+using UnityEngine.UIElements;
+using InputWrapper = TransformHandles.Utils.InputWrapper;
 #endif
 
 /// <summary>
@@ -15,14 +16,17 @@ using UnityEngine.UI;
 /// <see cref="TransformHandleSettings"/>, and all interaction events.
 ///
 /// Drop this on an empty GameObject and press Play — it spawns its own targets, ensures a
-/// camera, and draws an IMGUI control panel. No scene wiring required. The handle gizmos
+/// camera, and draws the sample UI Toolkit layout. Assign its local layout and panel settings. The handle gizmos
 /// still need the "TransformHandle" physics layer (Tools > Transform Handles > Setup Layer).
 /// </summary>
+[DefaultExecutionOrder(-100)]
 public class HandleDemo : MonoBehaviour
 {
     [Header("Spawned targets")]
     [SerializeField] private int targetCount = 6;
     [SerializeField] private float spacing = 2.5f;
+    [SerializeField] private VisualTreeAsset uiLayout;
+    [SerializeField] private PanelSettings uiPanelSettings;
 
     private static readonly Color[] Palette =
     {
@@ -39,9 +43,6 @@ public class HandleDemo : MonoBehaviour
     private TransformHandleSettings _previousSettings;
     private bool _previousUiBlock, _navigationPress;
     private readonly List<Material> _ownedMaterials = new List<Material>();
-#if TH_UGUI
-    private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
-#endif
 
     private readonly List<Transform> _targets = new List<Transform>();
     private readonly Dictionary<Transform, Handle> _targetToHandle = new Dictionary<Transform, Handle>();
@@ -61,14 +62,21 @@ public class HandleDemo : MonoBehaviour
     private bool _useSettings;
 
     private readonly List<string> _log = new List<string>();
-    private Vector2 _logScroll;
     private float _camYaw, _camPitch = 15f, _camDist = 12f;
-
-    // Cached HUD styles (default IMGUI skin is tiny and low-contrast over a bright skybox).
-    private GUISkin _skin;
-    private GUIStyle _panelStyle;
-    private Texture2D _panelTex;
-    private bool _uiInit;
+    private readonly Dictionary<Transform, PosRotScale> _initial = new Dictionary<Transform, PosRotScale>();
+    private GameObject _uiObject, _ownedEventSystem;
+    private UIDocument _document;
+    private PanelSettings _runtimePanelSettings;
+    private VisualElement _uiRoot, _workshop, _helpBackdrop, _testRegion;
+    private Label _selectionLabel, _selectionHint, _status, _eventLog;
+    private Button _moveButton, _rotateButton, _scaleButton, _spaceButton, _resetButton, _helpToggleButton, _helpCloseButton, _groupButton, _clearButton;
+    private SliderInt _sizeSlider;
+    private TextField _sizeInput;
+    private Slider _positionSlider, _rotationSlider, _scaleSlider, _multiplierSlider;
+    private Toggle _autoToggle, _settingsToggle, _showTestToggle, _blockTestToggle;
+    private DropdownField _typeField, _axesField, _snapField;
+    private int _handleSizePixels = 192, _lastSizeEditFrame = -1, _releaseFrame = -1;
+    private bool _initialized, _sizeEditing, _helpPanelOpen, _closeHelpPanelPending, _blockTest = true, _showTest, _suspendedManager;
 
     // Raycast mask that excludes the handle-gizmo layer so picking ignores gizmo colliders.
     private int _pickMask = ~0;
@@ -82,19 +90,19 @@ public class HandleDemo : MonoBehaviour
             _camera = go.AddComponent<Camera>();
         }
 
-        bool ownsManager = !Resources.FindObjectsOfTypeAll<TransformHandleManager>().Any(m => m.gameObject.scene.IsValid());
-        _manager = TransformHandleManager.Instance;
-        if (ownsManager) _ownedManager = _manager;
-        _previousCamera = _manager.MainCamera;
-        _previousSettings = _manager.Settings;
-        _previousUiBlock = _manager.BlockWhenPointerOverUI;
-        _manager.MainCamera = _camera;
-
         // Build a runtime settings asset (no .asset file needed) to demo Settings injection.
         _settings = TransformHandleSettings.CreateDefault();
 
         var handleLayer = LayerMask.NameToLayer("TransformHandle");
         _pickMask = handleLayer >= 0 ? ~(1 << handleLayer) : ~0;
+        if (uiLayout == null || uiPanelSettings == null)
+        {
+            Debug.LogError("Handle Showcase requires its local UI Toolkit layout and panel settings.", this);
+            enabled = false;
+            return;
+        }
+        BuildUi();
+        _initialized = true;
     }
 
     private void Start()
@@ -114,6 +122,7 @@ public class HandleDemo : MonoBehaviour
             _ownedMaterials.Add(material);
             material.color = Palette[i % Palette.Length];
             _targets.Add(cube.transform);
+            _initial[cube.transform] = new PosRotScale { Position = cube.transform.position, Rotation = cube.transform.rotation, Scale = cube.transform.localScale };
         }
 
         // FindAnyObjectByType lands in 2021.3.18 / 2022.2; the package's declared minimum is
@@ -130,112 +139,101 @@ public class HandleDemo : MonoBehaviour
             lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
         }
 
-        BuildUiOcclusionOverlay();
+        UpdateCamera();
     }
 
-    // Builds a real uGUI panel (+ an EventSystem if the scene lacks one) so the
-    // TransformHandleManager.BlockWhenPointerOverUI guard is demonstrable: with the guard on,
-    // clicking the panel must not select targets or start a handle drag underneath it.
-    private void BuildUiOcclusionOverlay()
+    private void OnEnable()
     {
-#if TH_UGUI
-        // The guard is opt-in (off by default on the manager); turn it on here so the sample
-        // demonstrates it out of the box. Flip it from the HUD to compare on/off behavior.
+        if (!_initialized) return;
+        bool ownsManager = !Resources.FindObjectsOfTypeAll<TransformHandleManager>().Any(m => m.gameObject.scene.IsValid() && m != _ownedManager);
+        _manager = TransformHandleManager.Instance;
+        if (ownsManager) _ownedManager = _manager;
+        _previousCamera = _manager.MainCamera;
+        _previousSettings = _manager.Settings;
+        _previousUiBlock = _manager.BlockWhenPointerOverUI;
+        _manager.MainCamera = _camera;
         _manager.BlockWhenPointerOverUI = true;
-#if UNITY_2023_1_OR_NEWER
-        var hasEventSystem = Object.FindAnyObjectByType<EventSystem>() != null;
-#else
-        var hasEventSystem = Object.FindObjectOfType<EventSystem>() != null;
-#endif
-        if (!hasEventSystem)
-        {
-            var esGo = new GameObject("EventSystem");
-            esGo.AddComponent<EventSystem>();
-#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
-            esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>().AssignDefaultActions();
-#else
-            esGo.AddComponent<StandaloneInputModule>();
-#endif
-        }
-
-        var canvasGo = new GameObject("Demo UI Canvas");
-        var canvas = canvasGo.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasGo.AddComponent<CanvasScaler>();
-        canvasGo.AddComponent<GraphicRaycaster>();
-
-        var panelGo = new GameObject("UI Occlusion Test Panel");
-        panelGo.transform.SetParent(canvasGo.transform, false);
-        var panel = panelGo.AddComponent<Image>();
-        panel.color = new Color(0.15f, 0.45f, 0.85f, 0.85f); // raycast target by default
-        var rect = panel.rectTransform;
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.sizeDelta = new Vector2(420f, 64f);
-        rect.anchoredPosition = new Vector2(0f, -12f);
-
-        var labelGo = new GameObject("Label");
-        labelGo.transform.SetParent(panelGo.transform, false);
-        var label = labelGo.AddComponent<Text>();
-        label.text = "uGUI panel — clicks here must NOT move objects\n(toggle the guard in the HUD)";
-        label.alignment = TextAnchor.MiddleCenter;
-        label.color = Color.white;
-#if UNITY_2022_2_OR_NEWER
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-#else
-        label.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-#endif
-        var labelRect = label.rectTransform;
-        labelRect.anchorMin = Vector2.zero;
-        labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
-#endif
+        _uiObject.SetActive(true);
+        BindUi();
+        if (_ownedEventSystem != null) _ownedEventSystem.SetActive(true);
+        RefreshUi();
     }
 
-    // True while the pointer is over a uGUI element, so the demo's own target picking respects
-    // UI occlusion the same way the handle manager does. No-op without uGUI.
+    private void OnDisable()
+    {
+        if (!_initialized) return;
+        ReleaseInput();
+        ClearOwnedHandles();
+        UnbindUi();
+        _helpPanelOpen = _closeHelpPanelPending = false;
+        if (_uiObject != null) _uiObject.SetActive(false);
+        if (_ownedEventSystem != null) _ownedEventSystem.SetActive(false);
+        if (_manager != null)
+        {
+            _manager.MainCamera = _previousCamera;
+            _manager.Settings = _previousSettings;
+            _manager.BlockWhenPointerOverUI = _previousUiBlock;
+        }
+        _manager = null;
+    }
+
+    private Vector2 PanelPointer()
+    {
+        var pointer = InputWrapper.PointerPosition;
+        return RuntimePanelUtils.ScreenToPanel(_uiRoot.panel, new Vector2(pointer.x, Screen.height - pointer.y));
+    }
+
+    private bool OverTestRegion() => _uiRoot != null && _uiRoot.panel != null && _showTest && _testRegion.worldBound.Contains(PanelPointer()) && !_helpPanelOpen;
+
     private bool PointerOverUi()
     {
-#if TH_UGUI
-        var es = EventSystem.current;
-        if (es == null) return false;
-        if (es.IsPointerOverGameObject()) return true; // mouse / default pointer
-        // Also test the active finger so the guard works under touch (mouse-only otherwise).
-        return InputWrapper.HasActiveTouch && es.IsPointerOverGameObject(InputWrapper.PrimaryTouchPointerId);
-#else
-        return false;
-#endif
-    }
-
-    private bool PointerOverNavigation()
-    {
-#if TH_UGUI
-        var system = EventSystem.current;
-        if (system == null) return false;
-        if (system.currentInputModule == null) return true;
-        _uiHits.Clear();
-        system.RaycastAll(new PointerEventData(system) { position = InputWrapper.PointerPosition }, _uiHits);
-        return _uiHits.Any(hit => hit.module is UnityEngine.UIElements.PanelRaycaster);
-#else
-        return false;
-#endif
+        if (_uiRoot == null || _uiRoot.panel == null) return false;
+        var hit = _uiRoot.panel.Pick(PanelPointer());
+        if (hit == null || hit == _uiRoot || hit == _workshop) return false;
+        return !OverTestRegion() || _blockTest;
     }
 
     private void Update()
     {
-        // The showcase toggle controls its test panel, never application navigation.
-        bool overNavigation = PointerOverNavigation();
-        if (overNavigation && (InputWrapper.GetMouseButtonDown(0) || InputWrapper.GetMouseButtonDown(1) || InputWrapper.GetMouseButtonDown(2)))
-            _navigationPress = true;
-        if (_navigationPress)
+        if (!_initialized || _manager == null || _uiRoot == null) return;
+        bool overUi = PointerOverUi();
+        bool down = InputWrapper.GetMouseButtonDown(0) || InputWrapper.GetMouseButtonDown(1) || InputWrapper.GetMouseButtonDown(2);
+        bool held = InputWrapper.GetMouseButton(0) || InputWrapper.GetMouseButton(1) || InputWrapper.GetMouseButton(2);
+        if (overUi && down) { _navigationPress = true; _releaseFrame = -1; }
+        if (_navigationPress && !held)
         {
-            if (!InputWrapper.GetMouseButton(0) && !InputWrapper.GetMouseButton(1) && !InputWrapper.GetMouseButton(2))
-                _navigationPress = false;
-            return;
+            if (_releaseFrame < 0) _releaseFrame = Time.frameCount;
+            else if (Time.frameCount > _releaseFrame) _navigationPress = false;
         }
-        if (overNavigation) return;
+        var editing = IsEditingText() || _lastSizeEditFrame == Time.frameCount;
+        bool suppress = _navigationPress || editing || _helpPanelOpen;
+        if (suppress && _manager.enabled) { _manager.enabled = false; _suspendedManager = true; }
+        else if (!suppress && _suspendedManager) ReleaseInput();
+        // Only the explicitly marked test region may bypass UI occlusion.
+        _manager.BlockWhenPointerOverUI = !OverTestRegion() || _blockTest;
+        if (_helpPanelOpen && InputWrapper.GetKeyDown(KeyCode.Escape) && !editing) RequestCloseHelpPanel();
+        if (suppress || overUi) return;
         HandleSelectionInput();
         OrbitCamera();
+    }
+
+    private void LateUpdate()
+    {
+        if (!_initialized || _manager == null) return;
+        if (_closeHelpPanelPending)
+        {
+            _helpPanelOpen = _closeHelpPanelPending = false;
+            _helpBackdrop.AddToClassList("hidden");
+        }
+        RefreshUi();
+    }
+
+    private void ReleaseInput()
+    {
+        if (_suspendedManager && _manager != null) _manager.enabled = true;
+        _suspendedManager = false;
+        _navigationPress = false;
+        _releaseFrame = -1;
     }
 
     // ----- Selection -------------------------------------------------------------------------
@@ -305,10 +303,10 @@ public class HandleDemo : MonoBehaviour
     private void GroupAll()
     {
         DestroyAll();
-        var handle = _manager.CreateHandleFromList(_targets.ToList());
+        var handle = _manager.CreateHandleFromList(_targets.Where(target => target != null).ToList());
         if (handle == null) return;
         Subscribe(handle);
-        foreach (var t in _targets) _targetToHandle[t] = handle;
+        foreach (var t in _targets.Where(target => target != null)) _targetToHandle[t] = handle;
         _activeHandle = handle;
         ApplyAllToActive();
         Log($"CreateHandleFromList({_targets.Count} targets)");
@@ -316,10 +314,8 @@ public class HandleDemo : MonoBehaviour
 
     private void DestroyAll()
     {
-        _manager.DestroyAllHandles();
-        _targetToHandle.Clear();
-        _activeHandle = null;
-        Log("DestroyAllHandles()");
+        ClearOwnedHandles();
+        Log("Clear owned handles");
     }
 
     // ----- Apply HUD state to the active handle ----------------------------------------------
@@ -327,13 +323,14 @@ public class HandleDemo : MonoBehaviour
     private void ApplyAllToActive()
     {
         if (_activeHandle == null) return;
+        if (_useSettings) _activeHandle.ApplySettings(_settings);
         TransformHandleManager.ChangeHandleType(_activeHandle, _type);
         _manager.ChangeHandleSpace(_activeHandle, _space);
         _activeHandle.Axes = _axes;
         ApplySnapping();
         _activeHandle.AutoScale = _autoScale;
+        _activeHandle.AutoScaleSizeInPixels = _handleSizePixels;
         _activeHandle.SetScale(_scaleMultiplier);
-        if (_useSettings) _activeHandle.ApplySettings(_settings);
     }
 
     private void ApplySnapping()
@@ -379,7 +376,12 @@ public class HandleDemo : MonoBehaviour
             _camPitch = Mathf.Clamp(_camPitch - InputWrapper.GetAxis("Mouse Y") * 3f, -80f, 80f);
         }
         _camDist = Mathf.Clamp(_camDist - InputWrapper.GetAxis("Mouse ScrollWheel") * 10f, 3f, 40f);
+        UpdateCamera();
 
+    }
+
+    private void UpdateCamera()
+    {
         var rot = Quaternion.Euler(_camPitch, _camYaw, 0f);
         _camera.transform.position = rot * new Vector3(0f, 0f, -_camDist) + Vector3.up * 0.5f;
         _camera.transform.LookAt(Vector3.up * 0.5f);
@@ -389,38 +391,10 @@ public class HandleDemo : MonoBehaviour
     {
         _log.Add(msg);
         if (_log.Count > 50) _log.RemoveAt(0);
-        _logScroll.y = float.MaxValue;
+
     }
 
-    // ----- HUD -------------------------------------------------------------------------------
-
-    private void EnsureUi()
-    {
-        if (_uiInit) return;
-        _uiInit = true;
-
-        _panelTex = new Texture2D(1, 1) { hideFlags = HideFlags.HideAndDontSave };
-        _panelTex.SetPixel(0, 0, new Color(0.07f, 0.07f, 0.09f, 0.94f));
-        _panelTex.Apply();
-
-        _panelStyle = new GUIStyle { padding = new RectOffset(14, 14, 14, 14) };
-        _panelStyle.normal.background = _panelTex;
-
-        // Work on a private clone of the skin so the demo never mutates the shared global
-        // GUI.skin (which would persist for every other OnGUI consumer in the session).
-        _skin = Instantiate(GUI.skin);
-        _skin.hideFlags = HideFlags.HideAndDontSave;
-        _skin.label.fontSize = 14;
-        _skin.label.richText = true;
-        _skin.label.normal.textColor = Color.white;
-        _skin.button.fontSize = 14;
-        foreach (var st in new[] { _skin.toggle.normal, _skin.toggle.onNormal, _skin.toggle.hover,
-                                   _skin.toggle.onHover, _skin.toggle.active, _skin.toggle.onActive })
-            st.textColor = Color.white;
-        _skin.toggle.fontSize = 14;
-    }
-
-    private void OnDestroy()
+    private void ClearOwnedHandles()
     {
         foreach (var handle in _targetToHandle.Values.Distinct().ToArray())
         {
@@ -432,97 +406,267 @@ public class HandleDemo : MonoBehaviour
             if (_manager != null) _manager.RemoveHandle(handle);
             if (handle != null) Destroy(handle.gameObject);
         }
-        if (_manager != null)
+        _targetToHandle.Clear(); _activeHandle = null; _interacting = false;
+    }
+
+    public void ResetLayout()
+    {
+        if (_interacting) return;
+        ClearOwnedHandles();
+        foreach (var pair in _initial)
         {
-            _manager.MainCamera = _previousCamera;
-            _manager.Settings = _previousSettings;
-            _manager.BlockWhenPointerOverUI = _previousUiBlock;
+            if (pair.Key == null) continue;
+            pair.Key.SetPositionAndRotation(pair.Value.Position, pair.Value.Rotation);
+            pair.Key.localScale = pair.Value.Scale;
         }
+        _type = HandleType.Position; _axes = HandleAxes.XYZ; _space = Space.Self;
+        _snapType = SnappingType.Relative; _posSnap = _rotSnap = _scaleSnap = 0;
+        _scaleMultiplier = 1; _autoScale = true; _useSettings = false;
+        _showTest = false; _blockTest = true;
+        _camYaw = 0; _camPitch = 15; _camDist = 12; UpdateCamera();
+        _log.Clear();
+        RefreshUi();
+    }
+
+    private void OnDestroy()
+    {
         if (_ownedManager != null) Destroy(_ownedManager.gameObject);
         if (_settings != null) Destroy(_settings);
         foreach (var material in _ownedMaterials) if (material != null) Destroy(material);
-        if (_panelTex != null) Destroy(_panelTex);
-        if (_skin != null) Destroy(_skin);
+        foreach (var target in _targets) if (target != null) Destroy(target.gameObject);
+        if (_uiObject != null) Destroy(_uiObject);
+        if (_runtimePanelSettings != null) Destroy(_runtimePanelSettings);
+        if (_ownedEventSystem != null) Destroy(_ownedEventSystem);
     }
 
-    private void OnGUI()
+    private void BuildUi()
     {
-        EnsureUi();
-
-        var prevSkin = GUI.skin;
-        GUI.skin = _skin;
-
-        GUILayout.BeginArea(new Rect(10, 10, 360, Screen.height - 20), _panelStyle);
-        GUILayout.Label("<size=17><b>Transform Handles — Demo</b></size>");
-        GUILayout.Label($"Targets: {_targets.Count}   Selected: {_targetToHandle.Count}   " +
-                        $"Active: {(_activeHandle ? "yes" : "none")}");
-        GUILayout.Label("LMB select · Shift+LMB add · RMB drop · MMB orbit · wheel zoom");
-        GUILayout.Label("Keys: W/E/R Pos/Rot/Scale · A All · X space · Z pivot");
-        GUILayout.Space(6);
-
-        EnumRow("Type", ref _type, () => { if (_activeHandle != null) TransformHandleManager.ChangeHandleType(_activeHandle, _type); });
-        EnumRow("Axes", ref _axes, () => { if (_activeHandle != null) _activeHandle.Axes = _axes; });
-        EnumRow("Space", ref _space, () => { if (_activeHandle != null) _manager.ChangeHandleSpace(_activeHandle, _space); });
-        EnumRow("Snap mode", ref _snapType, ApplySnapping);
-
-        GUILayout.Space(4);
-        Slider("Position snap", ref _posSnap, 0f, 5f, ApplySnapping);
-        Slider("Rotation snap", ref _rotSnap, 0f, 90f, ApplySnapping);
-        Slider("Scale snap", ref _scaleSnap, 0f, 1f, ApplySnapping);
-
-        GUILayout.Space(4);
-        Slider("Handle scale", ref _scaleMultiplier, 0.1f, 10f, () => _activeHandle?.SetScale(_scaleMultiplier));
-
-        var auto = GUILayout.Toggle(_autoScale, " Auto-scale with distance");
-        if (auto != _autoScale) { _autoScale = auto; if (_activeHandle != null) _activeHandle.AutoScale = _autoScale; }
-
-        var useSettings = GUILayout.Toggle(_useSettings, " Apply runtime Settings asset");
-        if (useSettings != _useSettings) { _useSettings = useSettings; if (_useSettings && _activeHandle != null) _activeHandle.ApplySettings(_settings); }
-
-        var blockUi = GUILayout.Toggle(_manager.BlockWhenPointerOverUI, " Block interaction over UI");
-        if (blockUi != _manager.BlockWhenPointerOverUI) _manager.BlockWhenPointerOverUI = blockUi;
-        GUILayout.Label("<size=11>Click the blue panel (top): blocked when on, drags through when off.</size>");
-
-        GUILayout.Space(6);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Group all")) GroupAll();
-        if (GUILayout.Button("Destroy all")) DestroyAll();
-        GUILayout.EndHorizontal();
-
-        GUILayout.Space(6);
-        GUILayout.Label("<b>Event log</b>");
-        _logScroll = GUILayout.BeginScrollView(_logScroll, GUILayout.Height(160));
-        foreach (var line in _log) GUILayout.Label(line);
-        GUILayout.EndScrollView();
-
-        GUILayout.EndArea();
-
-        GUI.skin = prevSkin;
-    }
-
-    private void EnumRow<T>(string label, ref T value, System.Action onChange) where T : System.Enum
-    {
-        GUILayout.Label($"{label}: <b>{value}</b>");
-        var names = System.Enum.GetNames(typeof(T));
-        var current = System.Array.IndexOf(names, value.ToString());
-        // Fewer, wider columns when names are long so they don't clip (e.g. PositionRotation).
-        var maxLen = names.Max(n => n.Length);
-        var cols = maxLen <= 6 ? 4 : maxLen <= 10 ? 3 : 2;
-        var picked = GUILayout.SelectionGrid(current, names, cols);
-        if (picked != current)
+        if (EventSystem.current == null)
         {
-            value = (T)System.Enum.Parse(typeof(T), names[picked]);
-            onChange();
+            _ownedEventSystem = new GameObject("Showcase Event System", typeof(EventSystem));
+#if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
+            _ownedEventSystem.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>().AssignDefaultActions();
+#else
+            _ownedEventSystem.AddComponent<StandaloneInputModule>();
+#endif
         }
+        _uiObject = new GameObject("Showcase Controls");
+        _uiObject.SetActive(false);
+        _document = _uiObject.AddComponent<UIDocument>();
+        _runtimePanelSettings = Instantiate(uiPanelSettings);
+        _document.panelSettings = _runtimePanelSettings;
+        _document.visualTreeAsset = uiLayout;
     }
 
-    private static void Slider(string label, ref float value, float min, float max, System.Action onChange)
+    private void BindUi()
     {
-        GUILayout.Label($"{label}: {value:0.00}");
-        var v = GUILayout.HorizontalSlider(value, min, max);
-        if (!Mathf.Approximately(v, value)) { value = v; onChange(); }
+        _uiRoot = _document.rootVisualElement;
+        _uiRoot.pickingMode = PickingMode.Ignore;
+        _workshop = _uiRoot.Q("workshop");
+        _selectionLabel = _uiRoot.Q<Label>("selection-name");
+        _selectionHint = _uiRoot.Q<Label>("selection-hint");
+        _status = _uiRoot.Q<Label>("inspector-status");
+        _eventLog = _uiRoot.Q<Label>("event-log");
+        _selectionLabel.enableRichText = _status.enableRichText = _eventLog.enableRichText = false;
+        _helpBackdrop = _uiRoot.Q("help-backdrop");
+        _testRegion = _uiRoot.Q("test-region");
+        _moveButton = _uiRoot.Q<Button>("move"); _rotateButton = _uiRoot.Q<Button>("rotate"); _scaleButton = _uiRoot.Q<Button>("scale");
+        _spaceButton = _uiRoot.Q<Button>("space"); _resetButton = _uiRoot.Q<Button>("reset");
+        _helpToggleButton = _uiRoot.Q<Button>("help-toggle"); _helpCloseButton = _uiRoot.Q<Button>("help-close");
+        _groupButton = _uiRoot.Q<Button>("group-all"); _clearButton = _uiRoot.Q<Button>("destroy-all");
+        _moveButton.clicked += Move; _rotateButton.clicked += Rotate; _scaleButton.clicked += Scale;
+        _spaceButton.clicked += ToggleSpace; _resetButton.clicked += ResetLayout;
+        _helpToggleButton.clicked += ToggleHelpPanel; _helpCloseButton.clicked += RequestCloseHelpPanel;
+        _groupButton.clicked += GroupAll; _clearButton.clicked += DestroyAll;
+        _sizeSlider = _uiRoot.Q<SliderInt>("size-slider"); _sizeInput = _uiRoot.Q<TextField>("size-input");
+        _sizeSlider.RegisterValueChangedCallback(OnSizeChanged);
+        _sizeInput.RegisterCallback<FocusInEvent>(OnSizeFocusIn);
+        _sizeInput.RegisterCallback<FocusOutEvent>(OnSizeFocusOut);
+        _sizeInput.RegisterCallback<KeyDownEvent>(OnSizeKeyDown, TrickleDown.TrickleDown);
+        _positionSlider = _uiRoot.Q<Slider>("position-snap"); _rotationSlider = _uiRoot.Q<Slider>("rotation-snap");
+        _scaleSlider = _uiRoot.Q<Slider>("scale-snap"); _multiplierSlider = _uiRoot.Q<Slider>("scale-multiplier");
+        foreach (var slider in new[] { _positionSlider, _rotationSlider, _scaleSlider, _multiplierSlider }) slider.RegisterValueChangedCallback(OnAdvancedSliderChanged);
+        _autoToggle = _uiRoot.Q<Toggle>("auto-scale"); _settingsToggle = _uiRoot.Q<Toggle>("runtime-settings");
+        _showTestToggle = _uiRoot.Q<Toggle>("show-test"); _blockTestToggle = _uiRoot.Q<Toggle>("block-test");
+        foreach (var toggle in new[] { _autoToggle, _settingsToggle, _showTestToggle, _blockTestToggle }) toggle.RegisterValueChangedCallback(OnToggleChanged);
+        var enums = _uiRoot.Q("enum-fields"); enums.Clear();
+        _typeField = new DropdownField("Handle type", System.Enum.GetNames(typeof(HandleType)).ToList(), (int)_type);
+        _axesField = new DropdownField("Axes", System.Enum.GetNames(typeof(HandleAxes)).ToList(), System.Array.IndexOf(System.Enum.GetNames(typeof(HandleAxes)), _axes.ToString()));
+        _snapField = new DropdownField("Snap mode", System.Enum.GetNames(typeof(SnappingType)).ToList(), (int)_snapType);
+        foreach (var field in new[] { _typeField, _axesField, _snapField })
+        {
+            field.AddToClassList("advanced-field"); enums.Add(field); field.RegisterValueChangedCallback(OnEnumChanged);
+        }
+        _uiRoot.RegisterCallback<PointerDownEvent>(OnUiPointerDown, TrickleDown.TrickleDown);
+        _uiRoot.RegisterCallback<NavigationMoveEvent>(OnUiNavigation, TrickleDown.TrickleDown);
+        _uiRoot.RegisterCallback<FocusOutEvent>(OnUiFocusOut);
+        _uiRoot.RegisterCallback<GeometryChangedEvent>(OnUiGeometryChanged);
+        _helpBackdrop.RegisterCallback<PointerDownEvent>(OnBackdropPressed);
+        UpdateUiLayout();
     }
+
+    private void UnbindUi()
+    {
+        if (_uiRoot == null) return;
+        _moveButton.clicked -= Move; _rotateButton.clicked -= Rotate; _scaleButton.clicked -= Scale;
+        _spaceButton.clicked -= ToggleSpace; _resetButton.clicked -= ResetLayout;
+        _helpToggleButton.clicked -= ToggleHelpPanel; _helpCloseButton.clicked -= RequestCloseHelpPanel;
+        _groupButton.clicked -= GroupAll; _clearButton.clicked -= DestroyAll;
+        _sizeSlider.UnregisterValueChangedCallback(OnSizeChanged);
+        _sizeInput.UnregisterCallback<FocusInEvent>(OnSizeFocusIn);
+        _sizeInput.UnregisterCallback<FocusOutEvent>(OnSizeFocusOut);
+        _sizeInput.UnregisterCallback<KeyDownEvent>(OnSizeKeyDown, TrickleDown.TrickleDown);
+        foreach (var slider in new[] { _positionSlider, _rotationSlider, _scaleSlider, _multiplierSlider }) slider.UnregisterValueChangedCallback(OnAdvancedSliderChanged);
+        foreach (var toggle in new[] { _autoToggle, _settingsToggle, _showTestToggle, _blockTestToggle }) toggle.UnregisterValueChangedCallback(OnToggleChanged);
+        foreach (var field in new[] { _typeField, _axesField, _snapField }) field.UnregisterValueChangedCallback(OnEnumChanged);
+        _uiRoot.UnregisterCallback<PointerDownEvent>(OnUiPointerDown, TrickleDown.TrickleDown);
+        _uiRoot.UnregisterCallback<NavigationMoveEvent>(OnUiNavigation, TrickleDown.TrickleDown);
+        _uiRoot.UnregisterCallback<FocusOutEvent>(OnUiFocusOut);
+        _uiRoot.UnregisterCallback<GeometryChangedEvent>(OnUiGeometryChanged);
+        _helpBackdrop.UnregisterCallback<PointerDownEvent>(OnBackdropPressed);
+        _sizeEditing = false;
+        _uiRoot = null;
+    }
+
+    private void Move() => SetMode(HandleType.Position);
+    private void Rotate() => SetMode(HandleType.Rotation);
+    private void Scale() => SetMode(HandleType.Scale);
+    private void SetMode(HandleType mode) { if (_interacting) return; _type = mode; ApplyAllToActive(); }
+    private void ToggleSpace() { if (_interacting) return; _space = _space == Space.World ? Space.Self : Space.World; ApplyAllToActive(); }
+    private void OnEnumChanged(ChangeEvent<string> evt)
+    {
+        if (_interacting) return;
+        if (evt.target == _typeField) _type = (HandleType)System.Enum.Parse(typeof(HandleType), evt.newValue);
+        else if (evt.target == _axesField) _axes = (HandleAxes)System.Enum.Parse(typeof(HandleAxes), evt.newValue);
+        else _snapType = (SnappingType)System.Enum.Parse(typeof(SnappingType), evt.newValue);
+        ApplyAllToActive();
+    }
+    private void OnAdvancedSliderChanged(ChangeEvent<float> evt)
+    {
+        if (_interacting) return;
+        if (float.IsNaN(evt.newValue) || float.IsInfinity(evt.newValue)) { RefreshUi(); return; }
+        if (evt.target == _positionSlider) _posSnap = Mathf.Clamp(evt.newValue, 0, 5);
+        else if (evt.target == _rotationSlider) _rotSnap = Mathf.Clamp(evt.newValue, 0, 90);
+        else if (evt.target == _scaleSlider) _scaleSnap = Mathf.Clamp01(evt.newValue);
+        else _scaleMultiplier = Mathf.Clamp(evt.newValue, .1f, 10);
+        ApplyAllToActive();
+    }
+    private void OnToggleChanged(ChangeEvent<bool> evt)
+    {
+        if (evt.target == _showTestToggle) _showTest = evt.newValue;
+        else if (evt.target == _blockTestToggle) _blockTest = evt.newValue;
+        else if (evt.target == _autoToggle) { _autoScale = evt.newValue; ApplyAllToActive(); }
+        else
+        {
+            _useSettings = evt.newValue;
+            if (_useSettings) _scaleMultiplier = _settings.HandleScale;
+            ApplyAllToActive();
+        }
+        RefreshUi();
+    }
+    private void OnSizeChanged(ChangeEvent<int> evt) => SetHandleSize(evt.newValue);
+    private void SetHandleSize(int value)
+    {
+        if (_interacting) return;
+        _handleSizePixels = Mathf.Clamp(value, 64, 512);
+        foreach (var handle in _targetToHandle.Values.Distinct())
+            if (handle != null) handle.AutoScaleSizeInPixels = _handleSizePixels;
+        _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
+        if (!_sizeEditing) _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
+    }
+    private void OnSizeFocusIn(FocusInEvent evt) { _sizeEditing = true; _sizeInput.parent.AddToClassList("editing"); }
+    private void OnSizeFocusOut(FocusOutEvent evt) { if (_sizeEditing) FinishSizeEdit(false); }
+    private void OnSizeKeyDown(KeyDownEvent evt)
+    {
+        if (evt.keyCode != KeyCode.Escape && evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter) return;
+        FinishSizeEdit(evt.keyCode == KeyCode.Escape);
+#if !UNITY_6000_0_OR_NEWER
+        evt.PreventDefault();
+#endif
+        evt.StopPropagation();
+    }
+    private void FinishSizeEdit(bool cancel)
+    {
+        if (!_sizeEditing) return;
+        _sizeEditing = false; _lastSizeEditFrame = Time.frameCount;
+        if (!cancel && int.TryParse(_sizeInput.value, out var value)) SetHandleSize(value);
+        _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
+        _sizeInput.parent.RemoveFromClassList("editing"); _sizeInput.Blur();
+    }
+    private static bool TextEditor(VisualElement element)
+    {
+        for (var current = element; current != null; current = current.parent)
+            if (current is TextField || current.ClassListContains("unity-base-text-field")) return true;
+        return false;
+    }
+    private bool IsEditingText() => _sizeEditing || TextEditor(_uiRoot?.focusController?.focusedElement as VisualElement);
+    private void OnUiFocusOut(FocusOutEvent evt) { if (TextEditor(evt.target as VisualElement)) _lastSizeEditFrame = Time.frameCount; }
+    private void OnUiPointerDown(PointerDownEvent evt)
+    {
+        var target = evt.target as VisualElement;
+        if (!_blockTest && target != null && (target == _testRegion || _testRegion.Contains(target))) return;
+        _navigationPress = true; _releaseFrame = -1;
+        if (_sizeEditing && target != _sizeInput && !_sizeInput.Contains(target)) FinishSizeEdit(false);
+    }
+    private void OnUiNavigation(NavigationMoveEvent evt)
+    {
+        if (!InputWrapper.GetKey(KeyCode.W) && !InputWrapper.GetKey(KeyCode.E) && !InputWrapper.GetKey(KeyCode.R) &&
+            !InputWrapper.GetKey(KeyCode.A) && !InputWrapper.GetKey(KeyCode.X) && !InputWrapper.GetKey(KeyCode.Z)) return;
+#if !UNITY_6000_0_OR_NEWER
+        evt.PreventDefault();
+#endif
+        evt.StopPropagation();
+    }
+    private void OnUiGeometryChanged(GeometryChangedEvent evt) => UpdateUiLayout();
+    private void UpdateUiLayout() { _workshop.EnableInClassList("compact", _uiRoot.resolvedStyle.width < 1190); }
+    private void ToggleHelpPanel()
+    {
+        if (_interacting) return;
+        if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
+        _helpPanelOpen = true; _closeHelpPanelPending = false;
+        _helpBackdrop.RemoveFromClassList("hidden");
+    }
+    private void OnBackdropPressed(PointerDownEvent evt) { if (evt.target == _helpBackdrop) RequestCloseHelpPanel(); }
+    private void RequestCloseHelpPanel() { if (_helpPanelOpen) { _closeHelpPanelPending = true; _navigationPress = true; _releaseFrame = -1; } }
+
+    private void RefreshUi()
+    {
+        if (_uiRoot == null) return;
+        if (_activeHandle != null)
+        {
+            _type = _activeHandle.Type; _space = _activeHandle.Space; _axes = _activeHandle.Axes;
+        }
+        _selectionLabel.text = _targetToHandle.Count == 0 ? "Select a target" : _targetToHandle.Count + " targets selected";
+        _selectionHint.text = _activeHandle == null ? "Click a cube to create its handle." : "Shift-click adds to the active handle.";
+        _status.text = "Targets: " + _targets.Count(target => target != null) + " · Active tool: " + _type;
+        _eventLog.text = _log.Count == 0 ? "Interactions will appear here." : string.Join("\n", _log);
+        foreach (var button in new[] { _moveButton, _rotateButton, _scaleButton, _spaceButton, _resetButton, _helpToggleButton, _groupButton, _clearButton }) button.SetEnabled(!_interacting);
+        _moveButton.EnableInClassList("selected", _type == HandleType.Position);
+        _rotateButton.EnableInClassList("selected", _type == HandleType.Rotation);
+        _scaleButton.EnableInClassList("selected", _type == HandleType.Scale);
+        _spaceButton.text = _space == Space.World ? "World" : "Local";
+        _sizeSlider.SetEnabled(!_interacting && _autoScale); _sizeInput.SetEnabled(!_interacting && _autoScale);
+        _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
+        if (!_sizeEditing) _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
+        _autoToggle.SetValueWithoutNotify(_autoScale); _settingsToggle.SetValueWithoutNotify(_useSettings);
+        _showTestToggle.SetValueWithoutNotify(_showTest); _blockTestToggle.SetValueWithoutNotify(_blockTest);
+        foreach (var field in new[] { _typeField, _axesField, _snapField }) field.SetEnabled(!_interacting);
+        _typeField.SetValueWithoutNotify(_type.ToString()); _axesField.SetValueWithoutNotify(_axes.ToString()); _snapField.SetValueWithoutNotify(_snapType.ToString());
+        foreach (var slider in new[] { _positionSlider, _rotationSlider, _scaleSlider, _multiplierSlider }) slider.SetEnabled(!_interacting);
+        if (!IsEditingText())
+        {
+            _positionSlider.SetValueWithoutNotify(_posSnap); _rotationSlider.SetValueWithoutNotify(_rotSnap);
+            _scaleSlider.SetValueWithoutNotify(_scaleSnap); _multiplierSlider.SetValueWithoutNotify(_scaleMultiplier);
+        }
+        _positionSlider.label = "Position snap · " + _posSnap.ToString("0.##");
+        _rotationSlider.label = "Rotation snap · " + _rotSnap.ToString("0.#") + "°";
+        _scaleSlider.label = "Scale snap · " + _scaleSnap.ToString("0.##");
+        _multiplierSlider.label = "Scale multiplier · " + _scaleMultiplier.ToString("0.##");
+        _testRegion.EnableInClassList("hidden", !_showTest);
+        _uiRoot.Q<Label>("test-region-hint").text = _blockTest ? "This region blocks scene input." : "Scene input passes through this region.";
+    }
+
 }
 
-/// <summary>Marker so the demo's raycast only selects spawned targets, not handle gizmos.</summary>
+/// <summary>Marker so selection only includes spawned targets.</summary>
 public class DemoTarget : MonoBehaviour { }

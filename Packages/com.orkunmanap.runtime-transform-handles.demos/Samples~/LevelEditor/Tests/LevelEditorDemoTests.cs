@@ -6,7 +6,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.TestTools;
-using UnityEngine.UI;
+using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
 namespace TransformHandles.Samples.LevelEditor.Tests
@@ -52,6 +52,13 @@ namespace TransformHandles.Samples.LevelEditor.Tests
 #else
             _settings = ScriptableObject.CreateInstance<TransformHandleSettings>();
             typeof(TransformHandleSettings).GetField("enableShortcuts", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(_settings, false);
+#endif
+#if UNITY_EDITOR
+            var layouts = UnityEditor.AssetDatabase.FindAssets("LevelEditor t:VisualTreeAsset", new[] {"Assets"});
+            var panels = UnityEditor.AssetDatabase.FindAssets("Prop Panel t:PanelSettings", new[] {"Assets"});
+            Assert.AreEqual(1, layouts.Length); Assert.AreEqual(1, panels.Length);
+            Set("uiLayout", UnityEditor.AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UnityEditor.AssetDatabase.GUIDToAssetPath(layouts[0])));
+            Set("uiPanelSettings", UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>(UnityEditor.AssetDatabase.GUIDToAssetPath(panels[0])));
 #endif
             _material = new Material(Shader.Find("TransformHandles/Samples/LevelEditorOpaque"));
             Set("sceneCamera", _camera); Set("targets", _targets);
@@ -100,12 +107,12 @@ namespace TransformHandles.Samples.LevelEditor.Tests
             _targets[1].name = "<b>Reference</b>";
             Select(); _demo.SelectTarget(_targets[1], true); _demo.SetMode(HandleType.Rotation); _demo.ToggleSpace();
             Call("RefreshUi");
-            var text = Get<Text>("_snapLabel");
-            Assert.IsFalse(text.supportRichText);
+            var text = Get<Label>("_snapLabel");
+            Assert.IsFalse(text.enableRichText);
             StringAssert.Contains("<b>Reference</b>", text.text);
             StringAssert.DoesNotContain("15-degree", text.text);
             _demo.ToggleSnapping(); Call("RefreshUi");
-            StringAssert.Contains("15-degree", text.text);
+            StringAssert.Contains("15°", text.text);
         }
 
         [UnityTest]
@@ -137,7 +144,7 @@ namespace TransformHandles.Samples.LevelEditor.Tests
             }
             yield return null;
             Call("RefreshUi");
-            StringAssert.Contains("cancelled", Get<Text>("_status").text);
+            StringAssert.Contains("cancelled", Get<Label>("_status").text);
             Assert.IsNotNull(_demo.ActiveHandle);
         }
 
@@ -462,146 +469,130 @@ namespace TransformHandles.Samples.LevelEditor.Tests
         {
             Select();
             _demo.ToggleSnapping(); Call("RefreshUi");
-            Assert.AreEqual("Snap 0.5", Get<Button>("_snapButton").GetComponentInChildren<Text>().text);
+            Assert.AreEqual("Snap 0.5", Get<Button>("_snapButton").text);
             _demo.ToggleSpace(); Call("RefreshUi");
-            Assert.AreEqual("Local", Get<Button>("_spaceButton").GetComponentInChildren<Text>().text);
-            Assert.AreEqual("Snap off", Get<Button>("_snapButton").GetComponentInChildren<Text>().text);
-            Assert.IsFalse(Get<Button>("_snapButton").interactable);
+            Assert.AreEqual("Local", Get<Button>("_spaceButton").text);
+            Assert.AreEqual("Snap off", Get<Button>("_snapButton").text);
+            Assert.IsFalse(Get<Button>("_snapButton").enabledSelf);
             _demo.SetMode(HandleType.Scale); Call("RefreshUi");
-            Assert.IsFalse(Get<Button>("_spaceButton").interactable);
+            Assert.IsFalse(Get<Button>("_spaceButton").enabledSelf);
             _demo.SelectTarget(_targets[1], true); Call("RefreshUi");
-            Assert.IsTrue(Get<Button>("_rotateButton").interactable);
-            Assert.IsTrue(Get<Button>("_scaleButton").interactable);
-            Assert.AreEqual("Uniform", Get<Button>("_spaceButton").GetComponentInChildren<Text>().text);
+            Assert.IsTrue(Get<Button>("_rotateButton").enabledSelf);
+            Assert.IsTrue(Get<Button>("_scaleButton").enabledSelf);
+            Assert.AreEqual("Uniform", Get<Button>("_spaceButton").text);
         }
 
-        [Test]
-        public void ToolbarAndSelectionCardDoNotOverlapAtSupportedSizes()
+        [UnityTest]
+        public IEnumerator HeaderAndScrollableInspectorHaveConsistentGeometry()
         {
-            var canvas = Get<GameObject>("_canvas");
-            var scaler = canvas.GetComponent<CanvasScaler>();
-            Assert.AreEqual(CanvasScaler.ScaleMode.ScaleWithScreenSize, scaler.uiScaleMode);
-            Assert.AreEqual(new Vector2(1280, 720), scaler.referenceResolution);
-            scaler.enabled = false;
-            var root = (RectTransform)canvas.transform;
-            foreach (var size in new[] {new Vector2(1440, 900), new Vector2(1280, 720), new Vector2(960, 640), new Vector2(1920, 1080), new Vector2(3840, 2160)})
+            var panel = Get<PanelSettings>("_runtimePanelSettings");
+            Assert.AreEqual(PanelScaleMode.ScaleWithScreenSize, panel.scaleMode);
+            Assert.AreEqual(new Vector2Int(1280, 720), panel.referenceResolution);
+            yield return null;
+            var root = Get<VisualElement>("_uiRoot");
+            var header = root.Q(className: "header");
+            var inspector = root.Q<ScrollView>("inspector");
+            Assert.Greater(inspector.worldBound.yMin, header.worldBound.yMax);
+            Assert.LessOrEqual(inspector.worldBound.yMax, root.worldBound.yMax);
+            Assert.IsFalse(root.Q<Button>("demo-gallery").ClassListContains("available"), "Standalone samples hide gallery navigation.");
+        }
+
+        [UnityTest]
+        public IEnumerator WrappedDescriptionsStayInsideInspectorAndHelp()
+        {
+            Select(); _demo.SelectTarget(_targets[1], true);
+            _demo.SetMode(HandleType.Scale); _demo.ToggleSnapping();
+            Call("RefreshUi"); Call("ToggleHelpPanel"); yield return null;
+            foreach (var name in new[] { "_status", "_snapLabel", "_inspectorStatus" })
             {
-                // Match the scaler's logarithmic width/height interpolation at match = 0.5.
-                var factor = Mathf.Sqrt(size.x / 1280f * size.y / 720f);
-                root.sizeDelta = size / factor;
-                Call("UpdateUiLayout"); Canvas.ForceUpdateCanvases();
-                var toolbar = Get<RectTransform>("_toolbar");
-                var card = Get<RectTransform>("_selectionCard");
-                Assert.Greater(-card.anchoredPosition.y, -toolbar.anchoredPosition.y + toolbar.sizeDelta.y);
-                var buttons = Get<List<Button>>("_buttons");
-                foreach (var button in buttons) Assert.GreaterOrEqual(((RectTransform)button.transform).rect.height * factor, 44);
+                var label = Get<Label>(name);
+                Assert.Greater(label.layout.height, 0);
+                Assert.GreaterOrEqual(label.resolvedStyle.fontSize, 16);
+                Assert.AreEqual(WhiteSpace.Normal, label.resolvedStyle.whiteSpace);
             }
         }
 
         [Test]
-        public void EnlargedTextFitsLongestStatusAndSnapDescriptions()
+        public void InspectorSizeWorksWithoutSelectionAndKeepsPreference()
         {
-            Select();
-            _demo.SelectTarget(_targets[1], true);
-            Call("RefreshUi");
-            foreach (var name in new[] {"_status", "_snapLabel", "_modeLabel"})
-            {
-                var label = Get<Text>(name);
-                Assert.LessOrEqual(label.preferredHeight, label.rectTransform.rect.height + .1f, label.text);
-                Assert.GreaterOrEqual(label.fontSize, 20);
-            }
-            _demo.ResetLayout(); Call("RefreshUi");
-            var status = Get<Text>("_status");
-            Assert.LessOrEqual(status.preferredHeight, status.rectTransform.rect.height + .1f, status.text);
-        }
-
-        [Test]
-        public void SizePopoverWorksWithoutSelectionAndPreservesPreferenceAfterClose()
-        {
-            Assert.IsFalse(Get<RectTransform>("_contextBar").gameObject.activeSelf);
-            Assert.IsTrue(Get<Button>("_sizeToggleButton").interactable);
-            Call("ToggleSizePanel");
-            Get<Slider>("_sizeSlider").value = 320;
-            Call("RefreshUi");
-            StringAssert.Contains("320 px", Get<Button>("_sizeToggleButton").GetComponentInChildren<Text>().text);
-            Call("RequestCloseSizePanel"); Call("ApplyDeferredPanelClose");
-            Assert.IsFalse(Get<RectTransform>("_selectionCard").gameObject.activeSelf);
+            Assert.AreEqual("Select a prop", Get<Label>("_selectionLabel").text);
+            Assert.IsFalse(Get<Button>("_moveButton").enabledSelf);
+            Assert.IsTrue(Get<TextField>("_sizeInput").enabledSelf);
+            Get<SliderInt>("_sizeSlider").value = 320;
+            Assert.AreEqual("320", Get<TextField>("_sizeInput").value);
             Select(); Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
         }
 
         [UnityTest]
-        public IEnumerator BackdropDismissalBlocksEntirePressUntilAfterManagerUpdates()
+        public IEnumerator HelpDismissalBlocksEntirePressUntilAfterManagerUpdates()
         {
-            Select(); Call("ToggleSizePanel");
-            yield return null; // Newly activated graphics need a render registration before raycasting.
-            var canvas = Get<GameObject>("_canvas");
-            Canvas.ForceUpdateCanvases();
-            var backdrop = Get<Button>("_sizeBackdrop");
-            var point = new Vector2(Screen.width * .5f, Screen.height * .5f);
-            var hits = new List<RaycastResult>();
-            canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(EventSystem.current) {position = point}, hits);
-            Assert.IsTrue(hits.Exists(h => h.gameObject == backdrop.gameObject));
+            Select(); Call("ToggleHelpPanel"); yield return null;
+            var point = new Vector2(Screen.width * .6f, Screen.height * .3f);
+            Assert.IsTrue(HitsToolkit(point));
             Call("BeginSelectionPress", Time.frameCount, (Vector3)point, true, false);
-            Call("RequestCloseSizePanel");
-            Assert.IsTrue(backdrop.gameObject.activeInHierarchy, "Core input must still see the UI in this Update.");
+            Call("RequestCloseHelpPanel");
+            Assert.IsFalse(Get<VisualElement>("_helpBackdrop").ClassListContains("hidden"));
             Assert.IsFalse((bool)Call("CanSelectOnRelease", (Vector3)point, false));
             Navigate(point, 0, 0);
             Assert.AreEqual(-1, Get<int>("_navigationButton"));
-            Call("ApplyDeferredPanelClose");
-            hits.Clear();
-            canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(EventSystem.current) {position = point}, hits);
-            Assert.IsFalse(hits.Exists(h => h.gameObject == backdrop.gameObject));
+            Call("ApplyDeferredPanelClose"); yield return null;
+            Assert.IsFalse(HitsToolkit(point));
             Assert.AreEqual(1, _demo.SelectionCount);
         }
 
         [UnityTest]
-        public IEnumerator EscapeRespectsEditingThenClosesPopoverBeforeClearingSelection()
+        public IEnumerator EscapeRespectsEditingThenClosesHelpBeforeClearingSelection()
         {
-            Select(); Call("ToggleSizePanel");
-            var field = Get<InputField>("_sizeInput"); field.Select(); field.ActivateInputField();
-            yield return null;
-            Assert.IsTrue(field.isFocused);
-            Call("HandleEscape", Time.frameCount);
-            Assert.IsFalse(Get<bool>("_closeSizePanelPending"));
-            field.DeactivateInputField();
-            Call("HandleEscape", Time.frameCount);
-            Assert.IsFalse(Get<bool>("_closeSizePanelPending"), "Editing-end frame is consumed.");
-            Call("HandleEscape", Time.frameCount + 1);
-            Assert.IsTrue(Get<bool>("_closeSizePanelPending"));
+            Select(); var field = Get<TextField>("_sizeInput"); field.Focus(); yield return null;
+            Assert.IsTrue(Get<bool>("_sizeEditing"));
+            Call("HandleEscape", Time.frameCount); Assert.AreEqual(1, _demo.SelectionCount);
+            SendKey(field, KeyCode.Escape);
+            Call("HandleEscape", Time.frameCount); Assert.AreEqual(1, _demo.SelectionCount);
+            Call("ToggleHelpPanel"); Call("HandleEscape", Time.frameCount + 1);
+            Assert.IsTrue(Get<bool>("_closeHelpPanelPending"));
             Call("ApplyDeferredPanelClose"); Assert.AreEqual(1, _demo.SelectionCount);
             Call("HandleEscape", Time.frameCount + 2); Assert.AreEqual(0, _demo.SelectionCount);
         }
 
         [Test]
-        public void LongSelectionNamesFitAndErrorsSurviveAnEmptySelection()
+        public void LongSelectionNamesAreLiteralAndErrorsSurviveEmptySelection()
         {
-            foreach (var selectionName in new[] {"A very long selection name that should stay inside the compact context bar", new string('W', 120), "<size=100>Wide name</size>\nsecond line"})
-            {
-                _targets[0].name = selectionName;
-                Select(); Call("RefreshUi"); Canvas.ForceUpdateCanvases();
-                var name = Get<Text>("_selectionLabel");
-                Assert.IsFalse(name.supportRichText);
-                Assert.LessOrEqual(name.preferredHeight, name.rectTransform.rect.height + .1f, selectionName);
-            }
-            _demo.ClearSelection();
-            Set("_notice", "A prop has an unsupported scale. Reset course to recover.");
+            _targets[0].name = "<size=100>" + new string('W', 120) + "</size>\nsecond line";
+            Select(); Call("RefreshUi");
+            var name = Get<Label>("_selectionLabel");
+            Assert.IsFalse(name.enableRichText);
+            Assert.IsFalse(name.text.Contains("\n"));
+            Assert.AreEqual(TextOverflow.Ellipsis, name.resolvedStyle.textOverflow);
+            _demo.ClearSelection(); Set("_notice", "A prop has an unsupported scale. Reset course to recover.");
             Call("RefreshUi");
-            Assert.IsFalse(Get<RectTransform>("_contextBar").gameObject.activeSelf);
-            Assert.IsTrue(Get<Text>("_status").gameObject.activeInHierarchy);
-            StringAssert.Contains("unsupported scale", Get<Text>("_status").text);
+            Assert.AreEqual("Select a prop", name.text);
+            StringAssert.Contains("unsupported scale", Get<Label>("_inspectorStatus").text);
         }
 
-        [Test]
-        public void DragCannotOpenSizePopoverAndDisableRemovesItsRaycasts()
+        [UnityTest]
+        public IEnumerator ReenableRebindsNewTreeOnceAndDisableRemovesRaycasts()
         {
+            var previous = Get<VisualElement>("_uiRoot");
+            var point = ScreenPoint(Get<TextField>("_sizeInput"));
+            Call("ToggleHelpPanel");
+            _demo.enabled = false; yield return null;
+            Assert.IsNull(previous.panel);
+            _demo.enabled = true; yield return null;
+            Assert.AreNotSame(previous, Get<VisualElement>("_uiRoot"));
+            Assert.IsTrue(HitsToolkit(point));
+            Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            var button = Get<Button>("_helpToggleButton");
+#if UNITY_6000_0_OR_NEWER
+            button.Focus();
+            using (var evt = NavigationSubmitEvent.GetPooled()) button.SendEvent(evt);
+#else
+            using (var evt = MouseDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0, mousePosition = button.worldBound.center })) button.SendEvent(evt);
+            using (var evt = MouseUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 0, mousePosition = button.worldBound.center })) button.SendEvent(evt);
+#endif
+            Assert.IsTrue(Get<bool>("_helpPanelOpen"), "A duplicate callback would toggle the panel closed again.");
+            Assert.IsFalse(Get<bool>("_closeHelpPanelPending"));
             Select(); _demo.ActiveHandle.InteractionStart(); Call("RefreshUi");
-            Assert.IsFalse(Get<Button>("_sizeToggleButton").interactable);
-            Call("ToggleSizePanel"); Assert.IsFalse(Get<bool>("_sizePanelOpen"));
-            _demo.ActiveHandle.InteractionEnd();
-            Call("ToggleSizePanel"); Assert.IsTrue(Get<bool>("_sizePanelOpen"));
-            _demo.enabled = false; _demo.enabled = true;
-            Assert.IsFalse(Get<bool>("_sizePanelOpen"));
-            Assert.IsFalse(Get<Button>("_sizeBackdrop").gameObject.activeInHierarchy);
+            Assert.IsFalse(Get<Button>("_helpToggleButton").enabledSelf);
         }
 
         [Test]
@@ -621,7 +612,7 @@ namespace TransformHandles.Samples.LevelEditor.Tests
         [UnityTest]
         public IEnumerator HandleSizeSurvivesSelectionModesGroupsResetDisableAndDeferredRebuild()
         {
-            Get<Slider>("_sizeSlider").value = 320;
+            Get<SliderInt>("_sizeSlider").value = 320;
             Select(); Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
             _demo.SetMode(HandleType.Rotation); Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
             _demo.SelectTarget(_targets[1], true); Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
@@ -647,23 +638,19 @@ namespace TransformHandles.Samples.LevelEditor.Tests
             {
                 Call("CommitHandleSize", invalid);
                 Assert.AreEqual(256, Get<int>("_handleSizePixels"));
-                Assert.AreEqual("256", Get<InputField>("_sizeInput").text);
-                Assert.AreEqual(256, Get<Slider>("_sizeSlider").value);
+                Assert.AreEqual("256", Get<TextField>("_sizeInput").value);
+                Assert.AreEqual(256, Get<SliderInt>("_sizeSlider").value);
             }
             Select(); Assert.AreEqual(256, _demo.ActiveHandle.AutoScaleSizeInPixels);
         }
 
         [UnityTest]
-        public IEnumerator NumericFocusAndEditEndFrameSuppressShortcuts()
+        public IEnumerator NumericFocusLossCommitsAndEditEndFrameSuppressesShortcuts()
         {
-            Select(); Call("ToggleSizePanel");
-            var field = Get<InputField>("_sizeInput");
-            field.Select(); field.ActivateInputField();
-            yield return null;
-            Assert.IsTrue(field.isFocused);
+            Select(); var field = Get<TextField>("_sizeInput"); field.Focus(); yield return null;
             Assert.IsTrue((bool)Call("SuppressShortcuts", Time.frameCount));
-            field.text = "280"; field.DeactivateInputField();
-            Assert.IsFalse(field.isFocused);
+            field.value = "280"; field.Blur();
+            Assert.IsFalse(Get<bool>("_sizeEditing"));
             Assert.IsTrue((bool)Call("SuppressShortcuts", Time.frameCount));
             Assert.IsFalse((bool)Call("SuppressShortcuts", Time.frameCount + 1));
             Assert.AreEqual(1, _demo.SelectionCount);
@@ -676,49 +663,78 @@ namespace TransformHandles.Samples.LevelEditor.Tests
             var other = _manager.CreateHandle(_targets[1]); _extraHandles.Add(other);
             other.AutoScale = false; other.AutoScaleSizeInPixels = 111;
             Select(); _demo.ActiveHandle.AutoScale = false;
-            Get<Slider>("_sizeSlider").value = 240;
+            Get<SliderInt>("_sizeSlider").value = 240;
             Assert.IsTrue(_demo.ActiveHandle.AutoScale);
             Assert.IsFalse(other.AutoScale); Assert.AreEqual(111, other.AutoScaleSizeInPixels);
             _demo.ActiveHandle.InteractionStart(); Call("RefreshUi");
-            Assert.IsFalse(Get<Slider>("_sizeSlider").interactable);
-            Assert.IsFalse(Get<InputField>("_sizeInput").interactable);
+            Assert.IsFalse(Get<SliderInt>("_sizeSlider").enabledSelf);
+            Assert.IsFalse(Get<TextField>("_sizeInput").enabledSelf);
             Call("SetHandleSize", 400f); Call("CommitHandleSize", "400");
             Assert.AreEqual(240, _demo.ActiveHandle.AutoScaleSizeInPixels);
-            Assert.AreEqual(240, Get<Slider>("_sizeSlider").value);
-            Assert.AreEqual("240", Get<InputField>("_sizeInput").text);
+            Assert.AreEqual(240, Get<SliderInt>("_sizeSlider").value);
+            Assert.AreEqual("240", Get<TextField>("_sizeInput").value);
         }
 
         [UnityTest]
-        public IEnumerator SliderAndInputBlockSelectionRaycasts()
+        public IEnumerator ToolkitControlsBlockSceneButEmptySpaceDoesNot()
         {
-            Call("ToggleSizePanel");
-            yield return null; // The sizing controls now start inactive inside the popover.
-            Canvas.ForceUpdateCanvases();
-            var canvas = Get<GameObject>("_canvas");
-            Assert.That(Get<Slider>("_sizeSlider").handleRect.rect.height, Is.EqualTo(18).Within(.01f));
-            foreach (var rect in new[] {(RectTransform)Get<Slider>("_sizeSlider").transform,
-                         (RectTransform)Get<InputField>("_sizeInput").transform})
+            yield return null;
+            foreach (var element in new VisualElement[] {Get<SliderInt>("_sizeSlider"), Get<TextField>("_sizeInput"), Get<Button>("_resetButton")})
             {
-                var point = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
-                var hits = new List<RaycastResult>();
-                canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(EventSystem.current) {position = point}, hits);
-                Assert.IsTrue(hits.Exists(h => h.gameObject == rect.gameObject));
+                var point = ScreenPoint(element);
+                Assert.IsTrue(HitsToolkit(point), element.name);
                 Call("BeginSelectionPress", 100, (Vector3)point, true, false);
-                Assert.IsFalse((bool)Call("CanSelectOnRelease", (Vector3)point, true));
+                Assert.IsFalse((bool)Call("CanSelectOnRelease", (Vector3)point, false));
             }
+            Assert.IsFalse(HitsToolkit(new Vector2(Screen.width * .7f, Screen.height * .2f)));
         }
 
         [Test]
-        public void PanelBlocksRaycastsButHelpTextDoesNot()
+        public void HelpCannotOpenDuringDragAndDisableClearsIt()
         {
-            Canvas.ForceUpdateCanvases();
-            var canvas = Get<GameObject>("_canvas");
-            var panel = canvas.transform.Find("Panel").GetComponent<RectTransform>();
-            var point = RectTransformUtility.WorldToScreenPoint(null, panel.TransformPoint(panel.rect.center));
+            Select(); _demo.ActiveHandle.InteractionStart(); Call("RefreshUi");
+            Assert.IsFalse(Get<Button>("_helpToggleButton").enabledSelf);
+            Call("ToggleHelpPanel"); Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            _demo.ActiveHandle.InteractionEnd(); Call("ToggleHelpPanel");
+            Assert.IsTrue(Get<bool>("_helpPanelOpen"));
+            _demo.enabled = false; _demo.enabled = true;
+            Assert.IsFalse(Get<bool>("_helpPanelOpen"));
+            Assert.IsTrue(Get<VisualElement>("_helpBackdrop").ClassListContains("hidden"));
+        }
+        private Vector2 ScreenPoint(VisualElement element)
+        {
+            var root = Get<VisualElement>("_uiRoot");
+            var point = element.worldBound.center;
+            var scale = Screen.width / root.worldBound.width;
+            return new Vector2(point.x * scale, Screen.height - point.y * scale);
+        }
+
+        private bool HitsToolkit(Vector2 point)
+        {
             var hits = new List<RaycastResult>();
-            canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(EventSystem.current) {position = point}, hits);
-            Assert.IsTrue(hits.Exists(h => h.gameObject == panel.gameObject));
-            foreach (var label in canvas.GetComponentsInChildren<Text>()) Assert.IsFalse(label.raycastTarget);
+            EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = point }, hits);
+            return hits.Any(h => h.module is PanelRaycaster raycaster && raycaster.panel == Get<VisualElement>("_uiRoot").panel);
+        }
+
+        private static void SendKey(VisualElement element, KeyCode key)
+        {
+            using (var evt = KeyDownEvent.GetPooled(new Event { type = EventType.KeyDown, keyCode = key }))
+                element.SendEvent(evt);
+        }
+
+
+        [UnityTest]
+        public IEnumerator NumericEscapeCancelsAndReturnCommits()
+        {
+            Select(); var field = Get<TextField>("_sizeInput");
+            field.Focus(); yield return null; field.value = "320";
+            SendKey(field, KeyCode.Escape);
+            Assert.AreEqual(192, Get<int>("_handleSizePixels"));
+            Assert.AreEqual("192", field.value); Assert.AreEqual(1, _demo.SelectionCount);
+            field.Focus(); yield return null; field.value = "320";
+            SendKey(field, KeyCode.Return);
+            Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
+            Assert.AreEqual("320", field.value);
         }
     }
 }
