@@ -1,6 +1,8 @@
 # Modular Building: Wall Study
 
-Import **Modular Building** from Package Manager > Runtime Transform Handles Demos > Samples. Run **Tools > Transform Handles > Setup Layer**, open `ModularBuilding.unity` and press Play. Only Core and the Demos package's UI dependencies are required; Level Editor is a separate optional import. Supports Unity 2021.3+ and the Legacy input backend, or Input System 1.1.1+ when enabled. The sample shader does not require URP.
+Before importing **Modular Building**, install TextMeshPro 3.0.6 or later on Unity 2021.3–2023.1 (`com.unity.textmeshpro` in Package Manager). Unity 2023.2+ / Unity 6 supplies TMP through uGUI 2.0; do not add the deprecated standalone TMP package there. In either case, run **Window > TextMeshPro > Import TMP Essential Resources** once if the project does not already have them. Keep the project's existing TMP Settings; this sample does not install or replace global settings.
+
+Import **Modular Building** from Package Manager > Runtime Transform Handles Demos > Samples. Run **Tools > Transform Handles > Setup Layer**, open `ModularBuilding.unity` and press Play. The sample and test assemblies wait for the compatible TMP/uGUI package before compiling. Supports Unity 2021.3+ and the Legacy input backend, or Input System 1.1.1+ when enabled. Level Editor is a separate optional import; Core and the other demos do not require TMP. The sample shader does not require URP.
 
 Arrange eight supplied straight-wall and L-corner modules on a foundation. Click any wall face to select the complete module. **W / Move** exposes X/Z arrows and the XZ plane pad; positions snap to a fixed 1-unit world grid. **E / Rotate** exposes the Y ring with fixed 90-degree steps from drag start. Height stays at ground level and scale stays one. This scene deliberately uses single selection and fixed constraints; it has no scale or World/Local toggle.
 
@@ -12,17 +14,21 @@ This is a finite arrangement demo: it has no catalog/spawning, deletion, multi-s
 
 ## Scene structure
 
-`ModularBuildingDemo` has serialized references to the scene camera, module root transforms, floor renderer, material, shortcuts-disabled handle settings and UI sprites. Each module is an unparented transform at y=0, with unit scale, integer X/Z coordinates and quarter-turn yaw. Child box meshes and colliders make the wall or L shape. Invalid initial setup fails explicitly. Child collider selection resolves only to registered module roots.
+`ModularBuildingDemo` has serialized references to the scene camera, module root transforms, floor renderer, material, shortcuts-disabled handle settings, UI sprites and the sample-local `Workshop Sans SDF` font asset. Each module is an unparented transform at y=0, with unit scale, integer X/Z coordinates and quarter-turn yaw. Child box meshes and colliders make the wall or L shape. Invalid initial setup fails explicitly. Child collider selection resolves only to registered module roots.
 
 Straight modules extend from local x=0 to x=2. Corner modules have mating faces at local (2,0,0) and (0,0,2); wall height is 1.3 and thickness 0.2 units. Their origin is the corner centerline intersection on the floor. The two corner boxes meet without overlapping volumes. Integer pivots and quarter-turn rotations keep connection faces on the same lattice. Placement constraints use Core `Handle.Axes`, `PositionSnap`, `RotationSnap` and `SnappingType`; the sample does not apply a second transform correction after the drag.
 
 The controller owns only its own handles, UI, event system (if needed) and runtime material instances. It restores a borrowed manager's camera/settings/UI-blocking state on disable and restores child renderer materials on destruction. An owned manager survives disable/re-enable and is destroyed with the controller. Sample assets, shader names and WebGL symbols are independent of Level Editor; no shared demo framework or new Core API is introduced.
 
+## Typography
+
+All controls use TextMeshPro, including the handle-size input with its own clipped text viewport. Font sizes stay explicit rather than shrinking to fit. The selection row shares one height and vertical alignment; help paragraphs remain top-aligned. The sample includes Liberation Sans under the SIL Open Font License in `Fonts/LiberationSans - OFL.txt`, plus a dynamic signed-distance-field font asset generated at 90 points with 9 pixels of padding in a 1024 × 1024 atlas. It can add glyphs supported by the source font for renamed modules, including Turkish text; it is not a universal Unicode font. The material references the standard TMP Essential Resources mobile SDF shader. Existing global TMP defaults are not used as the UI font.
+
 ## Validation and WebGL
 
 The optional `Tests` assembly is guarded by `UNITY_INCLUDE_TESTS`. After importing exactly once and setting up the layer, run PlayMode tests with `-testFilter TransformHandles.Samples.ModularBuilding.Tests`. Tests include actual Core plane/ring interaction, child selection, geometry joins at all quarter turns, UI/input ownership, Reset and lifecycle cleanup.
 
-The repository build helper imports without overwriting customized imports. On a clean CLI project, prepare in one invocation and build in the next, so Unity can load the newly compiled sample assembly before serializing the player. Building immediately after a first import is rejected with an actionable error:
+The repository build helper imports without overwriting customized imports. On a clean CLI project, install the version-appropriate TMP dependency and import its Essential Resources first. Then prepare in one invocation and build in the next, so Unity can load the newly compiled sample assembly before serializing the player. Building immediately after a first import is rejected with an actionable error:
 
 ```sh
 Unity -batchmode -quit -buildTarget WebGL -projectPath PROJECT \

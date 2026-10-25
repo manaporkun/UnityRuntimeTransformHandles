@@ -62,7 +62,12 @@ public static class BuildScript
         if (!AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == assemblyName))
             throw new InvalidOperationException($"Sample '{sampleName}' has been imported but its Editor assembly is not loaded. " +
                 "Let script compilation and domain reload finish, then run the build again in a new Editor invocation. " +
-                "For clean Modular Building CLI builds, run BuildScript.PrepareModularBuildingWebGL first.");
+                "For clean Modular Building CLI builds, install the version-appropriate TMP package and Essential Resources, " +
+                "then run BuildScript.PrepareModularBuildingWebGL first.");
+        if (sampleFolder == "ModularBuilding" &&
+            (Resources.Load("TMP Settings") == null || Shader.Find("TextMeshPro/Mobile/Distance Field") == null))
+            throw new InvalidOperationException("Modular Building requires TMP Essential Resources. " +
+                "Import them once through Window > TextMeshPro > Import TMP Essential Resources before building.");
 
         var previousTemplate = PlayerSettings.WebGL.template;
         var previousCompressionFormat = PlayerSettings.WebGL.compressionFormat;

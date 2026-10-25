@@ -6,6 +6,7 @@ using TransformHandles.Utils;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using TMPro;
 
 namespace TransformHandles.Samples.ModularBuilding
 {
@@ -19,6 +20,7 @@ namespace TransformHandles.Samples.ModularBuilding
         [SerializeField] private Material targetMaterial;
         [SerializeField] private TransformHandleSettings interactionSettings;
         [SerializeField] private Sprite panelSprite;
+        [SerializeField] private TMP_FontAsset uiFont;
         [SerializeField] private Sprite moveIcon, rotateIcon;
 
         private readonly List<Transform> _selection = new List<Transform>();
@@ -37,18 +39,17 @@ namespace TransformHandles.Samples.ModularBuilding
         private int _handleSizePixels = 192;
         private int _lastSizeEditFrame = -1;
         private Slider _sizeSlider;
-        private InputField _sizeInput;
+        private TMP_InputField _sizeInput;
         private int _lastStartFrame = -1, _pressFrame = -1;
         private bool _pressBlocked, _releasePending, _pressCancelled;
         private Vector3 _pressPosition, _releasePosition;
         private bool _releaseBlocked;
         private GameObject _canvas, _ownedEventSystem;
-        private Text _status, _selectionLabel, _modeLabel, _constraintLabel;
+        private TextMeshProUGUI _status, _selectionLabel, _modeLabel, _constraintLabel;
         private Button _moveButton, _rotateButton, _resetButton;
-        private Font _font;
         private RectTransform _toolbar, _toolRow, _selectionCard, _contextBar;
         private Button _sizeToggleButton, _sizeCloseButton, _sizeBackdrop;
-        private Text _projectLabel;
+        private TextMeshProUGUI _projectLabel;
         private RectTransform _helpCard, _contextSeparator;
         private Button _helpToggleButton, _helpCloseButton, _helpBackdrop;
         private bool _helpPanelOpen, _closeHelpPanelPending;
@@ -94,6 +95,12 @@ namespace TransformHandles.Samples.ModularBuilding
                 enabled = false;
                 return;
             }
+            if (uiFont == null || TMP_Settings.instance == null)
+            {
+                Debug.LogError("Modular Building requires its UI font and TMP Essential Resources. Import them through Window > TextMeshPro > Import TMP Essential Resources before playing.", this);
+                enabled = false;
+                return;
+            }
             var layer = LayerMask.NameToLayer("TransformHandle");
             if (layer < 0)
             {
@@ -113,11 +120,6 @@ namespace TransformHandles.Samples.ModularBuilding
                     SetMaterial(renderer, colors[i % colors.Length], false);
             }
             if (floorRenderer != null) SetMaterial(floorRenderer, new Color(.87f,.89f,.91f), true);
-#if UNITY_2022_2_OR_NEWER
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-#else
-            _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-#endif
             BuildUi();
             _initialized = true;
             UpdateCamera();
@@ -551,15 +553,16 @@ namespace TransformHandles.Samples.ModularBuilding
 
             _contextBar = Panel("Selection context", new Vector2(.5f, 0), new Vector2(0, 24), new Vector2(600, 72));
             AddPanelOutline(_contextBar);
-            _selectionLabel = Label(_contextBar, "No selection", 18, 10, PrimaryText, 20, 52);
-            _selectionLabel.alignment = TextAnchor.MiddleLeft;
-            _selectionLabel.supportRichText = false;
-            _selectionLabel.rectTransform.sizeDelta = new Vector2(210, 52);
+            _selectionLabel = Label(_contextBar, "No selection", 18, 20, PrimaryText, 20, 32);
+            _selectionLabel.alignment = TextAlignmentOptions.Left;
+            _selectionLabel.richText = false;
+            _selectionLabel.rectTransform.sizeDelta = new Vector2(210, 32);
             _contextSeparator = UiImage(_contextBar, "Selection separator", new Color(.90f, .91f, .93f), new Vector2(236, -14), new Vector2(1, 44)).rectTransform;
             _modeLabel = Label(_contextBar, "Move", 250, 20, MutedText, 20, 32);
             _modeLabel.rectTransform.sizeDelta = new Vector2(84, 32);
-            _modeLabel.alignment = TextAnchor.MiddleLeft;
+            _modeLabel.alignment = TextAlignmentOptions.Left;
             _constraintLabel = Label(_contextBar, "1 unit grid · 90° turns", 340, 20, MutedText, 20, 32);
+            _constraintLabel.alignment = TextAlignmentOptions.Left;
             _constraintLabel.rectTransform.sizeDelta = new Vector2(246, 32);
 
             BuildHelpUi();
@@ -608,7 +611,7 @@ namespace TransformHandles.Samples.ModularBuilding
             _helpToggleButton = AddButton(launcher, "?  Help", 0, 0, 112, ToggleHelpPanel);
             _buttons.Remove(_helpToggleButton);
             ((RectTransform)_helpToggleButton.transform).sizeDelta = new Vector2(112, 48);
-            _helpToggleButton.GetComponentInChildren<Text>().rectTransform.sizeDelta = new Vector2(112, 48);
+            _helpToggleButton.GetComponentInChildren<TextMeshProUGUI>().rectTransform.sizeDelta = new Vector2(112, 48);
 
             var backdrop = Panel("Help backdrop", Vector2.zero, Vector2.zero, Vector2.zero);
             backdrop.anchorMax = Vector2.one;
@@ -627,7 +630,7 @@ namespace TransformHandles.Samples.ModularBuilding
             HelpRow("Zoom", "Scroll", 160);
             UiImage(_helpCard, "Help separator", new Color(.90f, .91f, .93f), new Vector2(22, -198), new Vector2(316, 1));
             _status = Label(_helpCard, _notice, 22, 212, PrimaryText, 20, 48);
-            _status.supportRichText = false;
+            _status.richText = false;
             _status.rectTransform.sizeDelta = new Vector2(316, 48);
             var note = Label(_helpCard, "Modules can overlap. Reset restores the layout.", 22, 274, MutedText, 20, 48);
             note.rectTransform.sizeDelta = new Vector2(316, 48);
@@ -639,9 +642,10 @@ namespace TransformHandles.Samples.ModularBuilding
         {
             var name = Label(_helpCard, action, 22, top, PrimaryText, 20, 28);
             name.rectTransform.sizeDelta = new Vector2(166, 28);
+            name.alignment = TextAlignmentOptions.Left;
             var shortcut = Label(_helpCard, gesture, 194, top, MutedText, 20, 28);
             shortcut.rectTransform.sizeDelta = new Vector2(144, 28);
-            shortcut.alignment = TextAnchor.UpperRight;
+            shortcut.alignment = TextAlignmentOptions.Right;
         }
 
         private void ToggleHelpPanel()
@@ -685,7 +689,7 @@ namespace TransformHandles.Samples.ModularBuilding
         private void RequestCloseSizePanel()
         {
             if (!_sizePanelOpen) return;
-            // Commit an outside/Close click, but let InputField handle Escape cancellation first.
+            // Commit an outside/Close click, but let TMP_InputField handle Escape cancellation first.
             if (_sizeInput.isFocused) _sizeInput.DeactivateInputField();
             _pressBlocked = _pressCancelled = true;
             _releaseBlocked = true;
@@ -756,21 +760,35 @@ namespace TransformHandles.Samples.ModularBuilding
         private void BuildHandleSizeUi()
         {
             var label = Label(_selectionCard, "Size", 22, 70, PrimaryText, 20, 44);
-            label.alignment = TextAnchor.MiddleLeft;
+            label.alignment = TextAlignmentOptions.Left;
             label.rectTransform.sizeDelta = new Vector2(150, 44);
             var fieldImage = UiImage(_selectionCard, "Handle size input", Color.white, new Vector2(180, -70), new Vector2(98, 44));
             fieldImage.raycastTarget = true;
             var border = fieldImage.gameObject.AddComponent<Outline>();
             border.effectColor = new Color(.81f, .83f, .87f); border.effectDistance = new Vector2(1, -1);
-            _sizeInput = fieldImage.gameObject.AddComponent<InputField>();
+            _sizeInput = fieldImage.gameObject.AddComponent<TMP_InputField>();
             _sizeInput.targetGraphic = fieldImage;
-            _sizeInput.contentType = InputField.ContentType.IntegerNumber;
+            _sizeInput.contentType = TMP_InputField.ContentType.IntegerNumber;
             _sizeInput.characterLimit = 10;
-            var value = Label(fieldImage.transform, "192", 6, 0, PrimaryText, 20, 44);
-            value.rectTransform.sizeDelta = new Vector2(60, 44); value.alignment = TextAnchor.MiddleRight;
+            var viewport = new GameObject("Text viewport", typeof(RectTransform), typeof(RectMask2D));
+            viewport.transform.SetParent(fieldImage.transform, false);
+            var viewportRect = (RectTransform)viewport.transform;
+            viewportRect.anchorMin = new Vector2(0, 0); viewportRect.anchorMax = new Vector2(1, 1);
+            viewportRect.offsetMin = new Vector2(6, 2); viewportRect.offsetMax = new Vector2(-30, -2);
+            var value = Label(viewport.transform, "192", 0, 0, PrimaryText, 20, 40);
+            value.rectTransform.anchorMin = Vector2.zero; value.rectTransform.anchorMax = Vector2.one;
+            value.rectTransform.offsetMin = value.rectTransform.offsetMax = Vector2.zero;
+            value.alignment = TextAlignmentOptions.Right;
+            value.overflowMode = TextOverflowModes.Overflow;
+            _sizeInput.textViewport = viewportRect;
             _sizeInput.textComponent = value;
+            _sizeInput.lineType = TMP_InputField.LineType.SingleLine;
+            _sizeInput.richText = false;
+            _sizeInput.customCaretColor = true;
+            _sizeInput.caretColor = PrimaryText;
+            _sizeInput.selectionColor = new Color(.08f, .40f, .82f, .18f);
             var unit = Label(fieldImage.transform, "px", 71, 0, MutedText, 16, 44);
-            unit.rectTransform.sizeDelta = new Vector2(24, 44); unit.alignment = TextAnchor.MiddleLeft;
+            unit.rectTransform.sizeDelta = new Vector2(24, 44); unit.alignment = TextAlignmentOptions.Left;
             _sizeInput.SetTextWithoutNotify(_handleSizePixels.ToString());
             _sizeInput.onEndEdit.AddListener(CommitHandleSize);
 
@@ -794,7 +812,7 @@ namespace TransformHandles.Samples.ModularBuilding
             _sizeSlider.onValueChanged.AddListener(SetHandleSize);
             Label(_selectionCard, "64", 22, 174, MutedText, 14, 20);
             var maximum = Label(_selectionCard, "512", 228, 174, MutedText, 14, 20);
-            maximum.rectTransform.sizeDelta = new Vector2(50, 20); maximum.alignment = TextAnchor.UpperRight;
+            maximum.rectTransform.sizeDelta = new Vector2(50, 20); maximum.alignment = TextAlignmentOptions.TopRight;
         }
 
         private bool SuppressShortcuts(int frame) =>
@@ -825,13 +843,21 @@ namespace TransformHandles.Samples.ModularBuilding
             if (!_sizeInput.isFocused) _sizeInput.SetTextWithoutNotify(_handleSizePixels.ToString());
         }
 
-        private Text Label(Transform parent, string text, float x, float y, Color color, int size, float height = 32)
+        private TextMeshProUGUI Label(Transform parent, string text, float x, float y, Color color, int size, float height = 32)
         {
-            var go = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            var go = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
-            var label = go.GetComponent<Text>(); label.text = text; label.font = _font;
+            var label = go.GetComponent<TextMeshProUGUI>(); label.text = text; label.font = uiFont;
             label.fontSize = size; label.color = color; label.raycastTarget = false;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap; label.verticalOverflow = VerticalWrapMode.Truncate;
+            label.enableAutoSizing = false;
+            label.richText = false;
+            label.alignment = TextAlignmentOptions.TopLeft;
+#if UNITY_2023_2_OR_NEWER
+            label.textWrappingMode = TextWrappingModes.Normal;
+#else
+            label.enableWordWrapping = true;
+#endif
+            label.overflowMode = TextOverflowModes.Truncate;
             var rect = label.rectTransform; rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 1);
             rect.anchoredPosition = new Vector2(x, -y); rect.sizeDelta = new Vector2(252, height);
             return label;
@@ -847,7 +873,7 @@ namespace TransformHandles.Samples.ModularBuilding
             image.color = Color.white;
             var button = go.GetComponent<Button>(); button.onClick.AddListener(action); _buttons.Add(button);
             var label = Label(go.transform, text, 0, 0, PrimaryText, 20, 56);
-            label.alignment = TextAnchor.MiddleCenter; label.rectTransform.sizeDelta = new Vector2(width, 56);
+            label.alignment = TextAlignmentOptions.Center; label.rectTransform.sizeDelta = new Vector2(width, 56);
             if (icon != null)
             {
                 var iconObject = new GameObject("Icon", typeof(RectTransform), typeof(Image));
@@ -885,8 +911,9 @@ namespace TransformHandles.Samples.ModularBuilding
             _uiState = state;
             var selected = _selection.Count > 0;
             _contextBar.sizeDelta = selected ? new Vector2(600, 72) : new Vector2(340, 56);
-            _selectionLabel.rectTransform.sizeDelta = selected ? new Vector2(210, 52) : new Vector2(304, 36);
-            _selectionLabel.alignment = selected ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
+            _selectionLabel.rectTransform.anchoredPosition = new Vector2(18, selected ? -20 : -10);
+            _selectionLabel.rectTransform.sizeDelta = selected ? new Vector2(210, 32) : new Vector2(304, 36);
+            _selectionLabel.alignment = selected ? TextAlignmentOptions.Left : TextAlignmentOptions.Center;
             SetSelectionLabel(selected ? selectionName : "Select a wall or corner");
             _modeLabel.gameObject.SetActive(selected);
             _constraintLabel.gameObject.SetActive(selected);
@@ -898,7 +925,7 @@ namespace TransformHandles.Samples.ModularBuilding
             _sizeCloseButton.interactable = true;
             _helpToggleButton.interactable = !_dragging;
             _helpCloseButton.interactable = true;
-            _sizeToggleButton.GetComponentInChildren<Text>().text = "Handle size · " + _handleSizePixels + " px";
+            _sizeToggleButton.GetComponentInChildren<TextMeshProUGUI>().text = "Handle size · " + _handleSizePixels + " px";
             StyleButton(_moveButton, _mode == HandleType.Position);
             StyleButton(_rotateButton, _mode == HandleType.Rotation);
             StyleButton(_resetButton, false);
@@ -919,7 +946,7 @@ namespace TransformHandles.Samples.ModularBuilding
             colors.fadeDuration = .08f;
             button.colors = colors;
             var color = button.interactable ? (active ? Accent : MutedText) : new Color(.64f, .65f, .68f);
-            button.GetComponentInChildren<Text>().color = color;
+            button.GetComponentInChildren<TextMeshProUGUI>().color = color;
             var icon = button.transform.Find("Icon");
             if (icon != null) icon.GetComponent<Image>().color = color;
         }

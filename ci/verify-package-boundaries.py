@@ -11,6 +11,9 @@ DEMOS = CORE + '.demos'
 UNITY_ASSEMBLIES = {'2bafac87e7f4b9b418d9448d219b01ab', '75469ad4d38634e559750d17036d5f7c'}
 # The unchanged legacy showcase retains its documented URP camera component.
 LEGACY_URP = {'a79441f348de89743a2939f4d699eac1'}
+# Official TMP runtime assembly, font asset script and Essential Resources mobile SDF shader.
+MODULAR_TMP = {'6055be8ebefd69e48b49212b09b47b2f', '71c1514a6bd24e1e882cebbe1904ce04',
+               'fe393ace9b354375a9cb14cdbbc28be4'}
 GUID = re.compile(r'(?:guid:\s*|GUID:)([0-9a-f]{32})')
 
 
@@ -65,6 +68,8 @@ def validate(root):
         require(folder.is_relative_to((demos / 'Samples~').resolve()) and folder.is_dir(), 'invalid sample path')
         local_guids = {guid for guid, path in all_guids.items() if path.resolve().is_relative_to(folder)}
         allowed = core_guids | local_guids | UNITY_ASSEMBLIES
+        if sample['path'] == 'Samples~/ModularBuilding':
+            allowed |= MODULAR_TMP
         if sample['path'] == 'Samples~/Demo':
             allowed |= LEGACY_URP
         require(any(folder.glob('*.unity')) and any(folder.glob('*.asmdef')), 'sample scene/assembly missing')

@@ -55,6 +55,17 @@ SOFTWARE.
 
 ## Bundled assets
 
-All meshes (`cone`, `torus`, `tube`), materials, prefabs, and shaders shipped in this package are
+Except for the font assets listed below, all meshes (`cone`, `torus`, `tube`), materials, prefabs, and shaders shipped in this package are
 distributed under the package's MIT license (see `LICENSE.md`). Portions derive from the Runtime
 Transform Handle project credited above (also MIT).
+
+## Liberation Sans (Modular Building only)
+
+`Samples~/ModularBuilding/Fonts/LiberationSans.ttf` and its generated `Workshop Sans SDF.asset`
+are distributed under the SIL Open Font License 1.1, not the package MIT license.
+Copyright (c) 2010 Google Corporation and (c) 2012 Red Hat, Inc.
+The complete license and reserved font names are included in
+`Samples~/ModularBuilding/Fonts/LiberationSans - OFL.txt`.
+
+TextMeshPro runtime and Essential Resources are supplied separately by Unity; this package
+references them but does not redistribute TMP code, shaders or global settings.

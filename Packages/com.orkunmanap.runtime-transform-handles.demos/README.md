@@ -27,6 +27,10 @@ before publishing. Core-only installs can continue using the existing Core #upm 
 Select **Runtime Transform Handles Demos** in Package Manager and import the desired sample.
 Run **Tools > Transform Handles > Setup Layer** before Play. No URP or Input System dependency is
 added by this package; UI dependencies belong to demos, not Core.
+**Modular Building** additionally requires TextMeshPro 3.0.6+ on Unity 2021.3–2023.1,
+or uGUI 2.0 on Unity 2023.2+ / Unity 6, and TMP Essential Resources imported once through
+Window > TextMeshPro. See its [setup instructions](Samples~/ModularBuilding/README.md).
+This is a sample prerequisite, not a Core or other-demo dependency.
 
 ## Migrate an existing showcase
 
@@ -39,6 +43,6 @@ The new path uses Runtime Transform Handles Demos as the package display name.
 The build helper rejects duplicate GUIDs rather than overwriting a customized import.
 
 Removing the demos package does not remove Assets copies. Keep Core and explicit project dependencies
-on com.unity.ugui and com.unity.modules.imgui when retaining imports. Input System remains optional. When using its backend, use 1.1.1 or later for these demos; the retained original showcase also calls the runtime UI default-actions API and is not compatible with Input System 1.0.
+on com.unity.ugui and com.unity.modules.imgui when retaining imports. Retained Modular Building imports also need their TMP package/resources. Input System remains optional. When using its backend, use 1.1.1 or later for these demos; the retained original showcase also calls the runtime UI default-actions API and is not compatible with Input System 1.0.
 To remove examples entirely, explicitly remove their imported folders after backing up changes.
 This sample relocation is a distribution breaking change; preserve old version pins when needed.

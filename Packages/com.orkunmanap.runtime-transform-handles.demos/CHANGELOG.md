@@ -12,4 +12,5 @@
 - Responsive white editor UI, handle size popover, left-drag orbit, right-drag pan and fractional WebGL wheel zoom.
 
 ### Fixed
+- Modular Building uses sample-local SDF typography and a TMP numeric field; selection-row labels share vertical alignment. This sample now requires the version-appropriate TMP package and Essential Resources.
 - WebGL builds now reject newly imported sample assemblies until Unity reloads them, preventing missing-script players. Modular Building has a separate CLI preparation command; Pages prepares the original showcase before starting Unity.

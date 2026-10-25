@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
+using TMPro;
 using Object = UnityEngine.Object;
 
 namespace TransformHandles.Samples.ModularBuilding.Tests
@@ -56,6 +57,13 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
 #else
             _settings = ScriptableObject.CreateInstance<TransformHandleSettings>();
             typeof(TransformHandleSettings).GetField("enableShortcuts", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(_settings, false);
+#endif
+#if UNITY_EDITOR
+            var fonts = UnityEditor.AssetDatabase.FindAssets("Workshop Sans SDF t:TMP_FontAsset", new[] {"Assets"});
+            Assert.AreEqual(1, fonts.Length, "Import this sample font exactly once before testing.");
+            Set("uiFont", UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(UnityEditor.AssetDatabase.GUIDToAssetPath(fonts[0])));
+#else
+            Set("uiFont", TMP_Settings.defaultFontAsset);
 #endif
             _material = new Material(Shader.Find("TransformHandles/Samples/ModularBuildingOpaque"));
             Set("sceneCamera", _camera); Set("targets", _targets);
@@ -229,13 +237,13 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
         public void SizePopoverWorksWithoutSelectionAndPreservesPreferenceAfterClose()
         {
             Assert.IsTrue(Get<RectTransform>("_contextBar").gameObject.activeSelf);
-            Assert.AreEqual("Select a wall or corner", Get<Text>("_selectionLabel").text);
-            Assert.IsFalse(Get<Text>("_modeLabel").gameObject.activeSelf);
+            Assert.AreEqual("Select a wall or corner", Get<TextMeshProUGUI>("_selectionLabel").text);
+            Assert.IsFalse(Get<TextMeshProUGUI>("_modeLabel").gameObject.activeSelf);
             Assert.IsTrue(Get<Button>("_sizeToggleButton").interactable);
             Call("ToggleSizePanel");
             Get<Slider>("_sizeSlider").value = 320;
             Call("RefreshUi");
-            StringAssert.Contains("320 px", Get<Button>("_sizeToggleButton").GetComponentInChildren<Text>().text);
+            StringAssert.Contains("320 px", Get<Button>("_sizeToggleButton").GetComponentInChildren<TextMeshProUGUI>().text);
             Call("RequestCloseSizePanel"); Call("ApplyDeferredPanelClose");
             Assert.IsFalse(Get<RectTransform>("_selectionCard").gameObject.activeSelf);
             Select(); Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
@@ -270,7 +278,7 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
         public IEnumerator EscapeRespectsEditingThenClosesPopoverBeforeClearingSelection()
         {
             Select(); Call("ToggleSizePanel");
-            var field = Get<InputField>("_sizeInput"); field.Select(); field.ActivateInputField();
+            var field = Get<TMP_InputField>("_sizeInput"); field.Select(); field.ActivateInputField();
             yield return null;
             Assert.IsTrue(field.isFocused);
             Call("HandleEscape", Time.frameCount);
@@ -310,7 +318,7 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
             {
                 Call("CommitHandleSize", invalid);
                 Assert.AreEqual(256, Get<int>("_handleSizePixels"));
-                Assert.AreEqual("256", Get<InputField>("_sizeInput").text);
+                Assert.AreEqual("256", Get<TMP_InputField>("_sizeInput").text);
                 Assert.AreEqual(256, Get<Slider>("_sizeSlider").value);
             }
             Select(); Assert.AreEqual(256, _demo.ActiveHandle.AutoScaleSizeInPixels);
@@ -320,7 +328,7 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
         public IEnumerator NumericFocusAndEditEndFrameSuppressShortcuts()
         {
             Select(); Call("ToggleSizePanel");
-            var field = Get<InputField>("_sizeInput");
+            var field = Get<TMP_InputField>("_sizeInput");
             field.Select(); field.ActivateInputField();
             yield return null;
             Assert.IsTrue(field.isFocused);
@@ -344,11 +352,11 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
             Assert.IsFalse(other.AutoScale); Assert.AreEqual(111, other.AutoScaleSizeInPixels);
             _demo.ActiveHandle.InteractionStart(); Call("RefreshUi");
             Assert.IsFalse(Get<Slider>("_sizeSlider").interactable);
-            Assert.IsFalse(Get<InputField>("_sizeInput").interactable);
+            Assert.IsFalse(Get<TMP_InputField>("_sizeInput").interactable);
             Call("SetHandleSize", 400f); Call("CommitHandleSize", "400");
             Assert.AreEqual(240, _demo.ActiveHandle.AutoScaleSizeInPixels);
             Assert.AreEqual(240, Get<Slider>("_sizeSlider").value);
-            Assert.AreEqual("240", Get<InputField>("_sizeInput").text);
+            Assert.AreEqual("240", Get<TMP_InputField>("_sizeInput").text);
         }
 
         [UnityTest]
@@ -360,7 +368,7 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
             var canvas = Get<GameObject>("_canvas");
             Assert.That(Get<Slider>("_sizeSlider").handleRect.rect.height, Is.EqualTo(18).Within(.01f));
             foreach (var rect in new[] {(RectTransform)Get<Slider>("_sizeSlider").transform,
-                         (RectTransform)Get<InputField>("_sizeInput").transform})
+                         (RectTransform)Get<TMP_InputField>("_sizeInput").transform})
             {
                 var point = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
                 var hits = new List<RaycastResult>();
@@ -469,15 +477,63 @@ namespace TransformHandles.Samples.ModularBuilding.Tests
                 "Drag the handle to place this module.", "Scene reset. Handle size preference is kept."})
             {
                 Set("_notice", message); Call("RefreshUi");
-                foreach (var label in Get<RectTransform>("_helpCard").GetComponentsInChildren<Text>())
+                foreach (var label in Get<RectTransform>("_helpCard").GetComponentsInChildren<TextMeshProUGUI>())
                     Assert.LessOrEqual(label.preferredHeight, label.rectTransform.rect.height + .1f, label.text);
             }
-            var status = Get<Text>("_status");
+            var status = Get<TextMeshProUGUI>("_status");
             Assert.IsTrue(status.transform.IsChildOf(Get<RectTransform>("_helpCard")));
             Assert.IsNull(Get<GameObject>("_canvas").transform.Find("Shortcuts"));
             var strip = Get<RectTransform>("_contextBar");
             Assert.GreaterOrEqual(Get<RectTransform>("_helpCard").anchoredPosition.y,
                 strip.anchoredPosition.y + 72 + 12);
+        }
+
+        [UnityTest]
+        public IEnumerator TypographyUsesOneFontAndAlignedSelectionBaseline()
+        {
+            _targets[0].name = "Duvar İğüş · 90°";
+            Select();
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var labels = Get<GameObject>("_canvas").GetComponentsInChildren<TextMeshProUGUI>(true);
+            Assert.IsEmpty(Get<GameObject>("_canvas").GetComponentsInChildren<Text>(true));
+            foreach (var label in labels)
+            {
+                Assert.AreSame(Get<TMP_FontAsset>("uiFont"), label.font);
+                Assert.IsFalse(label.enableAutoSizing, "Controls must not silently shrink text.");
+            }
+            var selected = Get<TextMeshProUGUI>("_selectionLabel");
+            selected.ForceMeshUpdate();
+            Assert.AreEqual(_targets[0].name, selected.text);
+            foreach (var c in selected.text) Assert.IsTrue(selected.font.HasCharacter(c), "Missing glyph: " + c);
+            var baseline = selected.transform.TransformPoint(new Vector3(0, selected.textInfo.lineInfo[0].baseline, 0)).y;
+            foreach (var field in new[] {"_modeLabel", "_constraintLabel"})
+            {
+                var label = Get<TextMeshProUGUI>(field); label.ForceMeshUpdate();
+                Assert.That(label.transform.TransformPoint(new Vector3(0, label.textInfo.lineInfo[0].baseline, 0)).y,
+                    Is.EqualTo(baseline).Within(.1f), field);
+                Assert.IsFalse(label.isTextOverflowing, field);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator NumericEscapeCancelsAndReturnCommitsWithViewport()
+        {
+            Select(); Call("ToggleSizePanel");
+            var field = Get<TMP_InputField>("_sizeInput");
+            Assert.IsNotNull(field.textViewport.GetComponent<RectMask2D>());
+            Assert.IsTrue(field.textComponent.transform.IsChildOf(field.textViewport));
+            field.Select(); field.ActivateInputField(); yield return null;
+            field.text = "320";
+            field.ProcessEvent(Event.KeyboardEvent("escape")); field.DeactivateInputField();
+            Assert.AreEqual(192, Get<int>("_handleSizePixels"));
+            Assert.AreEqual("192", field.text);
+            Assert.AreEqual(1, _demo.SelectionCount);
+            field.Select(); field.ActivateInputField(); yield return null;
+            field.text = "320";
+            field.ProcessEvent(Event.KeyboardEvent("return")); field.DeactivateInputField();
+            Assert.AreEqual(320, _demo.ActiveHandle.AutoScaleSizeInPixels);
+            Assert.AreEqual("320", field.text);
         }
 
         [Test]
