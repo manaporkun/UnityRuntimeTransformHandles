@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Custom transformation overrides that detach a handle cannot make a factory return it as owned.
 
 ### Added
+- Optional `RotationAxis.DragAngleLimits` keeps joint rotation and its arc within grab-relative bounds, with immediate reversal after overshoot and explicit configuration lifetime. The default remains unrestricted.
 - Opt-in LocalSpaceReference and UniformGroupScale controls for shared-center group rotation and proportional scaling. The optional Level Editor exposes group Rotate and uniform Scale, preserving World/Local preference.
 - Precision handle style with slim geometry, translucent planes, stable overlay ordering and
   preserved axis/ring/tip picking volumes. Rounded plane pads are closer to the pivot with aligned picking areas. The supplied manager now uses Precision; Native remains available.

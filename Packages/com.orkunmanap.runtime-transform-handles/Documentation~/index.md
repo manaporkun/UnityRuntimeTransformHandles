@@ -281,3 +281,11 @@ additionally restores the whole drag if an object scale would leave its 0.25–4
 
 The Level Editor uses the last selected surviving prop as Local reference, allows group rotation,
 and enables uniform group scaling. World/Local selection is retained across group Scale mode.
+
+## Optional rotation angle limits
+
+`RotationAxis.DragAngleLimits` optionally restricts a single drag. Bounds are degrees relative to the pose at grab start. Both must be finite, in `[-180, 180]`, and contain zero; `null` (the default) preserves unrestricted behavior. Invalid bounds throw `ArgumentOutOfRangeException`. This bounded range also bounds rotation-arc tessellation.
+
+Configure before a drag, in the axis `InteractionStart` event, or the handle's `OnInteractionStartEvent`. After the first interaction step, changes throw `InvalidOperationException` until `EndInteraction` (including manager cancellation). Limits apply after snapping, so a boundary can lie between snap increments. Reverse movement responds immediately after an overshoot. The accepted angle drives both the pivot and the arc.
+
+For a joint currently at 20° with absolute bounds −30° and +60°, configure `new Vector2(-50, 40)` at grab start. Recompute on every grab. The sample owns the joint's neutral pose and current angle; Core does not add hierarchy or joint state. Axis components can be rebuilt when handle type/axes change, so obtain the active axis when configuring it.
