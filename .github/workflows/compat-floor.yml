@@ -93,6 +93,7 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
         with:
+          cliVersion: v0.1.72
           projectPath: ci/floor-2021
           unityVersion: 2021.3.45f1
           testMode: all

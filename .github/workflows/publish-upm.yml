@@ -224,6 +224,7 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
         with:
+          cliVersion: v0.1.72
           unityVersion: 6000.3.16f1
           testMode: all
           customParameters: -transformHandlesIsolatedTests -testFilter TransformHandles.Tests.
@@ -306,7 +307,7 @@ jobs:
           python3 ci/verify-sample-results.py prepare --out artifacts/sample-evidence --unity 6000.3.16f1 --input ${{ matrix.input }}
 
       - name: Run tests
-        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
@@ -314,6 +315,7 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
         with:
+          cliVersion: v0.1.72
           unityVersion: 6000.3.16f1
           testMode: playmode
           customParameters: -testFilter TransformHandles.Samples.

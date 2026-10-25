@@ -111,3 +111,9 @@ come from the existing reviewed 116/119-test development suites, not from the re
 actual Editor startup version, input setting and unchanged imported/package files afterward. Only
 Unity-generated metadata for the five top-level import folders may be added; every distributed file
 must remain byte-identical, and other additions fail.
+
+GameCI test runners and the Pages builder pin CLI `v0.1.72` instead of resolving `latest` on each
+runner. The upstream downloader's latest-release lookup can hit GitHub's unauthenticated shared-IP
+rate limit before Unity starts. Both Core/Demos jobs use the same pinned action revision and CLI;
+Unity editor versions remain explicit in test jobs and match each project's ProjectVersion.txt;
+Pages uses auto detection. Test startup logs independently verify the observed editor version. CLI pinning does not relax any suite, artifact or publication gate.
