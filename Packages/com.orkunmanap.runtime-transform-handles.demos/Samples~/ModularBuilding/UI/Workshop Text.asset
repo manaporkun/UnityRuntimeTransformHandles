@@ -11,8 +11,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 19103, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: Workshop Text
-  m_EditorClassIdentifier: 
-  m_Version: 
+  m_EditorClassIdentifier:
+  m_Version:
   m_DefaultFontAsset: {fileID: 0}
   m_DefaultFontAssetPath: Fonts & Materials/
   m_FallbackFontAssets: []
