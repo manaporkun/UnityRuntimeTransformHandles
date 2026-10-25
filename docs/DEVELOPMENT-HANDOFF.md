@@ -26,32 +26,32 @@ The owner considers the current demos sufficient. Stop adding demo scenarios or 
 
 ### 1. Align package versions and release scope
 
-- [ ] Inspect both package manifests, release automation and existing tags; propose the exact Core/Demos version pair. Do not infer a release version from the current development manifests.
-- [ ] Account for the optional-package split as a distribution breaking change; keep migration instructions and existing sample GUIDs consistent.
-- [ ] Ensure Demos depends on a Core version that actually includes `RotationAxis.DragAngleLimits`; published Core 3.3.0 must not be assumed to provide it.
-- [ ] After plan approval, update manifests, dependency declarations, changelogs and installation examples together.
-- [ ] Define and verify publication order so the declared Core dependency is available when Demos is released.
+- [x] Inspect both package manifests, release automation and existing tags; propose the exact Core/Demos version pair. Do not infer a release version from the current development manifests.
+- [x] Account for the optional-package split as a distribution breaking change; keep migration instructions and existing sample GUIDs consistent.
+- [x] Ensure Demos depends on a Core version that actually includes `RotationAxis.DragAngleLimits`; published Core 3.3.0 must not be assumed to provide it.
+- [x] After plan approval, update manifests, dependency declarations, changelogs and installation examples together.
+- [x] Define and verify publication order so the declared Core dependency is available when Demos is released.
 
 Done when: exact versions and dependency availability are documented, and the intended release artifacts—not just linked development folders—pass installation checks.
 
 ### 2. Verify clean consumer installation
 
-- [ ] Install the intended Core artifact in a fresh supported Unity project with no imported demos; verify compilation and basic handle use.
-- [ ] Add Demos separately and import each sample independently, including Lamp Assembly and the optional gallery.
-- [ ] Verify the combined gallery, transitions and standalone behavior from the intended release artifacts.
-- [ ] Verify removing Demos leaves Core usable; check dependency and GUID isolation.
-- [ ] Verify the upgrade path from prior sample locations, including removal of the old Product Configurator import before importing Lamp Assembly.
-- [ ] Run the declared Unity/input compatibility matrix and record versions, package versions, commands and results. Existing local results are evidence for the development revision, not for a future versioned release artifact.
+- [x] Install the intended Core artifact in a fresh supported Unity project with no imported demos; verify compilation and basic handle use.
+- [x] Add Demos separately and import each sample independently, including Lamp Assembly and the optional gallery.
+- [x] Verify the combined gallery, transitions and standalone behavior from the intended release artifacts.
+- [x] Verify removing Demos leaves Core usable; check dependency and GUID isolation.
+- [x] Verify the upgrade path from prior sample locations, including removal of the old Product Configurator import before importing Lamp Assembly.
+- [x] Run the declared Unity/input compatibility matrix and record versions, package versions, commands and results. Existing local results are evidence for the development revision, not for a future versioned release artifact.
 - [ ] Perform a physical Mac trackpad smoke test; previous browser automation did not validate actual trackpad hardware.
 
 Done when: a new consumer can install Core alone or opt into the demos without hidden setup, duplicate GUIDs or missing API errors, and the tested support matrix is explicit.
 
 ### 3. Prepare the PR and confirm CI
 
-- [ ] Inspect the complete branch diff against its intended base, including accumulated earlier work; check for conflicts and unrelated changes.
-- [ ] Keep README, API docs, changelogs and migration notes aligned with the final release scope.
-- [ ] Run the repository's local gates from the final revision. Follow `ci/README.md` for exact-suite evidence; a successful Unity process alone is insufficient.
-- [ ] Obtain independent final review and address findings before presenting the diff to the owner.
+- [x] Inspect the complete branch diff against its intended base, including accumulated earlier work; check for conflicts and unrelated changes.
+- [x] Keep README, API docs, changelogs and migration notes aligned with the final release scope.
+- [x] Run the repository's local gates from the final revision. Follow `ci/README.md` for exact-suite evidence; a successful Unity process alone is insufficient.
+- [x] Obtain independent final review and address findings before presenting the diff to the owner.
 - [ ] Prepare a Conventional Commit PR title and concise description explaining Core/optional-Demos distribution, behavior changes and validation; flag the distribution breaking change.
 - [ ] Verify actual remote CI status for the final PR revision and resolve failures before marking it ready. Remote CI success has not been established in this handoff.
 - [ ] Obtain approval before merge or release; inspect main-branch publishing workflows before taking either action.
@@ -70,11 +70,11 @@ Done when: the reviewed final revision has green required checks, accurate relea
 
 Done when: the submission package and media accurately represent the tested product, and the owner has approved the final presentation.
 
-**Recommended next task:** inspect release automation and propose the Core/Demos version pair and clean-install validation plan. Do not start another demo.
+**Next acceptance gates:** confirm remote checks for the final draft PR revision, complete the physical Mac trackpad check and obtain owner review. Do not merge, publish or start another demo.
 
-### Release plan approved; implementation in progress
+### Release plan approved; implementation validated locally
 
-The release inspection and independent plan review are complete. The proposed pair is **Core 4.0.0 / Demos 1.0.0**, with Demos requiring Core 4.0.0. The owner approved implementation with “go”; these versions are not published. The remote's latest Core tag at inspection was `v3.3.1`; the feature branch's Core manifest still says `3.3.0`.
+The release inspection and independent plan review are complete. The proposed pair is **Core 4.0.0 / Demos 1.0.0**, with Demos requiring Core 4.0.0. The owner approved implementation with “go”; these versions are not published. The remote's latest Core tag at inspection was `v3.3.1`; the feature branch now preserves main's `3.3.1` development baseline. Release preparation generates the final 4.0.0 / 1.0.0 manifests before testing.
 
 - Preserve the existing Core `upm`/version-tag distribution and the Demos README's two explicit, same-commit monorepo `?path` dependencies. A Core-only version tag points to the extracted Core tree and cannot resolve the Demos package path. No new Demos distribution branch is needed.
 - Preserve the current main version during integration and let release preparation calculate the major bump. Setting Core to 4.0.0 before the existing automatic major bump would risk producing 5.0.0.
@@ -82,9 +82,73 @@ The release inspection and independent plan review are complete. The proposed pa
 - Validate Core-only installation, every independent sample, co-import/gallery, removal with and without retained Assets copies, and upgrade cleanup preserving GUIDs. Include local Unity 2021.3.0f1 minimum support, the remote floor's 2021.3.45f1, and Unity 6000.3.16f1 Legacy/Input System. Core-only CI does not establish Demos acceptance. Physical Mac trackpad validation remains a separate owner check.
 - Update manifests, dependency declarations, changelogs and installation/migration instructions together after approval. Replace stale Product Configurator descriptions in the Demos package README and obsolete validation descriptions in `ci/README.md`.
 
-The independent reviewer accepted the version pair and existing distribution pattern with the revision-gap and Demos-validation requirements above. Implementation is now authorized; merge, publication and deployment still require separate owner approval. See [release preparation](RELEASE-PREPARATION.md) for the implementation contract and acceptance matrix. Final independent review and QC remain required.
+The independent reviewer accepted the version pair and existing distribution pattern with the revision-gap and Demos-validation requirements above. Implementation is now authorized; merge, publication and deployment still require separate owner approval. See [release preparation](RELEASE-PREPARATION.md) for the implementation contract and acceptance matrix. Final independent source review and local QC passed; remote checks and owner acceptance remain separate gates.
 
-## Latest checkpoint: Lamp Assembly (2026-10-25)
+## Latest checkpoint: release candidate validation (2026-10-25)
+
+The owner approved Core 4.0.0 / optional Demos 1.0.0 implementation. `ci/release-candidate.py`
+freezes the final package manifests, dependency pair, changelogs, notes and per-file/archive hashes
+before testing. The publisher consumes those same artifacts, rejects an advanced main and verifies
+existing Core tags against the tested Git tree. Demos uses two explicit same-SHA monorepo package
+paths after Core publication; no new distribution branch is introduced. Source manifests remain
+3.3.1 / 0.1.0-preview.1 until automated release preparation; do not pre-bump Core to 4.0.0.
+
+Main was integrated into the feature branch. The stronger feature teardown implementation was
+preserved byte-for-byte; main's regression test was adapted to cache its GameObject before manager
+cleanup destroys the owned handle. Core now has 199 required PlayMode tests. Ten historical Unity
+metadata/settings files received whitespace-only cleanup; full-base whitespace checks pass.
+
+The versioned candidate was prepared from `7b32b769cdf629a08b2ef3b513b1c86161172871`.
+Later CI-import-verifier edits do not change package source bytes. The tested local UPM archives are:
+
+- Core 4.0.0 SHA-256: `0908f8d4829e0cae57048381e2f0b874dc7f6e5f281168b6f57f7ad8a3aee991`.
+- Demos 1.0.0 SHA-256: `9d079dc93a53706a9144768a7ec4b1124734b5014516aac142d906336adf0af7`.
+
+| Editor / input | Core PlayMode | Core EditMode | Session cycles | Combined samples |
+| --- | ---: | ---: | ---: | ---: |
+| 2021.3.0f1 / Legacy / Built-in | 199 | 74 | 24 | 116 |
+| 2021.3.45f1 / Legacy / Built-in | 199 | 74 | 24 | 116 |
+| 6000.3.16f1 / Legacy / Built-in | 199 | 74 | 24 | 116 |
+| 6000.3.16f1 / Input System / Built-in | 199 | 74 | 24 | 119 |
+
+Every suite passed with zero skips and exact Core fullname/session verification. The 2021 projects
+use Test Framework 1.1.33 and uGUI 1.0.0; Unity 6 uses Test Framework 1.6.0 and uGUI 2.0.0, with
+Input System 1.19.0 only in the Input System project. All five samples were imported independently
+from the installed Demos tarball; Browser-only runs select its three applicable standalone tests.
+All workspaces were then co-imported for the full gallery suite. Removing Demos with imports retained
+and explicit UI dependencies preserved, and removing imports entirely, both leave Core usable.
+Additional minimal 2021.3.0f1 and Unity 6 consumers pass Core 199/74 plus 24 session cycles without
+uGUI, Demos, Input System or URP. These checks use tarballs and resolved PackageCache contents,
+not linked development folders; only Unity 6's generated manifest `_fingerprint` is normalized.
+
+A disposable local Git distribution verifies a Core-only root tag and both same-SHA package paths.
+Actual Core 3.3.1 showcase and historical Product Configurator imports were backed up outside Assets,
+removed and replaced. The new showcase and Lamp Assembly tests pass (5 and 23 respectively), the
+preserved scene/controller GUIDs match, backups survive and no imported/Core GUID duplicates remain.
+This verifies the intended Git shape locally; public 4.0.0 URLs require post-approval publication.
+
+Both embedded-candidate Demos CI paths also pass locally: 116 Legacy and 119 Input System cases.
+The verifier checks fresh results, actual Editor startup version, settings, package hashes and all
+source-owned import hashes. Only the five declared top-level folder metadata files generated by
+Unity may be added. Independent source review accepted this exception and the release/integration
+changes. All 57 Python tests, package boundaries, minimum-API/meta checks, theme and wheel bridges,
+actionlint, complete PR commit hygiene and `git diff --check origin/main` pass.
+
+Combined and standalone WebGL builds use the verified candidate package contents in a Unity 6
+Built-in host. Chromium 156.0.8078.4 passed all four workspace entries, Help and gallery returns,
+actual arm/head attachment, hinge movement/reversal and subtree detach/move. Standalone Lamp
+Assembly hides Demos navigation; 960×640 CSS at DPR 2 produces a 1920×1280 canvas with readable
+inspector and Help. Final browser error/page-error/request-failure arrays are empty. The smoke test
+resets through the gallery UI; a prior deliberate full-page reload cancelled an in-flight cache
+request, which was an automation/navigation event. This Built-in result does not replace separate URP shader/visual validation or the earlier
+URP development diagnostic record. Physical trackpad remains open.
+
+Disposable artifacts, consumers, XML/logs, per-run verification and screenshots live under
+`/tmp/rth-release-final-qc-20261025-r3`. The commands and acceptance contract are in
+[release preparation](RELEASE-PREPARATION.md) and `ci/README.md`. Local success is not remote CI
+success; consult the final draft PR's actual checks. No merge, public deployment or release occurred.
+
+## Previous checkpoint: Lamp Assembly (2026-10-25)
 
 The owner approved replacing the repetitive desktop arrangement scenario with lamp assembly, then separately approved the small Core API needed to keep constrained joints and their arcs in sync. The optional sample now has a fixed base, a free arm and a free head. Keep the `ProductConfigurator` folder, scene, controller and build method identifiers; the user-facing name is **Lamp Assembly**. Existing Product Configurator imports must be backed up outside Assets and removed before importing the renamed sample, because GUIDs are preserved.
 
@@ -186,9 +250,9 @@ git diff --check
 
 Run the static checks in `.github/workflows/min-api-lint.yml`, workflow syntax validation with actionlint, and manifest validation in `publish-upm.yml`. Follow `ci/README.md` for prepare/run/collect/verify. Use fresh artifact directories. Core runs use `-testFilter TransformHandles.Tests.`; separately run imported sample tests with `-testPlatform playmode -testFilter TransformHandles.Samples.LevelEditor.Tests`. Use disposable consumer projects; the isolated session-test flag must not be used in a project containing unsaved work.
 
-## Next work and boundaries
+## Historical demo planning (superseded by release preparation)
 
-The owner wants more demos, rather than Undo/Redo. Undo/Redo is outside the intended scope. The Modular Building plan was independently reviewed and approved. Its implementation is on `feat/modular-building-demo`; see the sample README for controls and constraints. Validation results for this addition are recorded below.
+The owner previously requested more demos, rather than Undo/Redo. The current release scope above supersedes this section. Undo/Redo is outside the intended scope. The Modular Building plan was independently reviewed and approved. Its implementation is on `feat/modular-building-demo`; see the sample README for controls and constraints. Validation results for this addition are recorded below.
 
 Suggested order:
 
@@ -201,7 +265,7 @@ Each should be an independently importable sample in the optional package, follo
 ## Known follow-ups
 
 - The previous cancellation notice can remain after a later successful interaction. Clearing it on the next valid drag is UI polish; immediate rollback errors must remain visible.
-- The original showcase retains pre-existing URP magenta-target/shader-diagnostic and stale shortcut-HUD issues. Relocation did not fix them. Level Editor has its own opaque shader and current UI labels.
+- Historical showcase magenta-target and shortcut-HUD notes predate the shared UI Toolkit shell and sample-owned target shader. Current showcase colors and controls were rechecked. Inherited hidden URP shader diagnostics still require separate inspection; a Built-in success does not establish URP behavior.
 - Group rotation can move objects through the sample floor; no collision constraint is promised. Group nonuniform scaling and individual-pivot rotation are not implemented by the new demo controls.
 - Extreme handle sizes can extend outside the viewport; 64 rendering pixels is small on Retina.
 - Core/demos manifest versions are a local development pair, not a claim that an older published Core 3.3.0 contains these changes. Align and test release versions before publishing. Sample relocation is a distribution breaking change; preserve migration docs, GUIDs and explicit import cleanup guidance.

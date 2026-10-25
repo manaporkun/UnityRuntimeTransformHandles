@@ -32,14 +32,19 @@ Local CLI success does not imply the exact code has passed remote CI.
 
 ## Local compatibility results
 
-On macOS ARM64, Unity 2021.3.0f1 passes 198 PlayMode and 74 EditMode tests with
-Test Framework 1.1.33, legacy input and no URP/Input System packages. Unity 6000.3.16f1 passes the
-same suites under both input handlers. The optional Lamp Assembly passes 23 PlayMode tests per
-configuration; imported sample totals are 116 on Legacy and 119 on Unity 6 Input System. Unity 2021.3.45f1 passed the earlier 134/70 suite before Precision changes; that
-patch has not been rerun for this revision. Each run validates 24 Editor session cycles. A freshly
-created floor consumer has no initial ProjectSettings/EditorSettings assets; its actual generated
-input and each fixture's settings restoration are checked, without claiming a raw whole-project
-before/after comparison where no before asset existed.
+The versioned Core 4.0.0 / Demos 1.0.0 candidate passes on macOS ARM64 with Unity
+2021.3.0f1 and 2021.3.45f1 Legacy, and Unity 6000.3.16f1 Legacy/Input System. Each configuration
+passes Core 199 PlayMode / 74 EditMode tests and all 24 Editor session cycles. Combined samples
+pass 116 Legacy / 119 Input System cases, with zero skips. Test Framework versions are 1.1.33
+on Unity 2021 and 1.6.0 on Unity 6; uGUI is 1.0.0 / 2.0.0 respectively, and Input System 1.19.0
+is installed only for its configuration. Additional minimum-Core projects without uGUI/Demos/Input
+System/URP pass the same Core suites and session cycles on 2021.3.0f1 and Unity 6.
+
+These are actual tarball consumers with resolved-package content verification, plus independent
+sample imports, co-import, removal and local Git upgrade checks. The candidate source/archive hashes
+and exact scope are recorded in `docs/DEVELOPMENT-HANDOFF.md`. A fresh floor consumer has no initial
+ProjectSettings/EditorSettings assets; its actual generated input and fixture settings restoration
+are checked, without claiming a raw before/after comparison where no before asset existed.
 
 The prepare step changes only the disposable test project's reload baseline. Fixture restoration
 is measured against that prepared baseline. Local callers that need to retain their initial
