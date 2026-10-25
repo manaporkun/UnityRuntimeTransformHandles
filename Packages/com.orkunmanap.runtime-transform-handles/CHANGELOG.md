@@ -42,7 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Direct handle destruction now releases ownership and its ghost even when a destruction subscriber
   throws, while preserving event delivery order and exception reporting. Nested manager destruction
   no longer tries to destroy the handle whose destruction callback is already running.
-- Destroying a handle after its manager no longer lazily instantiates a replacement manager during teardown.
 - Destroying a manager now destroys the handles and ghost pivots it owns instead of leaving them behind;
   consumer target objects, their hierarchy and their transforms are preserved.
 - Handles destroyed with their scene or GameObject now unregister from the manager and terminate their
@@ -81,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reactivation while `OnDisable` is still running. No library scheduler is involved.
 - Manager component/GameObject disable retains ownership and cancels one drag; re-enable resumes the
   same handles. A replaced `MainCamera` cancels an active drag and refreshes live handle cameras.
+
+## [3.3.1] - 2026-10-25
+
+### Fixed
+- Destroying a handle after its manager no longer lazily instantiates a replacement manager during teardown.
 
 ## [3.3.0] - 2026-06-11
 

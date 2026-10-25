@@ -21,13 +21,13 @@ in-game object manipulation.
 
 ## Validated compatibility
 
-Development-revision macOS ARM64 runs pass all 198 PlayMode and 74 EditMode tests on Unity
-2021.3.0f1 and 6000.3.16f1. Each run includes 24 real Editor Play Mode cycles across all four
+Development-revision macOS ARM64 runs validate Core on Unity 2021.3.0f1 and 6000.3.16f1.
+Each run includes 24 real Editor Play Mode cycles across all four
 domain/scene reload combinations and both manager creation paths. Unity 6 is tested separately
 with legacy input and the Input System. The 2021.3.0 consumer uses Test Framework 1.1.33,
 legacy input, no Input System package and no URP package. Imported optional samples pass
-116 tests on Legacy and 119 on Unity 6 Input System. Unity 2021.3.45f1 is the remote CI floor;
-its earlier 134/70 result does not validate this revision. These are measured configurations,
+116 tests on Legacy and 119 on Unity 6 Input System. Unity 2021.3.45f1 is also checked as the
+remote CI floor. These are measured configurations,
 not a claim that every intermediate Editor or rendering configuration was tested. Versioned
 release artifacts require fresh consumer validation before publication.
 

@@ -62,7 +62,7 @@ Lamp Assembly; the internal ProductConfigurator identities are intentionally ret
 
 | Editor | Input | Required evidence |
 | --- | --- | --- |
-| 2021.3.0f1 | Legacy; no Input System or URP | Core 198 PlayMode / 74 EditMode, 24 session cycles; samples 116 |
+| 2021.3.0f1 | Legacy; no Input System or URP | Core 199 PlayMode / 74 EditMode, 24 session cycles; samples 116 |
 | 2021.3.45f1 | Legacy; no Input System or URP | Same suites; also the configured remote compatibility floor |
 | 6000.3.16f1 | Legacy | Same Core suites/session cycles; samples 116 |
 | 6000.3.16f1 | Input System | Same Core suites/session cycles; samples 119 |
