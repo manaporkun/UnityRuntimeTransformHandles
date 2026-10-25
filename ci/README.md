@@ -103,4 +103,6 @@ Demos CI imports all five samples, runs only `TransformHandles.Samples.`, and ch
 `required-samples-input0.txt` or `required-samples-input1.txt` list with zero skips. These baselines
 come from the existing reviewed 116/119-test development suites, not from the result being accepted.
 `verify-sample-results.py` records import/candidate hashes before the run and verifies fresh XML,
-actual Editor startup version, input setting and unchanged imported/package files afterward.
+actual Editor startup version, input setting and unchanged imported/package files afterward. Only
+Unity-generated metadata for the five top-level import folders may be added; every distributed file
+must remain byte-identical, and other additions fail.

@@ -74,6 +74,25 @@ class SampleResultsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'imported samples changed'):
             self.verify()
 
+    def test_only_declared_unity_generated_folder_metadata_is_allowed(self):
+        path = self.out / 'metadata.json'
+        metadata = json.loads(path.read_text()); metadata['generated_folder_meta'] = ['Lamp Assembly.meta']
+        path.write_text(json.dumps(metadata))
+        (self.imports / 'Lamp Assembly').mkdir()
+        (self.imports / 'Lamp Assembly.meta').write_text('guid: ' + 'a' * 32 + '\nfolderAsset: yes\n')
+        self.verify()
+        (self.imports / 'unexpected.cs').write_text('untested code')
+        with self.assertRaisesRegex(ValueError, 'unexpected imported sample files'):
+            self.verify()
+
+    def test_generated_metadata_must_describe_a_folder(self):
+        path = self.out / 'metadata.json'
+        metadata = json.loads(path.read_text()); metadata['generated_folder_meta'] = ['Lamp Assembly.meta']
+        path.write_text(json.dumps(metadata))
+        (self.imports / 'Lamp Assembly.meta').write_text('guid: ' + 'a' * 32 + '\nfolderAsset: yes\n')
+        with self.assertRaisesRegex(ValueError, 'invalid generated import folder metadata'):
+            self.verify()
+
     def test_wrong_input_rejected(self):
         (self.root / 'ProjectSettings/ProjectSettings.asset').write_text('  activeInputHandler: 1\n')
         with self.assertRaisesRegex(ValueError, 'input configuration mismatch'):

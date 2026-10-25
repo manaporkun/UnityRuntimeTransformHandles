@@ -25,6 +25,7 @@ def prepare(root, out, unity, input_mode):
     out.mkdir(parents=True)
     data = {'started_ns': time.time_ns(), 'unity': unity, 'input': input_mode,
             'imports': str(imports.resolve()), 'files': candidate.hashes(imports),
+            'generated_folder_meta': [s['displayName'] + '.meta' for s in manifest['samples']],
             'candidate_sha256': candidate.digest(root / 'artifacts/candidate/candidate.json')}
     (out / 'metadata.json').write_text(json.dumps(data, indent=2) + '\n')
 
@@ -36,7 +37,19 @@ def verify(root, out, xml, log):
     require(candidate.digest(root / 'artifacts/candidate/candidate.json') == metadata['candidate_sha256'],
             'candidate metadata changed')
     candidate.verify(root, root / 'artifacts/candidate')
-    require(candidate.hashes(Path(metadata['imports'])) == metadata['files'], 'imported samples changed')
+    imports = Path(metadata['imports'])
+    actual = candidate.hashes(imports)
+    require(all(actual.get(name) == digest for name, digest in metadata['files'].items()),
+            'imported samples changed')
+    extra = set(actual) - set(metadata['files'])
+    require(extra <= set(metadata.get('generated_folder_meta', [])), 'unexpected imported sample files')
+    # Unity creates metadata for the consumer's newly named top-level import folders.
+    # These files are not part of the distributed sample. No source asset may change.
+    for name in extra:
+        text = (imports / name).read_text()
+        require(re.search(r'^guid: [0-9a-f]{32}$', text, re.M) and
+                re.search(r'^folderAsset: yes$', text, re.M) and
+                (imports / name[:-5]).is_dir(), 'invalid generated import folder metadata')
     settings = (root / 'ProjectSettings/ProjectSettings.asset').read_text()
     require(re.findall(r'^  activeInputHandler: (\d+)$', settings, re.M) == [str(metadata['input'])],
             'sample input configuration mismatch')
