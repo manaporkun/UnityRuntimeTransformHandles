@@ -46,6 +46,15 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 > **Upgrading from 2.x?** No code changes required — 3.0.0 shipped no breaking changes (the
 > major bump was a release-automation artifact, corrected in 3.0.1).
 
+## Optional demos and the next release
+
+The approved release candidate is Core **4.0.0** and optional Demos **1.0.0**; it is not published yet.
+Core remains independently usable. The original showcase moves to the Demos package alongside
+Level Editor, Modular Building, Lamp Assembly and Demo Browser. This changes sample distribution:
+back up old imports outside Assets and remove them before importing their replacements, which retain
+asset GUIDs. See the [Demos installation and migration guide](Packages/com.orkunmanap.runtime-transform-handles.demos/README.md)
+and [release preparation](docs/RELEASE-PREPARATION.md).
+
 ## Installation
 
 ### Option 1: Package Manager (Recommended)

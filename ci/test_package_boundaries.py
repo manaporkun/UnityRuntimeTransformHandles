@@ -1,8 +1,6 @@
 import importlib.util
 import json
-import re
 import shutil
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -93,37 +91,4 @@ class PackageBoundaryTests(unittest.TestCase):
 
 
 
-class ReleaseScopeTests(unittest.TestCase):
-    def test_workflow_queries_exclude_demo_only_history(self):
-        # Exercise the actual three workflow git-log statements against disposable history.
-        workflow = (ROOT / '.github/workflows/publish-upm.yml').read_text()
-        self.assertIn('git log $RANGE --format=%B -- "$PACKAGE_PATH"', workflow)
-        self.assertIn('git log $RANGE --no-merges --pretty=tformat:"%s" -- "$PACKAGE_PATH"', workflow)
-        self.assertIn('git log $RANGE --name-only --pretty=format: -- "$PACKAGE_PATH"', workflow)
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            def git(*args):
-                return subprocess.check_output(['git', '-C', folder, *args], text=True).strip()
-            git('init', '-q'); git('config', 'commit.gpgsign', 'false'); git('config', 'user.name', 'Fixture'); git('config', 'user.email', 'fixture@example.invalid')
-            cp = root / 'Packages' / boundary.CORE; dp = root / 'Packages' / boundary.DEMOS
-            cp.mkdir(parents=True); dp.mkdir(parents=True)
-            (cp / 'code.cs').write_text('initial'); git('add', '.'); git('commit', '-qm', 'initial')
-            start = git('rev-parse', 'HEAD')
-            for i, (subject, core_change, demo_change) in enumerate([
-                ('feat: demo only', False, True), ('fix: core only', True, False),
-                ('feat: mixed', True, True), ('docs: core docs', True, False),
-                ('feat!: demo breaking', False, True), ('fix!: core breaking', True, False)]):
-                if core_change: (cp / ('README.md' if subject.startswith('docs:') else 'code.cs')).write_text(str(i))
-                if demo_change: (dp / 'code.cs').write_text(str(i))
-                git('add', '.'); git('commit', '-qm', subject)
-            scope = f'{start}..HEAD'
-            assignments = re.findall(r'^\s*PACKAGE_PATH="([^"]+)"\s*$', workflow, re.M)
-            self.assertTrue(assignments)
-            self.assertEqual(set(assignments), {'Packages/' + boundary.CORE})
-            path = assignments[0]
-            for fmt in ['--format=%B', '--no-merges --pretty=tformat:%s']:
-                text = git('log', scope, *fmt.split(), '--', path)
-                for absent in ['feat: demo only', 'feat!: demo breaking']: self.assertNotIn(absent, text)
-                for present in ['fix: core only', 'feat: mixed', 'docs: core docs', 'fix!: core breaking']: self.assertIn(present, text)
-            names = git('log', scope, '--name-only', '--pretty=format:', '--', path)
-            self.assertNotIn(boundary.DEMOS, names)
+# Release-history scoping and candidate integrity are exercised in test_release_candidate.py.

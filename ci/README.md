@@ -44,7 +44,7 @@ before/after comparison where no before asset existed.
 The prepare step changes only the disposable test project's reload baseline. Fixture restoration
 is measured against that prepared baseline. Local callers that need to retain their initial
 project settings must restore their own byte backups after collection; CI checkouts are disposable.
-Remote CI on this uncommitted revision has not run.
+Remote CI success for the final release revision has not been established.
 
 ## Local WebGL check
 
@@ -60,10 +60,11 @@ batch script can leave platform-specific Editor assemblies loaded for another ta
 is not browser success: serve the resulting output locally and verify startup, selection and all
 three transform modes. Use a free local port and confirm the server started before navigating.
 
-The local Unity 6 build starts in Chromium and all four interactions work without JavaScript exceptions
-or startup crashes. The log still reports unsupported hidden URP shader variants, canonical sample
-targets are magenta, and keyboard mode changes leave the HUD label stale.
-WebGL visual acceptance remains open pending a separately approved sample fix.
+The combined gallery and standalone Lamp Assembly development builds passed local Chromium
+mouse interaction and Retina layout checks. Showcase targets now use their own pipeline-independent
+shader. Three inherited hidden URP shader diagnostics remain at log level. Physical Mac trackpad
+validation remains open. These development checks do not establish acceptance of a new release artifact.
+
 
 ## Optional demo checks
 
@@ -88,3 +89,18 @@ Run the independently imported Modular Building suite with `-testPlatform playmo
 On a clean CLI project run `BuildScript.PrepareModularBuildingWebGL` in a separate Unity invocation before `BuildScript.BuildModularBuildingWebGL`. A new sample assembly must compile and load into the Editor domain before player serialization. All build entry points reject an unloaded sample assembly rather than producing a player with missing scripts. Existing compiled imports can build directly.
 
 Pages CI copies the original showcase sample to its manifest-defined Assets import path before launching Unity. This loads its assembly before the first build and preserves the original public demo selection; an unexpected existing destination fails instead of being overwritten.
+
+## Versioned release candidates
+
+See [release preparation](../docs/RELEASE-PREPARATION.md) for the Core 4.0.0 / Demos 1.0.0
+pair, candidate commands, clean consumer matrix and publication order. The publish workflow now
+prepares both `.tgz` packages before validation. Every licensed Core/Demos job applies those same
+artifacts and verifies that package bytes remain unchanged. The separate compatibility-floor
+workflow remains an additional required review check; it is not a substitute for local minimum-version
+or versioned-artifact consumer tests.
+
+Demos CI imports all five samples, runs only `TransformHandles.Samples.`, and checks the exact
+`required-samples-input0.txt` or `required-samples-input1.txt` list with zero skips. These baselines
+come from the existing reviewed 116/119-test development suites, not from the result being accepted.
+`verify-sample-results.py` records import/candidate hashes before the run and verifies fresh XML,
+actual Editor startup version, input setting and unchanged imported/package files afterward.

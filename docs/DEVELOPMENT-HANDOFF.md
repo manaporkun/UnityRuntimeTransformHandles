@@ -72,6 +72,18 @@ Done when: the submission package and media accurately represent the tested prod
 
 **Recommended next task:** inspect release automation and propose the Core/Demos version pair and clean-install validation plan. Do not start another demo.
 
+### Release plan approved; implementation in progress
+
+The release inspection and independent plan review are complete. The proposed pair is **Core 4.0.0 / Demos 1.0.0**, with Demos requiring Core 4.0.0. The owner approved implementation with “go”; these versions are not published. The remote's latest Core tag at inspection was `v3.3.1`; the feature branch's Core manifest still says `3.3.0`.
+
+- Preserve the existing Core `upm`/version-tag distribution and the Demos README's two explicit, same-commit monorepo `?path` dependencies. A Core-only version tag points to the extracted Core tree and cannot resolve the Demos package path. No new Demos distribution branch is needed.
+- Preserve the current main version during integration and let release preparation calculate the major bump. Setting Core to 4.0.0 before the existing automatic major bump would risk producing 5.0.0.
+- Fix the publication revision gap before release: the current publish job fetches current main after testing, so its release source can differ from the tested revision. Prepare final package manifests from a fixed candidate, test those artifacts and verify source/package hashes before publication. A changed candidate requires new validation.
+- Validate Core-only installation, every independent sample, co-import/gallery, removal with and without retained Assets copies, and upgrade cleanup preserving GUIDs. Include local Unity 2021.3.0f1 minimum support, the remote floor's 2021.3.45f1, and Unity 6000.3.16f1 Legacy/Input System. Core-only CI does not establish Demos acceptance. Physical Mac trackpad validation remains a separate owner check.
+- Update manifests, dependency declarations, changelogs and installation/migration instructions together after approval. Replace stale Product Configurator descriptions in the Demos package README and obsolete validation descriptions in `ci/README.md`.
+
+The independent reviewer accepted the version pair and existing distribution pattern with the revision-gap and Demos-validation requirements above. Implementation is now authorized; merge, publication and deployment still require separate owner approval. See [release preparation](RELEASE-PREPARATION.md) for the implementation contract and acceptance matrix. Final independent review and QC remain required.
+
 ## Latest checkpoint: Lamp Assembly (2026-10-25)
 
 The owner approved replacing the repetitive desktop arrangement scenario with lamp assembly, then separately approved the small Core API needed to keep constrained joints and their arcs in sync. The optional sample now has a fixed base, a free arm and a free head. Keep the `ProductConfigurator` folder, scene, controller and build method identifiers; the user-facing name is **Lamp Assembly**. Existing Product Configurator imports must be backed up outside Assets and removed before importing the renamed sample, because GUIDs are preserved.

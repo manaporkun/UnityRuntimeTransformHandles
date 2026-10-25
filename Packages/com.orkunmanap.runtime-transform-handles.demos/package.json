@@ -11,7 +11,7 @@
   "displayName": "Runtime Transform Handles Demos",
   "description": "Optional, independently imported scenarios for Runtime Transform Handles.",
   "dependencies": {
-    "com.orkunmanap.runtime-transform-handles": "3.3.0",
+    "com.orkunmanap.runtime-transform-handles": "3.3.1",
     "com.unity.ugui": "1.0.0",
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.uielements": "1.0.0"
