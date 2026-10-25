@@ -5,10 +5,10 @@ This branch is a development checkpoint, not a published package release. It con
 ## Package boundaries and current behavior
 
 - Core: `Packages/com.orkunmanap.runtime-transform-handles`. Stable package identity; runtime handles, assets, editor setup, tests and API documentation. No dependency on demos.
-- Optional demos: `Packages/com.orkunmanap.runtime-transform-handles.demos`. Independently importable original feature showcase and Level Editor under `Samples~`. Keep application-specific UI and scenario rules here.
+- Optional demos: `Packages/com.orkunmanap.runtime-transform-handles.demos`. Independently importable original feature showcase, Level Editor and Modular Building under `Samples~`. Keep application-specific UI and scenario rules here.
 - Level Editor: Shift-click toggles members; Move/Rotate use World or Local axes. Local references the last selected surviving object. Rotation uses the shared mean of object pivots. Group Scale exposes the center only and scales object sizes and pivot offsets together. Single-object scaling retains axis controls.
 - `Handle.LocalSpaceReference` and `Handle.UniformGroupScale` are opt-in Core controls. Uniform group scaling requires a pure Scale handle, multiple targets and XYZ axes; partial masks disable its controls. Defaults preserve existing consumer behavior. See Core README/API docs for details.
-- Left drag orbits, right drag pans, scroll zooms. UI and handle gestures consume selection/camera input. The size popover supports 64–512 rendering pixels, default 192; Retina pixel ratio is not silently folded into that value.
+- Left drag orbits, right drag pans, scroll zooms. UI and handle gestures consume selection/camera input. Level Editor uses a size popover; Modular Building exposes the same size controls in its UI Toolkit inspector. Both support 64–512 rendering pixels, default 192; Retina pixel ratio is not silently folded into that value.
 - Precision handles keep axis-colored hover and picking volumes. Native remains available. Handle creation synchronizes visuals immediately to avoid an origin-to-target flash.
 - Ownership, target destruction, disable/re-enable, callback reentrancy and Editor session restoration have regression coverage. Re-enabling a GameObject inside its OnDisable callback is unsupported by Unity; defer activation until the next frame. Component.enabled reactivation is separately covered.
 
@@ -99,7 +99,9 @@ All 37 sample PlayMode tests passed in Unity 2021.3.0f1 Legacy and Unity 6000.3.
 
 Final WebGL visual checks passed at 1440×900, 960×640 and device pixel ratio 2, including the 20 px body text. Actual pointer checks covered both popup launchers, dismissal without click-through, and Escape preserving selection. Console diagnostics match the inherited URP shader messages listed above; no new diagnostics were observed.
 
-## Modular Building typography (2026-10-25)
+## Modular Building typography (2026-10-25, superseded)
+
+This historical TMP checkpoint is superseded by the UI Toolkit implementation below. TMP is no longer required by Modular Building.
 
 The Modular Building UI now uses TextMeshPro for every label and the handle-size numeric field. The existing `Label` factory stays in the controller; no shared UI framework was introduced. Selection, mode and constraints share a 32-unit row and middle alignment. Help control rows are centered, while explanatory paragraphs remain top-aligned. Font sizes stay explicit. The numeric field has a masked text viewport, caret and selection styling; Enter commits and Escape cancels as before.
 
@@ -110,3 +112,15 @@ Installation now requires TMP 3.0.6+ on Unity 2021.3–2023.1, or uGUI 2.0's int
 All 39 Modular Building PlayMode tests passed without skips on Unity 2021.3.0f1 Legacy and Unity 6000.3.16f1 Legacy/Input System. Added integration coverage verifies shared-font rendering, actual selection-row baselines, supported name glyphs, numeric viewport ownership and Enter/Escape editing. Package boundaries, minimum API, metadata and whitespace checks passed. Independent source review found no blocking issues.
 
 The rebuilt WebGL player was checked in Chromium at 1440×900 and 960×640, at device-pixel ratios 1 and 2 (1440×900 CSS produces a 2880×1800 backing buffer at DPR 2). Screenshots confirm the aligned selection row, help text fit, numeric selection and clipped horizontal scrolling. Browser interaction confirmed Escape restores 192 after a long edit, and Enter applies 320 to both the label and visible handle. No new console diagnostics appeared: the same three inherited hidden URP shader diagnostics documented above remain. Physical Mac trackpad testing was not part of this typography check.
+
+## Modular Building UI Toolkit checkpoint (2026-10-25)
+
+Modular Building now uses a slim header and one white left inspector containing selection, Move/Rotate, grid constraints and always-visible handle size. Help opens from the header. The former bottom strip and size popup are removed. The source layout is `UI/ModularBuilding.uxml`; its stylesheet is `UI/ModularBuilding.uss`. `Workshop Panel.asset`, `Workshop Text.asset` and the default-runtime theme import are sample-local. The existing controller binds the controls directly to its existing Core operations, without a shared UI framework or new Core types. Core is unchanged.
+
+The sample uses the licensed Liberation Sans source font through UI Toolkit, without TMP or Essential Resources. The previous generated TMP font asset and panel sprite are removed. Demos explicitly depends on the built-in UIElements module; uGUI remains for the EventSystem bridge. Toolkit assets were generated/imported with Unity 2021 and checked in Unity 6. The boundary verifier now checks UXML/USS/TSS references, including inline URLs, and rejects cross-sample, missing or external asset paths. Keep package source references relative when editing in UI Builder.
+
+The owned UIDocument recreates its tree after disable/enable; references and callbacks are rebound once and detached on disable. Runtime panel settings are cloned rather than mutating the serialized asset. Empty panel roots ignore picking. Both Toolkit PanelRaycaster and existing uGUI GraphicRaycaster surfaces block demo input. An uninitialized input module blocks scene navigation during re-enable until Unity is ready. Help dismissal remains deferred until LateUpdate. Text edits commit on Enter or focus loss, cancel on Escape and consume the editing-end frame; a scene press while editing commits without selecting or navigating. Slider capture and W/E ownership remain intact.
+
+Final PlayMode results: Unity 2021.3.0f1 Legacy 36/36; Unity 6000.3.16f1 Legacy 36/36; Unity 6000.3.16f1 Input System 37/37. No skips. The 2021 consumer has no TMP package, and the final Unity 6 runs passed with TMP Essential Resources removed. The additional Input System test hits a real Core plane handle, then sends a same-update pointer-enter/down over a Toolkit overlay and runs Core before the demo; no drag starts. Its cloned test input settings use both IgnoreFocus and AlwaysGameView so batch mode processes player actions, then restore the original settings. Production default actions are used. The early test failure was Editor-only event routing, not a Core change.
+
+All 12 package-boundary tests, minimum-API/meta checks and whitespace checks passed. Independent source and visual review approved the result. WebGL screenshots at 1440×900 and 960×640, DPR 1/2, show no clipped or overlapping text. Browser checks covered Move/Rotate, numeric Enter/Escape/Tab and long-value clipping, slider dragging outside the inspector, Help close/outside dismissal, and actual plane movement. Dragging on Help above an enlarged handle left the scene region pixel-identical before/after. The previous three hidden URP shader diagnostics remain; there are no new Toolkit, font or exception diagnostics. Physical Mac trackpad testing was not performed.

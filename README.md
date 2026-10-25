@@ -196,7 +196,7 @@ Existing imported Assets copies are user-owned; back up custom changes outside A
 
 ### Modular Building sample
 
-Modular Building uses TextMeshPro and requires its Essential Resources. See the [sample setup](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md) for Unity-version-specific installation. Core remains independent of demo UI.
+Modular Building uses UI Toolkit with an editable UXML/USS layout. See the [sample setup](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md). Core remains independent of demo UI.
 
 The optional Demos package also includes [Modular Building](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md): arrange supplied wall and corner modules using a fixed horizontal grid and 90-degree rotations. Import it separately from Level Editor; Core-only installs stay unchanged.
 

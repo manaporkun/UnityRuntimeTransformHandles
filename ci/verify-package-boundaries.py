@@ -4,6 +4,8 @@ import argparse
 import json
 import re
 from pathlib import Path
+from urllib.parse import unquote
+import xml.etree.ElementTree as ET
 
 CORE = 'com.orkunmanap.runtime-transform-handles'
 DEMOS = CORE + '.demos'
@@ -11,15 +13,33 @@ DEMOS = CORE + '.demos'
 UNITY_ASSEMBLIES = {'2bafac87e7f4b9b418d9448d219b01ab', '75469ad4d38634e559750d17036d5f7c'}
 # The unchanged legacy showcase retains its documented URP camera component.
 LEGACY_URP = {'a79441f348de89743a2939f4d699eac1'}
-# Official TMP runtime assembly, font asset script and Essential Resources mobile SDF shader.
-MODULAR_TMP = {'6055be8ebefd69e48b49212b09b47b2f', '71c1514a6bd24e1e882cebbe1904ce04',
-               'fe393ace9b354375a9cb14cdbbc28be4'}
 GUID = re.compile(r'(?:guid:\s*|GUID:)([0-9a-f]{32})')
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def validate_ui_references(path, text, folder):
+    # Toolkit references are often relative URLs rather than serialized YAML GUIDs.
+    if path.suffix == '.uxml':
+        refs = [value for node in ET.fromstring(text).iter() for key, value in node.attrib.items()
+                if key == 'src']
+    else:
+        refs = []
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
+    refs += re.findall(r'url\(\s*[\"\']?([^\)\"\']+)[\"\']?\s*\)', text)
+    refs += re.findall(r'@import\s+[\"\']([^\"\']+)[\"\']', text)
+    for value in refs:
+        value = unquote(value.strip())
+        if path.suffix == '.tss' and value == 'unity-theme://default':
+            continue
+        require(not any(c in value for c in (':', '?', '#', '\\')),
+                f'unsupported UI asset reference: {path}: {value}; use sample-relative paths')
+        target = (path.parent / value).resolve()
+        require(target.is_relative_to(folder) and target.is_file(),
+                f'UI reference escapes its sample or is missing: {path}: {value}')
 
 
 def validate(root):
@@ -68,15 +88,16 @@ def validate(root):
         require(folder.is_relative_to((demos / 'Samples~').resolve()) and folder.is_dir(), 'invalid sample path')
         local_guids = {guid for guid, path in all_guids.items() if path.resolve().is_relative_to(folder)}
         allowed = core_guids | local_guids | UNITY_ASSEMBLIES
-        if sample['path'] == 'Samples~/ModularBuilding':
-            allowed |= MODULAR_TMP
         if sample['path'] == 'Samples~/Demo':
             allowed |= LEGACY_URP
         require(any(folder.glob('*.unity')) and any(folder.glob('*.asmdef')), 'sample scene/assembly missing')
         for path in folder.rglob('*'):
-            if path.suffix not in ('.unity', '.prefab', '.asset', '.mat', '.asmdef', '.asmref', '.shader', '.anim', '.controller', '.inputactions', '.renderTexture'):
+            if path.suffix not in ('.unity', '.prefab', '.asset', '.mat', '.asmdef', '.asmref', '.shader', '.anim', '.controller', '.inputactions', '.renderTexture', '.uxml', '.uss', '.tss'):
                 continue
-            for guid in GUID.findall(path.read_text()):
+            text = path.read_text()
+            if path.suffix in ('.uxml', '.uss', '.tss'):
+                validate_ui_references(path, text, folder)
+            for guid in GUID.findall(text):
                 require(guid.startswith('0000000000000000') or guid in allowed,
                         f'sample reference escapes its import/Core/Unity dependencies: {path}: {guid}')
     return len(samples)

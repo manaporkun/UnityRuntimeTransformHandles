@@ -1,0 +1,57 @@
+.workshop {
+    flex-grow: 1;
+    color: rgb(43, 47, 54);
+    font-size: 20px;
+    -unity-font: url("../Fonts/LiberationSans.ttf");
+}
+Label { margin: 0; padding: 0; -unity-text-align: middle-left; }
+Button { margin: 0; border-width: 0; border-radius: 8px; padding: 0 16px; height: 44px; background-color: rgba(0, 0, 0, 0); color: rgb(71, 77, 87); -unity-font-style: normal; }
+Button:hover { background-color: rgb(241, 244, 248); }
+Button:active { background-color: rgb(226, 233, 242); }
+Button:focus { border-width: 1px; border-color: rgb(67, 120, 204); }
+Button:disabled { opacity: 0.42; }
+.header { height: 64px; padding: 0 24px; flex-direction: row; align-items: center; justify-content: space-between; background-color: rgb(255, 255, 255); border-bottom-width: 1px; border-bottom-color: rgb(226, 229, 234); }
+.identity, .header-actions { flex-direction: row; align-items: center; }
+.app-title { font-size: 24px; }
+.project-name { margin-left: 24px; color: rgb(115, 121, 132); font-size: 18px; }
+.header-actions Button { margin-left: 8px; }
+.inspector { position: absolute; top: 88px; left: 24px; width: 280px; padding: 24px; background-color: rgb(255, 255, 255); border-width: 1px; border-color: rgb(224, 228, 234); border-radius: 12px; }
+.eyebrow { color: rgb(125, 132, 143); font-size: 16px; margin-bottom: 10px; }
+.selection-name { font-size: 25px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.description { white-space: normal; color: rgb(111, 119, 131); font-size: 18px; }
+.selection-hint { margin-top: 10px; min-height: 46px; }
+.tools { flex-direction: row; padding: 4px; margin-top: 22px; margin-bottom: 22px; background-color: rgb(245, 247, 250); border-radius: 9px; }
+.tool-button { flex-grow: 1; flex-basis: 0; padding: 0 4px; flex-direction: row; align-items: center; justify-content: center; height: 48px; font-size: 18px; }
+.tool-button.selected { color: rgb(36, 100, 196); background-color: rgb(230, 239, 253); }
+.tool-button.selected:hover { background-color: rgb(218, 233, 253); }
+.tool-icon { width: 20px; height: 20px; margin-right: 7px; -unity-background-image-tint-color: rgb(71, 77, 87); }
+.tool-button.selected .tool-icon { -unity-background-image-tint-color: rgb(36, 100, 196); }
+.move-icon { background-image: url("Move.png"); }
+.rotate-icon { background-image: url("Rotate.png"); }
+.constraints, .size-row, .range-labels, .help-row, .help-heading { flex-direction: row; justify-content: space-between; align-items: center; }
+.constraints { margin-top: 10px; font-size: 18px; }
+.muted { color: rgb(111, 119, 131); }
+.divider { height: 1px; margin-top: 24px; margin-bottom: 24px; background-color: rgb(231, 234, 239); }
+.section-title { font-size: 20px; }
+.size-value { flex-direction: row; align-items: center; height: 42px; border-width: 1px; border-color: rgb(219, 224, 232); border-radius: 7px; background-color: rgb(249, 250, 252); padding-right: 9px; }
+#size-input { width: 57px; margin: 0; padding: 0; }
+#size-input .unity-text-field__input { background-color: rgba(0, 0, 0, 0); border-width: 0; padding: 8px 3px 8px 6px; margin: 0; color: rgb(43, 47, 54); -unity-text-align: middle-right; }
+.size-value.editing { border-color: rgb(67, 120, 204); }
+.unit { font-size: 16px; color: rgb(111, 119, 131); }
+#size-slider { height: 32px; margin: 16px 0 0 0; }
+#size-slider .unity-base-slider__tracker { height: 4px; border-width: 0; background-color: rgb(222, 228, 238); border-radius: 2px; }
+#size-slider .unity-base-slider__dragger { width: 18px; height: 18px; border-radius: 9px; border-width: 0; background-color: rgb(36, 100, 196); }
+.range-labels { margin-top: 2px; color: rgb(125, 132, 143); font-size: 16px; }
+.size-hint { margin-top: 16px; }
+.help-backdrop { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.help-card { position: absolute; right: 24px; top: 80px; width: 340px; padding: 24px; background-color: rgb(255, 255, 255); border-width: 1px; border-color: rgb(224, 228, 234); border-radius: 12px; }
+.help-heading { margin-bottom: 16px; }
+.close-button { font-size: 26px; width: 36px; height: 36px; padding: 0; }
+.help-row { min-height: 38px; font-size: 18px; }
+.status { color: rgb(71, 77, 87); }
+.help-note { margin-top: 18px; }
+.hidden { display: none; }
+.compact .header { padding-left: 16px; padding-right: 16px; }
+.compact .project-name { display: none; }
+.compact .inspector { top: 80px; left: 16px; width: 264px; padding: 20px; }
+.compact .help-card { right: 16px; }

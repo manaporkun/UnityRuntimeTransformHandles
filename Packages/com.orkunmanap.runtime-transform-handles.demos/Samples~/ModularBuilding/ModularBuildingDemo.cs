@@ -5,8 +5,8 @@ using TransformHandles;
 using TransformHandles.Utils;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
-using TMPro;
+using UnityEngine.UIElements;
+using InputWrapper = TransformHandles.Utils.InputWrapper;
 
 namespace TransformHandles.Samples.ModularBuilding
 {
@@ -19,15 +19,13 @@ namespace TransformHandles.Samples.ModularBuilding
         [SerializeField] private Renderer floorRenderer;
         [SerializeField] private Material targetMaterial;
         [SerializeField] private TransformHandleSettings interactionSettings;
-        [SerializeField] private Sprite panelSprite;
-        [SerializeField] private TMP_FontAsset uiFont;
-        [SerializeField] private Sprite moveIcon, rotateIcon;
+        [SerializeField] private VisualTreeAsset uiLayout;
+        [SerializeField] private PanelSettings uiPanelSettings;
 
         private readonly List<Transform> _selection = new List<Transform>();
         private readonly Dictionary<Transform, PosRotScale> _initial = new Dictionary<Transform, PosRotScale>();
         private readonly List<Material> _materials = new List<Material>();
         private readonly Dictionary<Renderer, Material> _originalMaterials = new Dictionary<Renderer, Material>();
-        private readonly List<Button> _buttons = new List<Button>();
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
         private TransformHandleManager _manager, _ownedManager;
         private TransformHandleSettings _previousSettings;
@@ -38,27 +36,21 @@ namespace TransformHandles.Samples.ModularBuilding
         private const int MinimumHandlePixels = 64, MaximumHandlePixels = 512;
         private int _handleSizePixels = 192;
         private int _lastSizeEditFrame = -1;
-        private Slider _sizeSlider;
-        private TMP_InputField _sizeInput;
+        private SliderInt _sizeSlider;
+        private TextField _sizeInput;
+        private bool _sizeEditing;
         private int _lastStartFrame = -1, _pressFrame = -1;
         private bool _pressBlocked, _releasePending, _pressCancelled;
         private Vector3 _pressPosition, _releasePosition;
         private bool _releaseBlocked;
-        private GameObject _canvas, _ownedEventSystem;
-        private TextMeshProUGUI _status, _selectionLabel, _modeLabel, _constraintLabel;
-        private Button _moveButton, _rotateButton, _resetButton;
-        private RectTransform _toolbar, _toolRow, _selectionCard, _contextBar;
-        private Button _sizeToggleButton, _sizeCloseButton, _sizeBackdrop;
-        private TextMeshProUGUI _projectLabel;
-        private RectTransform _helpCard, _contextSeparator;
-        private Button _helpToggleButton, _helpCloseButton, _helpBackdrop;
+        private GameObject _uiObject, _ownedEventSystem;
+        private UIDocument _document;
+        private PanelSettings _runtimePanelSettings;
+        private VisualElement _uiRoot, _workshop, _helpCard, _helpBackdrop;
+        private Label _status, _selectionLabel, _selectionHint;
+        private Button _moveButton, _rotateButton, _resetButton, _helpToggleButton, _helpCloseButton;
         private bool _helpPanelOpen, _closeHelpPanelPending;
-        private bool _sizePanelOpen, _closeSizePanelPending;
-        private bool _narrowLayout;
         private string _uiState;
-        private static readonly Color PrimaryText = new Color(.15f, .16f, .18f);
-        private static readonly Color MutedText = new Color(.39f, .41f, .45f);
-        private static readonly Color Accent = new Color(.08f, .40f, .82f);
         private string _notice = "Select a wall or corner and arrange your layout.";
         private float _yaw = 25f, _pitch = 42f, _distance = 18f;
         private Vector3 _cameraFocus = new Vector3(0, 0.5f, 0);
@@ -95,9 +87,9 @@ namespace TransformHandles.Samples.ModularBuilding
                 enabled = false;
                 return;
             }
-            if (uiFont == null || TMP_Settings.instance == null)
+            if (uiLayout == null || uiPanelSettings == null)
             {
-                Debug.LogError("Modular Building requires its UI font and TMP Essential Resources. Import them through Window > TextMeshPro > Import TMP Essential Resources before playing.", this);
+                Debug.LogError("Modular Building requires its UI Toolkit layout and panel settings. Reimport the complete sample before playing.", this);
                 enabled = false;
                 return;
             }
@@ -140,7 +132,8 @@ namespace TransformHandles.Samples.ModularBuilding
             _manager.MainCamera = sceneCamera;
             _manager.Settings = interactionSettings;
             _manager.BlockWhenPointerOverUI = true;
-            _canvas.SetActive(true);
+            _uiObject.SetActive(true);
+            BindUi();
             if (_ownedEventSystem != null) _ownedEventSystem.SetActive(true);
             _pressFrame = -1;
             _lastStartFrame = -1;
@@ -158,7 +151,11 @@ namespace TransformHandles.Samples.ModularBuilding
             Vector3 mouse = InputWrapper.MousePosition;
             var editingSize = SuppressShortcuts(Time.frameCount);
             if (InputWrapper.GetMouseButtonDown(0))
-                BeginSelectionPress(Time.frameCount, mouse, PointerOverUi() || editingSize);
+            {
+                var overUi = PointerOverUi();
+                if (_sizeEditing && !overUi) FinishSizeEdit(false);
+                BeginSelectionPress(Time.frameCount, mouse, overUi || editingSize);
+            }
             if (InputWrapper.GetMouseButtonUp(0))
             {
                 _releasePending = true;
@@ -335,13 +332,9 @@ namespace TransformHandles.Samples.ModularBuilding
             _releasePending = false;
             if (!_initialized) return;
             ClearSelection();
-            _sizePanelOpen = _closeSizePanelPending = false;
             _helpPanelOpen = _closeHelpPanelPending = false;
-            _helpCard.gameObject.SetActive(false);
-            _helpBackdrop.gameObject.SetActive(false);
-            _selectionCard.gameObject.SetActive(false);
-            _sizeBackdrop.gameObject.SetActive(false);
-            if (_canvas != null) _canvas.SetActive(false);
+            UnbindUi();
+            if (_uiObject != null) _uiObject.SetActive(false);
             if (_ownedEventSystem != null) _ownedEventSystem.SetActive(false);
             if (_manager != null)
             {
@@ -361,7 +354,8 @@ namespace TransformHandles.Samples.ModularBuilding
             foreach (var pair in _originalMaterials)
                 if (pair.Key != null && _materials.Contains(pair.Key.sharedMaterial)) pair.Key.sharedMaterial = pair.Value;
             foreach (var material in _materials) if (material != null) Destroy(material);
-            if (_canvas != null) Destroy(_canvas);
+            if (_uiObject != null) Destroy(_uiObject);
+            if (_runtimePanelSettings != null) Destroy(_runtimePanelSettings);
             if (_ownedEventSystem != null) Destroy(_ownedEventSystem);
         }
 
@@ -385,10 +379,12 @@ namespace TransformHandles.Samples.ModularBuilding
         {
             var system = EventSystem.current;
             if (system == null) return false;
+            // PanelRaycaster needs the active input module after an EventSystem re-enable.
+            if (system.currentInputModule == null) return true;
             // Query the current position instead of EventSystem's potentially previous-frame hover cache.
             _uiHits.Clear();
             system.RaycastAll(new PointerEventData(system) { position = InputWrapper.PointerPosition }, _uiHits);
-            return _uiHits.Any(hit => hit.module is GraphicRaycaster);
+            return _uiHits.Any(hit => hit.module is UnityEngine.UI.GraphicRaycaster || hit.module is PanelRaycaster);
         }
 
         private void SetMaterial(Renderer renderer, Color color, bool grid)
@@ -457,8 +453,9 @@ namespace TransformHandles.Samples.ModularBuilding
 
         private float LogicalPointerDistance(Vector3 a, Vector3 b)
         {
-            var canvas = _canvas != null ? _canvas.GetComponent<Canvas>() : null;
-            return Vector3.Distance(a, b) / (canvas != null ? Mathf.Max(.001f, canvas.scaleFactor) : 1f);
+            var width = _uiRoot != null ? _uiRoot.resolvedStyle.width : Screen.width;
+            var scale = width > 0 && !float.IsNaN(width) ? Screen.width / width : 1f;
+            return Vector3.Distance(a, b) / Mathf.Max(.001f, scale);
         }
 
         private void AdvanceNavigation(Vector3 position, bool overUi)
@@ -526,304 +523,140 @@ namespace TransformHandles.Samples.ModularBuilding
                 _ownedEventSystem.AddComponent<StandaloneInputModule>();
 #endif
             }
-            _canvas = new GameObject("Modular Building Controls", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            _canvas.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = _canvas.GetComponent<CanvasScaler>();
-            // Scale the complete interface, including type and hit targets, with the viewport.
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280, 720);
-            scaler.matchWidthOrHeight = .5f;
-            _toolbar = Panel("Panel", new Vector2(0, 1), Vector2.zero, new Vector2(0, 56));
-            _toolbar.anchorMax = Vector2.one;
-            _toolbar.GetComponent<Image>().sprite = null;
-            var border = UiImage(_toolbar, "Bottom separator", new Color(.89f, .90f, .92f), Vector2.zero, Vector2.zero);
-            border.rectTransform.anchorMin = Vector2.zero;
-            border.rectTransform.anchorMax = new Vector2(1, 0);
-            border.rectTransform.pivot = new Vector2(.5f, 0);
-            border.rectTransform.sizeDelta = new Vector2(0, 1);
-            Label(_toolbar, "Modular workshop", 24, 14, PrimaryText, 22);
-            _projectLabel = Label(_toolbar, "Wall study", 250, 17, MutedText, 18);
-            _resetButton = AddButton(_toolbar, "Reset scene", 0, 0, 136, ResetLayout);
-            AnchorHeaderButton(_resetButton, 16);
+            _uiObject = new GameObject("Modular Building Controls");
+            _uiObject.SetActive(false);
+            _document = _uiObject.AddComponent<UIDocument>();
+            _runtimePanelSettings = Instantiate(uiPanelSettings);
+            _document.panelSettings = _runtimePanelSettings;
+            _document.visualTreeAsset = uiLayout;
+        }
 
-            _toolRow = Panel("Transform tools", new Vector2(0, 1), new Vector2(22, -102), new Vector2(168, 128));
-            AddPanelOutline(_toolRow);
-            _moveButton = AddButton(_toolRow, "Move", 6, 8, 156, () => SetMode(HandleType.Position), moveIcon);
-            _rotateButton = AddButton(_toolRow, "Rotate", 6, 64, 156, () => SetMode(HandleType.Rotation), rotateIcon);
-
-            _contextBar = Panel("Selection context", new Vector2(.5f, 0), new Vector2(0, 24), new Vector2(600, 72));
-            AddPanelOutline(_contextBar);
-            _selectionLabel = Label(_contextBar, "No selection", 18, 20, PrimaryText, 20, 32);
-            _selectionLabel.alignment = TextAlignmentOptions.Left;
-            _selectionLabel.richText = false;
-            _selectionLabel.rectTransform.sizeDelta = new Vector2(210, 32);
-            _contextSeparator = UiImage(_contextBar, "Selection separator", new Color(.90f, .91f, .93f), new Vector2(236, -14), new Vector2(1, 44)).rectTransform;
-            _modeLabel = Label(_contextBar, "Move", 250, 20, MutedText, 20, 32);
-            _modeLabel.rectTransform.sizeDelta = new Vector2(84, 32);
-            _modeLabel.alignment = TextAlignmentOptions.Left;
-            _constraintLabel = Label(_contextBar, "1 unit grid · 90° turns", 340, 20, MutedText, 20, 32);
-            _constraintLabel.alignment = TextAlignmentOptions.Left;
-            _constraintLabel.rectTransform.sizeDelta = new Vector2(246, 32);
-
-            BuildHelpUi();
-
-            // This backdrop remains active until LateUpdate on dismissal, after Core input.
-            var backdrop = Panel("Size panel backdrop", Vector2.zero, Vector2.zero, Vector2.zero);
-            backdrop.anchorMax = Vector2.one;
-            backdrop.GetComponent<Image>().color = Color.clear;
-            _sizeBackdrop = backdrop.gameObject.AddComponent<Button>();
-            _sizeBackdrop.transition = Selectable.Transition.None;
-            _sizeBackdrop.onClick.AddListener(RequestCloseSizePanel);
-            _sizeToggleButton = AddButton(_canvas.transform, "Handle size · 192 px", 0, 0, 244, ToggleSizePanel);
-            _buttons.Remove(_sizeToggleButton);
-            AnchorHeaderButton(_sizeToggleButton, 154);
-            _selectionCard = Panel("Handle size", Vector2.one, new Vector2(-24, -80), new Vector2(300, 258));
-            AddPanelOutline(_selectionCard);
-            Label(_selectionCard, "Handle size", 22, 18, PrimaryText, 22);
-            _sizeCloseButton = AddButton(_selectionCard, "×", 248, 0, 44, RequestCloseSizePanel);
-            _buttons.Remove(_sizeCloseButton);
-            BuildHandleSizeUi();
-            var note = Label(_selectionCard, "Choose a comfortable size for your display.", 22, 200, MutedText, 18, 52);
-            note.rectTransform.sizeDelta = new Vector2(256, 52);
-            _selectionCard.gameObject.SetActive(false);
-            _sizeBackdrop.gameObject.SetActive(false);
+        private void BindUi()
+        {
+            _uiRoot = _document.rootVisualElement;
+            _uiRoot.pickingMode = PickingMode.Ignore;
+            _workshop = _uiRoot.Q<VisualElement>("workshop");
+            _selectionLabel = _uiRoot.Q<Label>("selection-name");
+            _selectionHint = _uiRoot.Q<Label>("selection-hint");
+            _status = _uiRoot.Q<Label>("status");
+            _selectionLabel.enableRichText = _status.enableRichText = false;
+            _moveButton = _uiRoot.Q<Button>("move");
+            _rotateButton = _uiRoot.Q<Button>("rotate");
+            _resetButton = _uiRoot.Q<Button>("reset");
+            _helpToggleButton = _uiRoot.Q<Button>("help-toggle");
+            _helpCloseButton = _uiRoot.Q<Button>("help-close");
+            _helpBackdrop = _uiRoot.Q<VisualElement>("help-backdrop");
+            _helpCard = _uiRoot.Q<VisualElement>("help-card");
+            _sizeSlider = _uiRoot.Q<SliderInt>("size-slider");
+            _sizeInput = _uiRoot.Q<TextField>("size-input");
+            _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
+            _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
+            _moveButton.clicked += Move;
+            _rotateButton.clicked += Rotate;
+            _resetButton.clicked += ResetLayout;
+            _helpToggleButton.clicked += ToggleHelpPanel;
+            _helpCloseButton.clicked += RequestCloseHelpPanel;
+            _sizeSlider.RegisterValueChangedCallback(OnSizeSliderChanged);
+            _sizeInput.RegisterCallback<FocusInEvent>(OnSizeFocusIn);
+            _sizeInput.RegisterCallback<FocusOutEvent>(OnSizeFocusOut);
+            _sizeInput.RegisterCallback<KeyDownEvent>(OnSizeKeyDown, TrickleDown.TrickleDown);
+            _uiRoot.RegisterCallback<PointerDownEvent>(OnUiPointerDown, TrickleDown.TrickleDown);
+            _uiRoot.RegisterCallback<NavigationMoveEvent>(OnUiNavigation, TrickleDown.TrickleDown);
+            _uiRoot.RegisterCallback<GeometryChangedEvent>(OnUiGeometryChanged);
+            _helpBackdrop.RegisterCallback<PointerDownEvent>(OnHelpBackdropPressed);
+            _uiState = null;
             UpdateUiLayout();
         }
 
-        private static void AnchorHeaderButton(Button button, float right)
+        private void UnbindUi()
         {
-            var rect = (RectTransform)button.transform;
-            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one;
-            rect.anchoredPosition = new Vector2(-right, 0);
+            if (_uiRoot == null) return;
+            _moveButton.clicked -= Move;
+            _rotateButton.clicked -= Rotate;
+            _resetButton.clicked -= ResetLayout;
+            _helpToggleButton.clicked -= ToggleHelpPanel;
+            _helpCloseButton.clicked -= RequestCloseHelpPanel;
+            _sizeSlider.UnregisterValueChangedCallback(OnSizeSliderChanged);
+            _sizeInput.UnregisterCallback<FocusInEvent>(OnSizeFocusIn);
+            _sizeInput.UnregisterCallback<FocusOutEvent>(OnSizeFocusOut);
+            _sizeInput.UnregisterCallback<KeyDownEvent>(OnSizeKeyDown, TrickleDown.TrickleDown);
+            _uiRoot.UnregisterCallback<PointerDownEvent>(OnUiPointerDown, TrickleDown.TrickleDown);
+            _uiRoot.UnregisterCallback<NavigationMoveEvent>(OnUiNavigation, TrickleDown.TrickleDown);
+            _uiRoot.UnregisterCallback<GeometryChangedEvent>(OnUiGeometryChanged);
+            _helpBackdrop.UnregisterCallback<PointerDownEvent>(OnHelpBackdropPressed);
+            _sizeEditing = false;
+            _uiRoot = null;
         }
 
-        private static void AddPanelOutline(RectTransform panel)
-        {
-            var outline = panel.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(.84f, .86f, .89f, .6f);
-            outline.effectDistance = new Vector2(1, -1);
-        }
-
-        private void BuildHelpUi()
-        {
-            var launcher = Panel("Help launcher", new Vector2(1, 0), new Vector2(-24, 24), new Vector2(112, 48));
-            AddPanelOutline(launcher);
-            _helpToggleButton = AddButton(launcher, "?  Help", 0, 0, 112, ToggleHelpPanel);
-            _buttons.Remove(_helpToggleButton);
-            ((RectTransform)_helpToggleButton.transform).sizeDelta = new Vector2(112, 48);
-            _helpToggleButton.GetComponentInChildren<TextMeshProUGUI>().rectTransform.sizeDelta = new Vector2(112, 48);
-
-            var backdrop = Panel("Help backdrop", Vector2.zero, Vector2.zero, Vector2.zero);
-            backdrop.anchorMax = Vector2.one;
-            backdrop.GetComponent<Image>().color = Color.clear;
-            _helpBackdrop = backdrop.gameObject.AddComponent<Button>();
-            _helpBackdrop.transition = Selectable.Transition.None;
-            _helpBackdrop.onClick.AddListener(RequestCloseHelpPanel);
-            _helpCard = Panel("Workshop help", new Vector2(1, 0), new Vector2(-24, 108), new Vector2(360, 344));
-            AddPanelOutline(_helpCard);
-            Label(_helpCard, "Workshop controls", 22, 18, PrimaryText, 22);
-            _helpCloseButton = AddButton(_helpCard, "×", 310, 0, 44, RequestCloseHelpPanel);
-            _buttons.Remove(_helpCloseButton);
-            HelpRow("Move / Rotate", "W / E", 64);
-            HelpRow("Orbit", "Left-drag", 96);
-            HelpRow("Pan", "Right-drag", 128);
-            HelpRow("Zoom", "Scroll", 160);
-            UiImage(_helpCard, "Help separator", new Color(.90f, .91f, .93f), new Vector2(22, -198), new Vector2(316, 1));
-            _status = Label(_helpCard, _notice, 22, 212, PrimaryText, 20, 48);
-            _status.richText = false;
-            _status.rectTransform.sizeDelta = new Vector2(316, 48);
-            var note = Label(_helpCard, "Modules can overlap. Reset restores the layout.", 22, 274, MutedText, 20, 48);
-            note.rectTransform.sizeDelta = new Vector2(316, 48);
-            _helpCard.gameObject.SetActive(false);
-            _helpBackdrop.gameObject.SetActive(false);
-        }
-
-        private void HelpRow(string action, string gesture, float top)
-        {
-            var name = Label(_helpCard, action, 22, top, PrimaryText, 20, 28);
-            name.rectTransform.sizeDelta = new Vector2(166, 28);
-            name.alignment = TextAlignmentOptions.Left;
-            var shortcut = Label(_helpCard, gesture, 194, top, MutedText, 20, 28);
-            shortcut.rectTransform.sizeDelta = new Vector2(144, 28);
-            shortcut.alignment = TextAlignmentOptions.Right;
-        }
-
-        private void ToggleHelpPanel()
-        {
-            if (_dragging) return;
-            // A dismissal click only closes the current popup; never open another in the same press.
-            if (_sizePanelOpen) { RequestCloseSizePanel(); return; }
-            if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
-            CancelNavigation();
-            _pressBlocked = _pressCancelled = true;
-            _helpPanelOpen = true;
-            _closeHelpPanelPending = false;
-            _helpBackdrop.gameObject.SetActive(true);
-            _helpCard.gameObject.SetActive(true);
-            RefreshUi();
-        }
-
-        private void RequestCloseHelpPanel()
-        {
-            if (!_helpPanelOpen) return;
-            _pressBlocked = _pressCancelled = true;
-            _releaseBlocked = true;
-            CancelNavigation();
-            _closeHelpPanelPending = true;
-        }
-
-        private void ToggleSizePanel()
-        {
-            if (_dragging) return;
-            if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
-            if (_sizePanelOpen) { RequestCloseSizePanel(); return; }
-            CancelNavigation();
-            _pressBlocked = _pressCancelled = true;
-            _sizePanelOpen = true;
-            _closeSizePanelPending = false;
-            _sizeBackdrop.gameObject.SetActive(true);
-            _selectionCard.gameObject.SetActive(true);
-            RefreshUi();
-        }
-
-        private void RequestCloseSizePanel()
-        {
-            if (!_sizePanelOpen) return;
-            // Commit an outside/Close click, but let TMP_InputField handle Escape cancellation first.
-            if (_sizeInput.isFocused) _sizeInput.DeactivateInputField();
-            _pressBlocked = _pressCancelled = true;
-            _releaseBlocked = true;
-            CancelNavigation();
-            _closeSizePanelPending = true;
-        }
-
-        private void ApplyDeferredPanelClose()
-        {
-            if (_closeSizePanelPending)
-            {
-                _closeSizePanelPending = _sizePanelOpen = false;
-                _selectionCard.gameObject.SetActive(false);
-                _sizeBackdrop.gameObject.SetActive(false);
-            }
-            if (_closeHelpPanelPending)
-            {
-                _closeHelpPanelPending = _helpPanelOpen = false;
-                _helpCard.gameObject.SetActive(false);
-                _helpBackdrop.gameObject.SetActive(false);
-            }
-        }
-
-        private void HandleEscape(int frame)
-        {
-            if (SuppressShortcuts(frame)) return;
-            if (_sizePanelOpen) RequestCloseSizePanel();
-            else if (_helpPanelOpen) RequestCloseHelpPanel();
-            else ClearSelection();
-        }
-
-        private RectTransform Panel(string name, Vector2 anchor, Vector2 position, Vector2 size)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(_canvas.transform, false);
-            var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = rect.anchorMax = rect.pivot = anchor;
-            rect.anchoredPosition = position; rect.sizeDelta = size;
-            var image = go.GetComponent<Image>();
-            image.sprite = panelSprite; image.type = Image.Type.Sliced;
-            image.color = new Color(1f, 1f, 1f, .98f);
-            return rect;
-        }
+        private void Move() => SetMode(HandleType.Position);
+        private void Rotate() => SetMode(HandleType.Rotation);
+        private void OnSizeSliderChanged(ChangeEvent<int> evt) => SetHandleSize(evt.newValue);
+        private void OnUiGeometryChanged(GeometryChangedEvent evt) => UpdateUiLayout();
 
         private void UpdateUiLayout()
         {
-            var narrow = ((RectTransform)_canvas.transform).rect.width < 1190;
-            if (_uiState != null && narrow == _narrowLayout) return;
-            _narrowLayout = narrow;
-            _projectLabel.gameObject.SetActive(!narrow);
-            _toolRow.anchoredPosition = new Vector2(narrow ? 16 : 22, -102);
-            _selectionCard.anchoredPosition = new Vector2(narrow ? -16 : -24, -80);
+            if (_uiRoot == null) return;
+            _workshop.EnableInClassList("compact", _uiRoot.resolvedStyle.width < 1190);
         }
 
-        private Image UiImage(Transform parent, string name, Color color, Vector2 position, Vector2 size)
+        private void OnUiPointerDown(PointerDownEvent evt)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(parent, false);
-            var image = go.GetComponent<Image>();
-            image.color = color; image.sprite = panelSprite; image.type = Image.Type.Sliced;
-            image.raycastTarget = false;
-            var rect = image.rectTransform;
-            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
-            rect.anchoredPosition = position; rect.sizeDelta = size;
-            return image;
+            _pressBlocked = _pressCancelled = true;
+            CancelNavigation();
+            if (_sizeEditing && evt.target is VisualElement target && target != _sizeInput && !_sizeInput.Contains(target))
+                FinishSizeEdit(false);
         }
 
-        private void BuildHandleSizeUi()
+        private void OnUiNavigation(NavigationMoveEvent evt)
         {
-            var label = Label(_selectionCard, "Size", 22, 70, PrimaryText, 20, 44);
-            label.alignment = TextAlignmentOptions.Left;
-            label.rectTransform.sizeDelta = new Vector2(150, 44);
-            var fieldImage = UiImage(_selectionCard, "Handle size input", Color.white, new Vector2(180, -70), new Vector2(98, 44));
-            fieldImage.raycastTarget = true;
-            var border = fieldImage.gameObject.AddComponent<Outline>();
-            border.effectColor = new Color(.81f, .83f, .87f); border.effectDistance = new Vector2(1, -1);
-            _sizeInput = fieldImage.gameObject.AddComponent<TMP_InputField>();
-            _sizeInput.targetGraphic = fieldImage;
-            _sizeInput.contentType = TMP_InputField.ContentType.IntegerNumber;
-            _sizeInput.characterLimit = 10;
-            var viewport = new GameObject("Text viewport", typeof(RectTransform), typeof(RectMask2D));
-            viewport.transform.SetParent(fieldImage.transform, false);
-            var viewportRect = (RectTransform)viewport.transform;
-            viewportRect.anchorMin = new Vector2(0, 0); viewportRect.anchorMax = new Vector2(1, 1);
-            viewportRect.offsetMin = new Vector2(6, 2); viewportRect.offsetMax = new Vector2(-30, -2);
-            var value = Label(viewport.transform, "192", 0, 0, PrimaryText, 20, 40);
-            value.rectTransform.anchorMin = Vector2.zero; value.rectTransform.anchorMax = Vector2.one;
-            value.rectTransform.offsetMin = value.rectTransform.offsetMax = Vector2.zero;
-            value.alignment = TextAlignmentOptions.Right;
-            value.overflowMode = TextOverflowModes.Overflow;
-            _sizeInput.textViewport = viewportRect;
-            _sizeInput.textComponent = value;
-            _sizeInput.lineType = TMP_InputField.LineType.SingleLine;
-            _sizeInput.richText = false;
-            _sizeInput.customCaretColor = true;
-            _sizeInput.caretColor = PrimaryText;
-            _sizeInput.selectionColor = new Color(.08f, .40f, .82f, .18f);
-            var unit = Label(fieldImage.transform, "px", 71, 0, MutedText, 16, 44);
-            unit.rectTransform.sizeDelta = new Vector2(24, 44); unit.alignment = TextAlignmentOptions.Left;
-            _sizeInput.SetTextWithoutNotify(_handleSizePixels.ToString());
-            _sizeInput.onEndEdit.AddListener(CommitHandleSize);
-
-            var sliderImage = UiImage(_selectionCard, "Handle size slider", Color.clear, new Vector2(22, -126), new Vector2(256, 44));
-            sliderImage.raycastTarget = true;
-            _sizeSlider = sliderImage.gameObject.AddComponent<Slider>();
-            _sizeSlider.minValue = MinimumHandlePixels; _sizeSlider.maxValue = MaximumHandlePixels;
-            _sizeSlider.wholeNumbers = true;
-            UiImage(sliderImage.transform, "Track", new Color(.86f, .87f, .90f), new Vector2(9, -20), new Vector2(238, 4));
-            var fillArea = UiImage(sliderImage.transform, "Fill area", Color.clear, new Vector2(9, -20), new Vector2(238, 4));
-            var fill = UiImage(fillArea.transform, "Fill", Accent, Vector2.zero, Vector2.zero);
-            fill.rectTransform.anchorMin = Vector2.zero; fill.rectTransform.anchorMax = Vector2.one;
-            fill.rectTransform.offsetMin = fill.rectTransform.offsetMax = Vector2.zero;
-            var handleArea = UiImage(sliderImage.transform, "Handle area", Color.clear, new Vector2(9, -13), new Vector2(238, 18));
-            var thumb = UiImage(handleArea.transform, "Thumb", Accent, Vector2.zero, new Vector2(18, 0));
-            thumb.rectTransform.anchorMin = thumb.rectTransform.anchorMax = new Vector2(0, .5f);
-            thumb.rectTransform.pivot = new Vector2(.5f, .5f);
-            _sizeSlider.fillRect = fill.rectTransform; _sizeSlider.handleRect = thumb.rectTransform;
-            _sizeSlider.targetGraphic = thumb;
-            _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
-            _sizeSlider.onValueChanged.AddListener(SetHandleSize);
-            Label(_selectionCard, "64", 22, 174, MutedText, 14, 20);
-            var maximum = Label(_selectionCard, "512", 228, 174, MutedText, 14, 20);
-            maximum.rectTransform.sizeDelta = new Vector2(50, 20); maximum.alignment = TextAlignmentOptions.TopRight;
+            // W/E are workshop tools, not navigation through focused controls. Tab and arrows remain available.
+            if (!InputWrapper.GetKey(KeyCode.W) && !InputWrapper.GetKey(KeyCode.E)) return;
+#if !UNITY_6000_0_OR_NEWER
+            evt.PreventDefault();
+#endif
+            evt.StopPropagation();
         }
 
-        private bool SuppressShortcuts(int frame) =>
-            (_sizeInput != null && _sizeInput.isFocused) || _lastSizeEditFrame == frame;
+        private void OnSizeFocusIn(FocusInEvent evt)
+        {
+            _sizeEditing = true;
+            CancelNavigation();
+            _sizeInput.parent.AddToClassList("editing");
+        }
+
+        private void OnSizeFocusOut(FocusOutEvent evt)
+        {
+            if (_sizeEditing) FinishSizeEdit(false);
+        }
+
+        private void OnSizeKeyDown(KeyDownEvent evt)
+        {
+            if (evt.keyCode != KeyCode.Escape && evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter) return;
+            FinishSizeEdit(evt.keyCode == KeyCode.Escape);
+#if !UNITY_6000_0_OR_NEWER
+            evt.PreventDefault();
+#endif
+            evt.StopPropagation();
+        }
+
+        private void FinishSizeEdit(bool cancel)
+        {
+            if (!_sizeEditing) return;
+            _sizeEditing = false;
+            _lastSizeEditFrame = Time.frameCount;
+            if (!cancel) CommitHandleSize(_sizeInput.value);
+            _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
+            _sizeInput.parent.RemoveFromClassList("editing");
+            _sizeInput.Blur();
+        }
+
+        private bool SuppressShortcuts(int frame) => _sizeEditing || _lastSizeEditFrame == frame;
 
         private void CommitHandleSize(string text)
         {
             _lastSizeEditFrame = Time.frameCount;
-            if (_sizeInput != null && !_sizeInput.wasCanceled && int.TryParse(text, out var value))
-                SetHandleSize(value);
-            if (_sizeInput != null) _sizeInput.SetTextWithoutNotify(_handleSizePixels.ToString());
+            if (int.TryParse(text, out var value)) SetHandleSize(value);
+            _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
         }
 
         private void SetHandleSize(float value)
@@ -833,123 +666,77 @@ namespace TransformHandles.Samples.ModularBuilding
                 _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
                 return;
             }
-            _handleSizePixels = Mathf.RoundToInt(Mathf.Clamp(value, MinimumHandlePixels, MaximumHandlePixels));
+            _handleSizePixels = Mathf.Clamp(Mathf.RoundToInt(value), MinimumHandlePixels, MaximumHandlePixels);
             if (_handle != null)
             {
                 _handle.AutoScale = true;
                 _handle.AutoScaleSizeInPixels = _handleSizePixels;
             }
             _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
-            if (!_sizeInput.isFocused) _sizeInput.SetTextWithoutNotify(_handleSizePixels.ToString());
+            if (!_sizeEditing) _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
         }
 
-        private TextMeshProUGUI Label(Transform parent, string text, float x, float y, Color color, int size, float height = 32)
+        private void ToggleHelpPanel()
         {
-            var go = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
-            var label = go.GetComponent<TextMeshProUGUI>(); label.text = text; label.font = uiFont;
-            label.fontSize = size; label.color = color; label.raycastTarget = false;
-            label.enableAutoSizing = false;
-            label.richText = false;
-            label.alignment = TextAlignmentOptions.TopLeft;
-#if UNITY_2023_2_OR_NEWER
-            label.textWrappingMode = TextWrappingModes.Normal;
-#else
-            label.enableWordWrapping = true;
-#endif
-            label.overflowMode = TextOverflowModes.Truncate;
-            var rect = label.rectTransform; rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 1);
-            rect.anchoredPosition = new Vector2(x, -y); rect.sizeDelta = new Vector2(252, height);
-            return label;
+            if (_dragging) return;
+            if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
+            CancelNavigation();
+            _pressBlocked = _pressCancelled = true;
+            _helpPanelOpen = true;
+            _closeHelpPanelPending = false;
+            _helpBackdrop.RemoveFromClassList("hidden");
+            RefreshUi();
         }
 
-        private Button AddButton(Transform parent, string text, float x, float y, float width, UnityEngine.Events.UnityAction action, Sprite icon = null)
+        private void OnHelpBackdropPressed(PointerDownEvent evt)
         {
-            var go = new GameObject(text, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(parent, false);
-            var rect = go.GetComponent<RectTransform>(); rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 1);
-            rect.anchoredPosition = new Vector2(x, -y); rect.sizeDelta = new Vector2(width, 56);
-            var image = go.GetComponent<Image>(); image.sprite = panelSprite; image.type = Image.Type.Sliced;
-            image.color = Color.white;
-            var button = go.GetComponent<Button>(); button.onClick.AddListener(action); _buttons.Add(button);
-            var label = Label(go.transform, text, 0, 0, PrimaryText, 20, 56);
-            label.alignment = TextAlignmentOptions.Center; label.rectTransform.sizeDelta = new Vector2(width, 56);
-            if (icon != null)
-            {
-                var iconObject = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-                iconObject.transform.SetParent(go.transform, false);
-                var iconImage = iconObject.GetComponent<Image>(); iconImage.sprite = icon; iconImage.raycastTarget = false;
-                var iconRect = iconImage.rectTransform; iconRect.anchorMin = iconRect.anchorMax = new Vector2(0, .5f);
-                iconRect.anchoredPosition = new Vector2(24, 0); iconRect.sizeDelta = new Vector2(22, 22);
-                label.rectTransform.anchoredPosition = new Vector2(42, 0); label.rectTransform.sizeDelta = new Vector2(width - 48, 56);
-            }
-            StyleButton(button, false);
-            return button;
+            if (evt.target == _helpBackdrop) RequestCloseHelpPanel();
         }
 
-        private void SetSelectionLabel(string name)
+        private void RequestCloseHelpPanel()
         {
-            name = name.Replace('\n', ' ').Replace('\r', ' ');
-            var length = Mathf.Min(name.Length, 64);
-            _selectionLabel.text = length < name.Length ? name.Substring(0, length) + "…" : name;
-            while (length > 0 && _selectionLabel.preferredHeight > _selectionLabel.rectTransform.rect.height + .1f)
-            {
-                length--;
-                _selectionLabel.text = name.Substring(0, length) + "…";
-            }
+            if (!_helpPanelOpen) return;
+            _pressBlocked = _pressCancelled = _releaseBlocked = true;
+            CancelNavigation();
+            _closeHelpPanelPending = true;
+        }
+
+        private void ApplyDeferredPanelClose()
+        {
+            if (!_closeHelpPanelPending) return;
+            _closeHelpPanelPending = _helpPanelOpen = false;
+            _helpBackdrop.AddToClassList("hidden");
+        }
+
+        private void HandleEscape(int frame)
+        {
+            if (SuppressShortcuts(frame)) return;
+            if (_helpPanelOpen) RequestCloseHelpPanel();
+            else ClearSelection();
         }
 
         private void RefreshUi()
         {
-            if (_canvas == null) return;
-            UpdateUiLayout();
-            _sizeSlider.interactable = !_dragging;
-            _sizeInput.interactable = !_dragging;
+            if (_uiRoot == null) return;
             var selectionName = _selection.Count == 1 && _selection[0] != null ? _selection[0].name : "";
-            var state = $"{selectionName}|{_mode}|{_dragging}|{_handle != null}|{_notice}|{_handleSizePixels}|{_sizePanelOpen}|{_helpPanelOpen}";
-            if (_uiState == state) return;
+            var state = $"{selectionName}|{_mode}|{_dragging}|{_handle != null}|{_notice}|{_helpPanelOpen}";
+            if (state == _uiState) return;
             _uiState = state;
             var selected = _selection.Count > 0;
-            _contextBar.sizeDelta = selected ? new Vector2(600, 72) : new Vector2(340, 56);
-            _selectionLabel.rectTransform.anchoredPosition = new Vector2(18, selected ? -20 : -10);
-            _selectionLabel.rectTransform.sizeDelta = selected ? new Vector2(210, 32) : new Vector2(304, 36);
-            _selectionLabel.alignment = selected ? TextAlignmentOptions.Left : TextAlignmentOptions.Center;
-            SetSelectionLabel(selected ? selectionName : "Select a wall or corner");
-            _modeLabel.gameObject.SetActive(selected);
-            _constraintLabel.gameObject.SetActive(selected);
-            _contextSeparator.gameObject.SetActive(selected);
-            _modeLabel.text = _mode == HandleType.Position ? "Move" : "Rotate";
-            foreach (var button in _buttons) button.interactable = !_dragging && _handle != null;
-            _resetButton.interactable = !_dragging;
-            _sizeToggleButton.interactable = !_dragging;
-            _sizeCloseButton.interactable = true;
-            _helpToggleButton.interactable = !_dragging;
-            _helpCloseButton.interactable = true;
-            _sizeToggleButton.GetComponentInChildren<TextMeshProUGUI>().text = "Handle size · " + _handleSizePixels + " px";
-            StyleButton(_moveButton, _mode == HandleType.Position);
-            StyleButton(_rotateButton, _mode == HandleType.Rotation);
-            StyleButton(_resetButton, false);
-            StyleButton(_sizeToggleButton, _sizePanelOpen);
-            StyleButton(_sizeCloseButton, false);
-            StyleButton(_helpToggleButton, _helpPanelOpen);
-            StyleButton(_helpCloseButton, false);
+            _selectionLabel.text = selected ? selectionName.Replace('\n', ' ').Replace('\r', ' ') : "Select a module";
+            _selectionLabel.tooltip = selected ? selectionName : "";
+            _selectionHint.text = !selected ? "Click a wall or corner in the scene." :
+                _mode == HandleType.Position ? "Move on the ground plane." : "Turn in 90° steps.";
+            _moveButton.SetEnabled(!_dragging && _handle != null);
+            _rotateButton.SetEnabled(!_dragging && _handle != null);
+            _resetButton.SetEnabled(!_dragging);
+            _helpToggleButton.SetEnabled(!_dragging);
+            _sizeInput.SetEnabled(!_dragging);
+            _sizeSlider.SetEnabled(!_dragging);
+            _moveButton.EnableInClassList("selected", selected && _mode == HandleType.Position);
+            _rotateButton.EnableInClassList("selected", selected && _mode == HandleType.Rotation);
+            _helpToggleButton.EnableInClassList("selected", _helpPanelOpen);
             _status.text = _notice;
         }
-        private static void StyleButton(Button button, bool active)
-        {
-            var colors = button.colors;
-            colors.normalColor = active ? new Color(.92f, .95f, .99f) : new Color(1, 1, 1, 0);
-            colors.highlightedColor = new Color(.90f, .93f, .98f);
-            colors.pressedColor = new Color(.82f, .88f, .97f);
-            colors.selectedColor = colors.normalColor;
-            colors.disabledColor = new Color(1, 1, 1, 0);
-            colors.fadeDuration = .08f;
-            button.colors = colors;
-            var color = button.interactable ? (active ? Accent : MutedText) : new Color(.64f, .65f, .68f);
-            button.GetComponentInChildren<TextMeshProUGUI>().color = color;
-            var icon = button.transform.Find("Icon");
-            if (icon != null) icon.GetComponent<Image>().color = color;
-        }
-
     }
 }

@@ -73,6 +73,25 @@ class PackageBoundaryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'always-compiled'): boundary.validate(self.root)
                 path.unlink()
 
+    def test_toolkit_relative_reference_escape_rejected(self):
+        folder = self.demos / 'Samples~/ModularBuilding/UI'
+        for suffix, text in [('.uxml', '<UXML><Style src="../../LevelEditor/LevelEditorDemo.cs" /></UXML>'),
+                             ('.uxml', '<UXML><VisualElement style="background-image: url(../../LevelEditor/LevelEditorDemo.cs);" /></UXML>'),
+                             ('.uss', '.x { background-image: url("../../LevelEditor/LevelEditorDemo.cs"); }'),
+                             ('.tss', '@import "../../LevelEditor/LevelEditorDemo.cs";')]:
+            with self.subTest(suffix=suffix):
+                path = folder / ('Escape' + suffix); path.write_text(text)
+                with self.assertRaisesRegex(ValueError, 'UI reference escapes'): boundary.validate(self.root)
+                path.unlink()
+
+    def test_toolkit_external_or_missing_reference_rejected(self):
+        path = self.demos / 'Samples~/ModularBuilding/UI/Bad.uss'
+        for value in ('https://example.com/font.ttf', 'project://database/Assets/font.ttf', 'missing.ttf'):
+            with self.subTest(value=value):
+                path.write_text('.x { -unity-font: url("' + value + '"); }')
+                with self.assertRaises(ValueError): boundary.validate(self.root)
+
+
 
 class ReleaseScopeTests(unittest.TestCase):
     def test_workflow_queries_exclude_demo_only_history(self):
