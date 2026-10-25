@@ -194,6 +194,10 @@ Core users do not need it. See [installation and migration](Packages/com.orkunma
 Import individual examples from that package's Samples tab, then run Tools > Transform Handles > Setup Layer.
 Existing imported Assets copies are user-owned; back up custom changes outside Assets before migration.
 
+### Modular Building sample
+
+The optional Demos package also includes [Modular Building](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md): arrange supplied wall and corner modules using a fixed horizontal grid and 90-degree rotations. Import it separately from Level Editor; Core-only installs stay unchanged.
+
 ## Package Structure
 
 ```

@@ -1,8 +1,8 @@
 # Runtime Transform Handles Demos
 
 Optional examples for Runtime Transform Handles. Core does not depend on this package.
-Import **Level Editor** for the Prop Workshop: select, move, rotate, scale and reset six props, with World/Local group movement and rotation, plus shared-center uniform group scaling. The original feature showcase remains a separate import through Package Manager > Samples.
-Its known URP magenta targets, stale shortcut HUD and shader diagnostics are not fixed by relocation.
+Import **Level Editor** for the Prop Workshop: select, move, rotate, scale and reset six props, with World/Local group movement and rotation, plus shared-center uniform group scaling. Import **Modular Building** for a wall-and-corner arrangement scene with a fixed 1-unit horizontal grid, 90-degree yaw, Reset and the same camera/handle-size controls. All three samples are separate imports through Package Manager > Samples.
+The original showcase's known URP magenta targets, stale shortcut HUD and shader diagnostics are not fixed by relocation.
 
 ## Install
 

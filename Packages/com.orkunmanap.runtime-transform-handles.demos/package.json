@@ -25,6 +25,11 @@
       "displayName": "Level Editor",
       "description": "A resettable prop workshop with single-object tools, World/Local group movement and rotation, and shared-center uniform group scaling.",
       "path": "Samples~/LevelEditor"
+    },
+    {
+      "displayName": "Modular Building",
+      "description": "Arrange supplied wall and corner modules with horizontal grid movement and quarter-turn rotation.",
+      "path": "Samples~/ModularBuilding"
     }
   ]
 }

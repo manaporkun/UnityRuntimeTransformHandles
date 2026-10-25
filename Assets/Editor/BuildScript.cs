@@ -39,11 +39,30 @@ public static class BuildScript
             "Level Editor", "LevelEditor", "LevelEditor");
     }
 
+    // A new sample assembly needs a domain reload before BuildPlayer serializes its scene.
+    // For a clean CLI project, prepare in one invocation and build in the next.
+    public static void PrepareModularBuildingWebGL()
+    {
+        ResolveSampleScenePath("Modular Building", "ModularBuilding", "ModularBuilding");
+        Debug.Log("Modular Building imported. Run BuildModularBuildingWebGL in a new Editor invocation after compilation.");
+    }
+
+    public static void BuildModularBuildingWebGL()
+    {
+        BuildWebGL(GetCommandLineArgument("-buildPath") ?? "Build/ModularBuildingWebGL",
+            "Modular Building", "ModularBuilding", "ModularBuilding");
+    }
+
     private static void BuildWebGL(string outputPath, string sampleName, string sampleFolder, string sceneName)
     {
         if (Application.isBatchMode && EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
             throw new InvalidOperationException("Start Unity with -buildTarget WebGL before executing this build method.");
         var scenePath = ResolveSampleScenePath(sampleName, sampleFolder, sceneName);
+        var assemblyName = "TransformHandles.Samples." + sampleFolder;
+        if (!AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == assemblyName))
+            throw new InvalidOperationException($"Sample '{sampleName}' has been imported but its Editor assembly is not loaded. " +
+                "Let script compilation and domain reload finish, then run the build again in a new Editor invocation. " +
+                "For clean Modular Building CLI builds, run BuildScript.PrepareModularBuildingWebGL first.");
 
         var previousTemplate = PlayerSettings.WebGL.template;
         var previousCompressionFormat = PlayerSettings.WebGL.compressionFormat;

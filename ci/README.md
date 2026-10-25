@@ -82,3 +82,9 @@ diagnostic; the tests do not silently modify the consumer's project layers.
 customized imports. The new scene uses its own opaque shader and current UI mode labels; relocating
 the original showcase does not fix its pre-existing visual issues. Inspect all browser console text,
 including log-level `ERROR: Shader` messages, before claiming a clean WebGL result.
+
+Run the independently imported Modular Building suite with `-testPlatform playmode -testFilter TransformHandles.Samples.ModularBuilding.Tests`. Its WebGL entry point is `BuildScript.BuildModularBuildingWebGL`. Verify single-sample import and co-import with Level Editor; run the scenes separately. `node ci/test-level-editor-input.cjs` checks both sample-local wheel bridges and their co-existence.
+
+On a clean CLI project run `BuildScript.PrepareModularBuildingWebGL` in a separate Unity invocation before `BuildScript.BuildModularBuildingWebGL`. A new sample assembly must compile and load into the Editor domain before player serialization. All build entry points reject an unloaded sample assembly rather than producing a player with missing scripts. Existing compiled imports can build directly.
+
+Pages CI copies the original showcase sample to its manifest-defined Assets import path before launching Unity. This loads its assembly before the first build and preserves the original public demo selection; an unexpected existing destination fails instead of being overwritten.

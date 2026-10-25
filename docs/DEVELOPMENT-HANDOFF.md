@@ -50,11 +50,11 @@ Run the static checks in `.github/workflows/min-api-lint.yml`, workflow syntax v
 
 ## Next work and boundaries
 
-The owner wants more demos, rather than Undo/Redo. Undo/Redo is outside the intended scope. No new scenario implementation has started or been approved at the detailed design level.
+The owner wants more demos, rather than Undo/Redo. Undo/Redo is outside the intended scope. The Modular Building plan was independently reviewed and approved. Its implementation is on `feat/modular-building-demo`; see the sample README for controls and constraints. Validation results for this addition are recorded below.
 
 Suggested order:
 
-1. Modular placement: ready-made wall/corner pieces on a foundation; planar translation, axis masks, grid and 90-degree rotation snapping, Reset. Avoid a resource economy or full building system. Define confirm/cancel/overlap rules only if actually needed for the demo.
+1. Modular Building now supplies eight wall/corner modules with fixed horizontal grid and quarter-turn yaw, single selection and Reset. No catalog, collision checks or confirmation flow. Keep it independently importable; run demo controllers separately.
 2. Vehicle customization: attached accessories, Local axes, constrained movement and parent-child handling. Verify rotated/nonuniform parent support before exposing combinations that imply distortion-free scaling.
 3. Mechanical alignment: orthographic views, fine snapping and pivot behavior. Document units/tolerances; do not imply CAD-grade accuracy or add numeric input without an explicit interaction plan.
 
@@ -68,3 +68,23 @@ Each should be an independently importable sample in the optional package, follo
 - Extreme handle sizes can extend outside the viewport; 64 rendering pixels is small on Retina.
 - Core/demos manifest versions are a local development pair, not a claim that an older published Core 3.3.0 contains these changes. Align and test release versions before publishing. Sample relocation is a distribution breaking change; preserve migration docs, GUIDs and explicit import cleanup guidance.
 - Do not merge into main or dispatch publishing merely to continue development. Existing workflows publish on main. This checkpoint is a branch push only.
+
+## Modular Building checkpoint (2026-10-25)
+
+`feat/modular-building-demo` adds a third independently importable sample. Import **Modular Building** and open `ModularBuilding.unity`. Eight supplied wall/corner roots use child meshes/colliders; clicking any face selects the module. Move uses world XZ and a fixed 1-unit grid; Rotate exposes only Y with 90-degree steps. Reset restores the authored layout, camera and Move mode while retaining handle size. The scene starts without overlapping modules. Corner 8 is placed left of the partial room so its default plane pad stays above the bottom UI at both tested viewport sizes.
+
+The sample adapts Level Editor's established UI/input/ownership pattern with independent asset GUIDs, shader and browser symbols. It intentionally does not introduce a shared framework or change Core. The README documents the serialized scene structure and finite-module scope: no catalog, spawning, scale, multi-selection, collision rejection, persistence or Undo/Redo. Co-import is supported; run demo controllers separately because they configure the same singleton manager.
+
+| Configuration | Modular Building PlayMode | Level Editor regression |
+| --- | ---: | ---: |
+| Unity 2021.3.0f1 / Legacy / Built-in | 34 | 44 |
+| Unity 6000.3.16f1 / Legacy | 34 | 44 |
+| Unity 6000.3.16f1 / Input System | 34 | 44 |
+
+All passed without skips. The final Modular Building scene/test revision also passed all 34 tests as a standalone import in the Unity 2021 consumer. A fresh Core regression run passed 176 PlayMode and 74 EditMode tests in that consumer; Core files are unchanged. New coverage exercises real ray/plane and ring snapping, compound selection, module joins at every quarter turn, initial non-overlap, immediate non-origin handle placement, input ownership, reset, popover/size behavior and resource cleanup.
+
+The Unity 6 WebGL build was tested in Chromium: plane and axis movement, quarter-turn rotation, orbit/pan/scroll, numeric handle sizing, popover dismissal, Reset and compound-module dragging. Reset restored a scene crop pixel-for-pixel after transforms and camera gestures. Layout checks cover 1440×900, 960×640 and device pixel ratio 2; final Corner 8 plane drags passed at the default 192 px size. Browser runtime/page errors were empty; Chromium emitted GPU ReadPixels performance warnings. No physical trackpad test was performed.
+
+Clean first-import testing exposed a build-helper defect: importing a new assembly and immediately building in the same Editor invocation could serialize a missing controller. Build entry points now reject an unloaded sample assembly before changing settings or writing output. For a clean Modular Building CLI consumer, run `BuildScript.PrepareModularBuildingWebGL`, then `BuildScript.BuildModularBuildingWebGL` in a new Unity invocation. The fresh-import rejection and prepare/build sequence were verified. Pages CI prepares the original showcase before Unity starts; its public scene selection is unchanged. The actual CI preparation script was executed against a disposable checkout, with all original file bytes preserved and overwrite rejection checked.
+
+Static verification passed: 27 Python CI tests, three-sample package/GUID boundary checks, both raw-wheel bridges plus co-import isolation, minimum Unity API/meta checks, manifest/assembly JSON validation, actionlint and whitespace checks. Independent plan, code and visual reviews completed. These are local results, not a claim of remote CI or deployment. Builds/logs are disposable and excluded from Git; use the sample README and `ci/README.md` to repeat the checks. No publishing or main merge is part of this checkpoint.

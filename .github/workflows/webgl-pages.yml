@@ -69,6 +69,22 @@ jobs:
           restore-keys: |
             Library-
 
+      # Import before Unity starts so its first domain already contains the sample assembly.
+      - name: Prepare original showcase sample
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import shutil
+          from pathlib import Path
+
+          package = Path('Packages/com.orkunmanap.runtime-transform-handles.demos')
+          manifest = json.loads((package / 'package.json').read_text())
+          sample = next(item for item in manifest['samples'] if item['path'] == 'Samples~/Demo')
+          destination = Path('Assets/Samples') / manifest['displayName'] / manifest['version'] / sample['displayName']
+          # The checkout is clean; fail instead of overwriting an unexpected existing import.
+          shutil.copytree(package / sample['path'], destination)
+          PYTHON
+
       - name: Build WebGL project
         uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5
         env:
