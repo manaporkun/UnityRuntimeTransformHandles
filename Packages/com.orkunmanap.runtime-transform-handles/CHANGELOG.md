@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - BREAKING CHANGE: samples move to the separate optional demos package. Existing imported Assets
   copies remain user-owned; back them up outside Assets before importing the relocated showcase.
-  Core package identity and runtime API are unchanged.
+  Core package identity and existing runtime API remain compatible; the new controls are opt-in.
 
 ### Documentation
 - Recorded local compatibility results for Unity 2021.3.0f1, 2021.3.45f1 and 6000.3.16f1.
