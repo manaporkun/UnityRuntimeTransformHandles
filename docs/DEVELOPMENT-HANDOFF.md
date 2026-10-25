@@ -2,6 +2,76 @@
 
 This branch is a development checkpoint, not a published package release. It contains the accumulated lifecycle fixes, Precision visuals, optional-package split, Level Editor UI/input work and group transforms. Continue from this branch rather than rebuilding the changes from older task branches.
 
+## Release preparation checklist and next-agent handoff (2026-10-25)
+
+The owner considers the current demos sufficient. Stop adding demo scenarios or features; focus next on release readiness. A more polished showcase scene is an optional Asset Store presentation task, not a blocker for finishing the current engineering work.
+
+### Resume here
+
+- Working tree: `/Users/orkunmanap/Desktop/UnityRuntimeTransformHandles-demos`.
+- Branch: `feat/modular-building-demo`; continue here, not the older main checkout.
+- Implementation commits, already pushed: `6120c93` (bounded rotation API) and `e55cbfc` (Lamp Assembly).
+- Read the latest checkpoint below for implementation decisions, test evidence and limitations. Older checkpoints are historical; Product Configurator's finish/group-placement behavior has been replaced.
+- Current scope: Core stays independently usable; demos stay optional. No Android, new demo framework, Undo/Redo or additional feature work.
+- This checklist authorizes documentation of the remaining work, not merging, publishing packages, deploying a public demo or submitting to Asset Store. Obtain the owner's decision before those actions. For nontrivial implementation, follow plan, independent review, owner approval, implementation, independent final review and QC.
+
+### Completed development work
+
+- [x] Implement optional Core angle limits and keep rotation geometry/arc consistent.
+- [x] Complete Lamp Assembly, shared UI and gallery navigation.
+- [x] Complete independent source and visual reviews.
+- [x] Pass local Unity 2021/6, Legacy/Input System, package-boundary and UI checks; see the exact matrix below.
+- [x] Check combined and standalone WebGL builds, mouse interaction and Retina layout.
+- [x] Commit and push the implementation to the feature branch.
+
+### 1. Align package versions and release scope
+
+- [ ] Inspect both package manifests, release automation and existing tags; propose the exact Core/Demos version pair. Do not infer a release version from the current development manifests.
+- [ ] Account for the optional-package split as a distribution breaking change; keep migration instructions and existing sample GUIDs consistent.
+- [ ] Ensure Demos depends on a Core version that actually includes `RotationAxis.DragAngleLimits`; published Core 3.3.0 must not be assumed to provide it.
+- [ ] After plan approval, update manifests, dependency declarations, changelogs and installation examples together.
+- [ ] Define and verify publication order so the declared Core dependency is available when Demos is released.
+
+Done when: exact versions and dependency availability are documented, and the intended release artifacts—not just linked development folders—pass installation checks.
+
+### 2. Verify clean consumer installation
+
+- [ ] Install the intended Core artifact in a fresh supported Unity project with no imported demos; verify compilation and basic handle use.
+- [ ] Add Demos separately and import each sample independently, including Lamp Assembly and the optional gallery.
+- [ ] Verify the combined gallery, transitions and standalone behavior from the intended release artifacts.
+- [ ] Verify removing Demos leaves Core usable; check dependency and GUID isolation.
+- [ ] Verify the upgrade path from prior sample locations, including removal of the old Product Configurator import before importing Lamp Assembly.
+- [ ] Run the declared Unity/input compatibility matrix and record versions, package versions, commands and results. Existing local results are evidence for the development revision, not for a future versioned release artifact.
+- [ ] Perform a physical Mac trackpad smoke test; previous browser automation did not validate actual trackpad hardware.
+
+Done when: a new consumer can install Core alone or opt into the demos without hidden setup, duplicate GUIDs or missing API errors, and the tested support matrix is explicit.
+
+### 3. Prepare the PR and confirm CI
+
+- [ ] Inspect the complete branch diff against its intended base, including accumulated earlier work; check for conflicts and unrelated changes.
+- [ ] Keep README, API docs, changelogs and migration notes aligned with the final release scope.
+- [ ] Run the repository's local gates from the final revision. Follow `ci/README.md` for exact-suite evidence; a successful Unity process alone is insufficient.
+- [ ] Obtain independent final review and address findings before presenting the diff to the owner.
+- [ ] Prepare a Conventional Commit PR title and concise description explaining Core/optional-Demos distribution, behavior changes and validation; flag the distribution breaking change.
+- [ ] Verify actual remote CI status for the final PR revision and resolve failures before marking it ready. Remote CI success has not been established in this handoff.
+- [ ] Obtain approval before merge or release; inspect main-branch publishing workflows before taking either action.
+
+Done when: the reviewed final revision has green required checks, accurate release/migration documentation and explicit owner approval for the next external action.
+
+### 4. Prepare the Asset Store presentation
+
+- [ ] Confirm the distribution format and how optional demos are delivered to Asset Store users; do not assume the UPM layout directly answers this.
+- [ ] Verify the current submission requirements and supported Unity/render-pipeline claims at preparation time.
+- [ ] Review the distributed files, license texts and third-party notices, including bundled fonts, models and textures.
+- [ ] Write the listing: supported features, installation, controls, limitations and support contact.
+- [ ] Capture clear screenshots and a short video showing movement, rotation, scale, multi-selection and the assembly scenario where each applies.
+- [ ] Optional: plan a separate polished showcase scene with better models, lighting and materials. Preserve the lightweight instructional demos and optional-package boundary.
+- [ ] Review the complete submission with the owner before uploading or publishing it.
+
+Done when: the submission package and media accurately represent the tested product, and the owner has approved the final presentation.
+
+**Recommended next task:** inspect release automation and propose the Core/Demos version pair and clean-install validation plan. Do not start another demo.
+
 ## Latest checkpoint: Lamp Assembly (2026-10-25)
 
 The owner approved replacing the repetitive desktop arrangement scenario with lamp assembly, then separately approved the small Core API needed to keep constrained joints and their arcs in sync. The optional sample now has a fixed base, a free arm and a free head. Keep the `ProductConfigurator` folder, scene, controller and build method identifiers; the user-facing name is **Lamp Assembly**. Existing Product Configurator imports must be backed up outside Assets and removed before importing the renamed sample, because GUIDs are preserved.
