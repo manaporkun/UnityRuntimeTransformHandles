@@ -65,10 +65,10 @@ batch script can leave platform-specific Editor assemblies loaded for another ta
 is not browser success: serve the resulting output locally and verify startup, selection and all
 three transform modes. Use a free local port and confirm the server started before navigating.
 
-The combined gallery and standalone Lamp Assembly development builds passed local Chromium
-mouse interaction and Retina layout checks. Showcase targets now use their own pipeline-independent
-shader. Three inherited hidden URP shader diagnostics remain at log level. Physical Mac trackpad
-validation remains open. These development checks do not establish acceptance of a new release artifact.
+The combined gallery and standalone Lamp Assembly candidate builds passed local Chromium
+mouse interaction and Retina layout checks in Built-in/Legacy and URP 17.3.0/Input System hosts. Showcase targets now use their own pipeline-independent
+shader. Three inherited hidden URP shader diagnostics remain at log level. The owner confirmed physical Mac trackpad
+validation in the local player. Resolved package files match the versioned candidate hashes in both hosts.
 
 
 ## Optional demo checks

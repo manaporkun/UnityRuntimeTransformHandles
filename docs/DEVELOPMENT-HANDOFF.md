@@ -42,7 +42,7 @@ Done when: exact versions and dependency availability are documented, and the in
 - [x] Verify removing Demos leaves Core usable; check dependency and GUID isolation.
 - [x] Verify the upgrade path from prior sample locations, including removal of the old Product Configurator import before importing Lamp Assembly.
 - [x] Run the declared Unity/input compatibility matrix and record versions, package versions, commands and results. Existing local results are evidence for the development revision, not for a future versioned release artifact.
-- [ ] Perform a physical Mac trackpad smoke test; previous browser automation did not validate actual trackpad hardware.
+- [x] Perform a physical Mac trackpad smoke test; the owner confirmed it works in the local player. Browser automation alone does not validate hardware.
 
 Done when: a new consumer can install Core alone or opt into the demos without hidden setup, duplicate GUIDs or missing API errors, and the tested support matrix is explicit.
 
@@ -53,7 +53,7 @@ Done when: a new consumer can install Core alone or opt into the demos without h
 - [x] Run the repository's local gates from the final revision. Follow `ci/README.md` for exact-suite evidence; a successful Unity process alone is insufficient.
 - [x] Obtain independent final review and address findings before presenting the diff to the owner.
 - [x] Prepare a Conventional Commit PR title and concise description explaining Core/optional-Demos distribution, behavior changes and validation; flag the distribution breaking change.
-- [ ] Verify actual remote CI status for the final PR revision and resolve failures before marking it ready. Remote CI success has not been established in this handoff.
+- [x] Verify actual remote CI status and resolve failures before marking the PR ready. The corrected code run passed; the live PR checks must also pass for the final documentation revision.
 - [ ] Obtain approval before merge or release; inspect main-branch publishing workflows before taking either action.
 
 Done when: the reviewed final revision has green required checks, accurate release/migration documentation and explicit owner approval for the next external action.
@@ -70,7 +70,7 @@ Done when: the reviewed final revision has green required checks, accurate relea
 
 Done when: the submission package and media accurately represent the tested product, and the owner has approved the final presentation.
 
-**Next acceptance gates:** confirm the final revision checks on [draft PR](https://github.com/manaporkun/UnityRuntimeTransformHandles/pull/53), complete the physical Mac trackpad check and obtain owner review. Do not merge, publish or start another demo.
+**Next acceptance gates:** confirm the final revision checks on [draft PR](https://github.com/manaporkun/UnityRuntimeTransformHandles/pull/53), obtain owner review of the final diff and decide the next external action. The physical Mac trackpad check is complete. Do not merge, publish or start another demo.
 
 ### Release plan approved; implementation validated locally
 
@@ -98,11 +98,20 @@ preserved byte-for-byte; main's regression test was adapted to cache its GameObj
 cleanup destroys the owned handle. Core now has 199 required PlayMode tests. Ten historical Unity
 metadata/settings files received whitespace-only cleanup; full-base whitespace checks pass.
 
-The versioned candidate was prepared from `7b32b769cdf629a08b2ef3b513b1c86161172871`.
-Later CI-import-verifier edits do not change package source bytes. The tested local UPM archives are:
+The first Unity 6 CI run exposed two test assumptions: a Built-in-only camera callback and exact
+RGBA float equality. The render regression now listens to both Built-in/SRP callbacks, observes
+only the first target-camera callback and requires the same frame as creation, with an offscreen
+RenderTexture and deterministic Built-in submission. The color comparison allows only 1e-6 RGBA
+distance. Both are test-only fixes; production Runtime files remain unchanged from the development
+checkpoint. GameCI CLI v0.1.72 is pinned after a pre-Unity latest-release lookup hit GitHub's 403
+rate limit. The corrected code revision passed all remote Core/Demos/floor jobs; check the live
+PR status again for the final documentation revision before acceptance.
 
-- Core 4.0.0 SHA-256: `0908f8d4829e0cae57048381e2f0b874dc7f6e5f281168b6f57f7ad8a3aee991`.
-- Demos 1.0.0 SHA-256: `9d079dc93a53706a9144768a7ec4b1124734b5014516aac142d906336adf0af7`.
+The versioned candidate was prepared from `d06d532f5d7e9e413fe9f05dedd344158bae110d`.
+This candidate includes the final test-only render observation and color-precision fixes. Later handoff/CI documentation edits do not change package source bytes. The tested local UPM archives are:
+
+- Core 4.0.0 SHA-256: `e9652e025fcd884890f78c33c76f66e68c5f6cf3aee2b47ccc02803740a8683b`.
+- Demos 1.0.0 SHA-256: `ff474867cbac07425eadfe87f940962bc47738ff808521bdebd05458d1423f5a`.
 
 | Editor / input | Core PlayMode | Core EditMode | Session cycles | Combined samples |
 | --- | ---: | ---: | ---: | ---: |
@@ -134,17 +143,23 @@ Unity may be added. Independent source review accepted this exception and the re
 changes. All 57 Python tests, package boundaries, minimum-API/meta checks, theme and wheel bridges,
 actionlint, complete PR commit hygiene and `git diff --check origin/main` pass.
 
-Combined and standalone WebGL builds use the verified candidate package contents in a Unity 6
-Built-in host. Chromium 156.0.8078.4 passed all four workspace entries, Help and gallery returns,
+Combined and standalone WebGL builds use the verified candidate package contents in Unity 6
+Built-in and URP 17.3.0 hosts. The Built-in host uses Legacy input; the URP host uses Input System
+1.19.0 and uGUI 2.0.0. Resolved package contents match the same candidate file hashes in both hosts.
+Chromium 156.0.8078.4 passed all four workspace entries, Help and gallery returns,
 actual arm/head attachment, hinge movement/reversal and subtree detach/move. Standalone Lamp
 Assembly hides Demos navigation; 960×640 CSS at DPR 2 produces a 1920×1280 canvas with readable
 inspector and Help. Final browser error/page-error/request-failure arrays are empty. The smoke test
 resets through the gallery UI; a prior deliberate full-page reload cancelled an in-flight cache
-request, which was an automation/navigation event. This Built-in result does not replace separate URP shader/visual validation or the earlier
-URP development diagnostic record. Physical trackpad remains open.
+request, which was an automation/navigation event. URP repeats only the three inherited hidden-shader
+diagnostics (`Hidden/CoreSRP/CoreCopy`, `Hidden/Universal Render Pipeline/StencilDitherMaskSeed`,
+`Hidden/Universal/HDRDebugView`) at log level; there are no new console errors, page errors or failed
+requests. This is not a diagnostic-free URP claim. The owner confirmed the physical Mac trackpad
+smoke test in this thread;
+input/UI/runtime source bytes did not change during the subsequent test-only corrections.
 
 Disposable artifacts, consumers, XML/logs, per-run verification and screenshots live under
-`/tmp/rth-release-final-qc-20261025-r3`. The commands and acceptance contract are in
+`/tmp/rth-release-final-qc-20261025-r5`. The commands and acceptance contract are in
 [release preparation](RELEASE-PREPARATION.md) and `ci/README.md`. Local success is not remote CI
 success; consult the [draft PR's actual checks](https://github.com/manaporkun/UnityRuntimeTransformHandles/pull/53/checks). The PR uses a breaking Conventional Commit title and remains draft for owner acceptance. No merge, public deployment or release occurred.
 
