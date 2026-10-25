@@ -16,12 +16,13 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
         private GameObject _root;
         private ProductConfiguratorDemo _demo;
         private Transform[] _targets;
-        private Material[] _originalMaterials;
+        private Transform _base;
+        private Transform[] _sockets;
+        private Material _preview;
         private UnityEngine.SceneManagement.Scene _loadedScene;
         private readonly List<Handle> _extraHandles = new List<Handle>();
         private Camera _camera;
         private TransformHandleSettings _settings;
-        private Material _material;
         private TransformHandleManager _manager;
         private Camera _originalCamera;
         private TransformHandleSettings _originalSettings;
@@ -48,7 +49,17 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
                 mesh.localPosition = new Vector3(0, .3f, 0);
                 mesh.localScale = new Vector3(1.2f, .6f, .8f);
             }
-            _originalMaterials = _targets.Select(t => t.GetComponentInChildren<Renderer>().sharedMaterial).ToArray();
+            _base = new GameObject("Fixed base").transform;
+            _sockets = new Transform[2];
+            for (int i = 0; i < 2; i++)
+            {
+                _sockets[i] = new GameObject("Socket " + i).transform;
+                _sockets[i].SetParent(i == 0 ? _base : _targets[0], false);
+                _sockets[i].localPosition = Vector3.up * (i == 0 ? .5f : 1.6f);
+            }
+            _preview = new Material(Shader.Find("TransformHandles/Samples/AssemblyPreview"));
+            Set("previewMaterial", _preview);
+            Set("socketMarkerMesh", _targets[0].GetComponentInChildren<MeshFilter>().sharedMesh);
 #if UNITY_EDITOR
             var settingsPaths = UnityEditor.AssetDatabase.FindAssets("ProductConfiguratorSettings t:TransformHandleSettings", new[] {"Assets"});
             Assert.AreEqual(1, settingsPaths.Length, "Import this sample exactly once before testing.");
@@ -66,20 +77,20 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
 #else
             Assert.Fail("This sample suite loads its imported UI assets through the Editor AssetDatabase.");
 #endif
-            _material = new Material(Shader.Find("TransformHandles/Samples/ProductConfiguratorOpaque"));
             Set("sceneCamera", _camera);
-            var partType = typeof(ProductConfiguratorDemo).GetNestedType("ProductPart", BindingFlags.NonPublic);
+            var partType = typeof(ProductConfiguratorDemo).GetNestedType("AssemblyPart", BindingFlags.NonPublic);
             var parts = System.Array.CreateInstance(partType, _targets.Length);
             for (var i = 0; i < _targets.Length; i++)
             {
                 var part = System.Activator.CreateInstance(partType);
                 partType.GetField("root").SetValue(part, _targets[i]);
                 partType.GetField("displayName").SetValue(part, "Product " + i);
-                partType.GetField("finishRenderers").SetValue(part, _targets[i].GetComponentsInChildren<Renderer>());
+                partType.GetField("socket").SetValue(part, _sockets[i]);
+                partType.GetField("parentRoot").SetValue(part, i == 0 ? _base : _targets[0]);
                 parts.SetValue(part, i);
             }
-            Set("products", parts);
-            Set("targetMaterial", _material); Set("interactionSettings", _settings);
+            Set("parts", parts);
+            Set("interactionSettings", _settings);
             _root.SetActive(true);
             yield return null;
             yield return null;
@@ -104,7 +115,8 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
             if (_manager != null) Object.Destroy(_manager.gameObject);
             if (_camera != null) Object.Destroy(_camera.gameObject);
             if (_originalCamera != null) Object.Destroy(_originalCamera.gameObject);
-            Object.Destroy(_settings); Object.Destroy(_material);
+            Object.Destroy(_settings); Object.Destroy(_preview);
+            if (_base != null) Object.Destroy(_base.gameObject);
             yield return null;
         }
 
@@ -119,148 +131,240 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
                 held == 0, held == 1, held == 2, ui, editing, scroll, Time.frameCount);
         }
 
-        private void Group() { Select(); _demo.SelectTarget(_targets[1], true); }
-        private void Release() { Set("_releasePending", true); _demo.ActiveHandle.InteractionEnd(); Set("_releasePending", false); }
+        private void Release()
+        {
+            Set("_releasePending", true);
+            _demo.ActiveHandle.InteractionEnd();
+            Set("_releasePending", false);
+        }
+
+        private void MoveToSocket(int index, bool complete = true)
+        {
+            _demo.SelectTarget(_targets[index]);
+            _demo.ActiveHandle.InteractionStart();
+            _targets[index].position = _sockets[index].position;
+            _demo.ActiveHandle.InteractionStay();
+            Release();
+            if (complete) Call("AdvanceAttachment", 1f);
+        }
 
         [Test]
-        public void ChildSelectionAndShiftToggleResolveOnlyRegisteredProducts()
+        public void ChildSelectionIsSingleAndFreePartsOnlyMoveInXYZ()
         {
             _demo.SelectTarget(_targets[0].GetChild(0));
+            _demo.SelectTarget(_targets[1].GetChild(0));
             Assert.AreEqual(1, _demo.SelectionCount);
-            _demo.SelectTarget(_targets[1].GetChild(0), true);
-            Assert.AreEqual(2, _demo.SelectionCount);
-            _demo.SelectTarget(_targets[0], true);
-            Assert.AreEqual(1, _demo.SelectionCount);
-            _demo.SelectTarget(_camera.transform);
-            Assert.AreEqual(1, _demo.SelectionCount);
-        }
-
-        [Test]
-        public void WorldLocalGroupToolsKeepSurfaceConstraintsAndRejectScale()
-        {
-            _targets[1].rotation = Quaternion.Euler(0, 35, 0);
-            Group(); var h = _demo.ActiveHandle;
-            Assert.AreEqual(HandleAxes.XZ, h.Axes);
-            Assert.AreEqual(Space.World, h.Space);
-            _demo.ToggleSpace();
-            Assert.AreEqual(Space.Self, h.Space);
-            Assert.AreEqual(_targets[1], h.LocalSpaceReference);
-            Assert.That(Vector3.Distance((_targets[0].position + _targets[1].position) * .5f, h.Pivot.position), Is.LessThan(.001f));
+            Assert.AreEqual(HandleAxes.XYZ, _demo.ActiveHandle.Axes);
+            Assert.AreEqual(Space.World, _demo.ActiveHandle.Space);
             _demo.SetMode(HandleType.Rotation);
-            Assert.AreEqual(HandleAxes.Y, h.Axes);
-            _demo.SetMode(HandleType.Scale);
-            Assert.AreEqual(HandleType.Rotation, h.Type);
-            Assert.IsFalse(_settings.EnableShortcuts);
-            Assert.AreEqual(Vector3.zero, h.PositionSnap);
-            Assert.AreEqual(0, h.RotationSnap);
-        }
-
-        [TestCase(3.39f, 0f, true)]
-        [TestCase(3.41f, 0f, false)]
-        [TestCase(3.29f, 45f, true)]
-        [TestCase(3.31f, 45f, false)]
-        public void EntireRotatedMeshMustFitNotOnlyItsPivot(float x, float yaw, bool expected)
-        {
-            _targets[0].SetPositionAndRotation(new Vector3(x,0,0), Quaternion.Euler(0,yaw,0));
-            Assert.AreEqual(expected, (bool)Call("FitsDesk", _targets[0]));
+            Assert.AreEqual(HandleType.Position, _demo.ActiveHandle.Type);
+            _demo.SelectTarget(_base);
+            Assert.AreEqual(1, _demo.SelectionCount);
         }
 
         [Test]
-        public void GroupMoveUsesSharedDeltaAndReleaseCommitsValidPlacement()
+        public void HeadCannotAttachBeforeArmButCanAfterArmIsMounted()
         {
-            Group(); var h = _demo.ActiveHandle; var start = _targets.Select(t=>t.position).ToArray();
-            h.InteractionStart();
-            _manager.UpdateGroupPosition(h.Pivot.GetComponent<Ghost>(), new Vector3(.2f,0,.3f));
-            h.InteractionStay(); Release();
-            for(var i=0;i<2;i++) Assert.That(Vector3.Distance(start[i] + new Vector3(.2f,0,.3f), _targets[i].position), Is.LessThan(.001f));
+            MoveToSocket(1);
+            Assert.IsNull(_targets[1].parent);
+            Assert.AreEqual(HandleType.Position, _demo.ActiveHandle.Type);
+            MoveToSocket(0); MoveToSocket(1);
+            Assert.AreSame(_base, _targets[0].parent);
+            Assert.AreSame(_targets[0], _targets[1].parent);
+            Assert.AreEqual(HandleType.Rotation, _demo.ActiveHandle.Type);
+            Assert.AreEqual(HandleAxes.X, _demo.ActiveHandle.Axes);
+            Assert.AreEqual(Space.Self, _demo.ActiveHandle.Space);
+        }
+
+        [Test]
+        public void AttachmentRemovesHandleAndCommitsOnlyWhenTweenCompletes()
+        {
+            MoveToSocket(0, false);
+            Assert.IsNull(_demo.ActiveHandle);
+            Assert.IsNull(_targets[0].parent);
+            _demo.SelectTarget(_targets[1]);
+            Assert.IsNull(_demo.ActiveHandle);
+            Call("AdvanceAttachment", .05f);
+            Assert.IsNull(_targets[0].parent);
+            Call("AdvanceAttachment", .2f);
+            Assert.AreSame(_base, _targets[0].parent);
+            Assert.That(Vector3.Distance(_sockets[0].position, _targets[0].position), Is.LessThan(.001f));
+            Assert.That(Quaternion.Angle(_sockets[0].rotation, _targets[0].rotation), Is.LessThan(.03f));
+            Assert.NotNull(_demo.ActiveHandle);
+        }
+
+        [TestCase(.249f, true)]
+        [TestCase(.251f, false)]
+        public void SocketDistanceIsCheckedOnRelease(float distance, bool attached)
+        {
+            Select(); _demo.ActiveHandle.InteractionStart();
+            _targets[0].position = _sockets[0].position + Vector3.right * distance;
+            Release(); Call("AdvanceAttachment", 1f);
+            Assert.AreEqual(attached, _targets[0].parent == _base);
+        }
+
+        [Test]
+        public void DetachingArmKeepsWorldPoseAndAttachedHeadSubtree()
+        {
+            MoveToSocket(0); MoveToSocket(1);
+            _targets[1].localRotation = Quaternion.Euler(25, 0, 0);
+            var position = _targets[1].position; var rotation = _targets[1].rotation;
+            _demo.SelectTarget(_targets[0]); _demo.DetachSelected();
+            Assert.IsNull(_targets[0].parent);
+            Assert.AreSame(_targets[0], _targets[1].parent);
+            Assert.That(Vector3.Distance(position, _targets[1].position), Is.LessThan(.001f));
+            Assert.That(Quaternion.Angle(rotation, _targets[1].rotation), Is.LessThan(.03f));
+            _demo.SelectTarget(_targets[1]);
+            Assert.AreEqual(HandleType.Rotation, _demo.ActiveHandle.Type);
+            _demo.DetachSelected();
+            Assert.IsNull(_targets[1].parent);
+            MoveToSocket(1);
+            Assert.IsNull(_targets[1].parent, "A new head attachment requires a mounted arm.");
+        }
+
+        [Test]
+        public void MovingParentCarriesHeadOnceAndReattachmentPreservesHeadJointAngle()
+        {
+            MoveToSocket(0); MoveToSocket(1);
+            _targets[1].localRotation = Quaternion.Euler(25,0,0);
+            _demo.SelectTarget(_targets[0]); _demo.DetachSelected();
+            var before = _targets[1].position;
+            var h = _demo.ActiveHandle; h.InteractionStart();
+            _manager.UpdateGroupPosition(h.Pivot.GetComponent<Ghost>(), Vector3.right);
+            Assert.That(Vector3.Distance(before + Vector3.right, _targets[1].position), Is.LessThan(.001f));
+            Release(); MoveToSocket(0);
+            Assert.That(Quaternion.Angle(Quaternion.Euler(25,0,0), _targets[1].localRotation), Is.LessThan(.03f));
+        }
+
+        [TestCase("disable", false)]
+        [TestCase("focus", false)]
+        [TestCase("manager", false)]
+        [TestCase("disable", true)]
+        [TestCase("focus", true)]
+        [TestCase("manager", true)]
+        public void InterruptedDragOrAlignmentRestoresPreDragPose(string reason, bool aligning)
+        {
+            var initial = _targets[0].position;
+            if (aligning) MoveToSocket(0, false);
+            else { Select(); _demo.ActiveHandle.InteractionStart(); _targets[0].position += Vector3.forward; }
+            if (reason == "disable") _demo.enabled = false;
+            else if (reason == "focus") Call("OnApplicationFocus", false);
+            else
+            {
+                _manager.enabled = false;
+                if (aligning) Call("AdvanceAttachment", .1f);
+                else _demo.ActiveHandle.InteractionEnd();
+            }
+            Assert.That(Vector3.Distance(initial, _targets[0].position), Is.LessThan(.001f));
+            Assert.IsNull(_targets[0].parent);
             Assert.IsFalse(_demo.IsDragging);
         }
 
         [UnityTest]
-        public IEnumerator OneInvalidMemberRestoresEveryPoseAndRebuildsAfterRelease()
+        public IEnumerator DestroyedSocketDuringAlignmentCancelsSafely()
         {
-            Group(); var starts = _targets.Select(t=>t.position).ToArray(); var h = _demo.ActiveHandle;
-            h.InteractionStart(); _targets[0].position += Vector3.right * .1f; _targets[1].position = new Vector3(3.8f,0,0);
-            h.InteractionStay(); StringAssert.Contains("Outside", Get<string>("_notice"));
-            Release();
-            for(var i=0;i<2;i++) Assert.AreEqual(starts[i], _targets[i].position);
-            yield return null;
-            Assert.NotNull(_demo.ActiveHandle); Assert.IsFalse(_demo.IsDragging);
-        }
-
-        [Test]
-        public void InvalidYawRestoresRotationAndPositionForTheWholeGroup()
-        {
-            Group(); var starts = _targets.Select(t=>t.position).ToArray(); var h = _demo.ActiveHandle;
-            _demo.SetMode(HandleType.Rotation); h.InteractionStart();
-            _targets[0].rotation=Quaternion.Euler(0,40,0); _targets[1].SetPositionAndRotation(new Vector3(3.5f,0,1.8f),Quaternion.Euler(0,45,0));
-            Release();
-            for(var i=0;i<2;i++) { Assert.AreEqual(starts[i], _targets[i].position); Assert.That(Quaternion.Angle(Quaternion.identity,_targets[i].rotation),Is.LessThan(.001f)); }
-        }
-
-        [TestCase("disable")]
-        [TestCase("focus")]
-        [TestCase("manager")]
-        public void InterruptedValidPreviewIsCancelled(string interruption)
-        {
-            Group(); var starts = _targets.Select(t=>t.position).ToArray(); var h = _demo.ActiveHandle;
-            h.InteractionStart(); foreach(var t in _targets) t.position += Vector3.forward * .2f;
-            if(interruption=="disable") _demo.enabled=false;
-            else if(interruption=="focus") Call("OnApplicationFocus",false);
-            else { _manager.enabled=false; h.InteractionEnd(); }
-            for(var i=0;i<2;i++) Assert.AreEqual(starts[i],_targets[i].position);
-            Assert.IsFalse(_demo.IsDragging);
-        }
-
-        [UnityTest]
-        public IEnumerator DestroyedMemberCancelsAndRestoresSurvivors()
-        {
-            Group(); var start=_targets[0].position; _demo.ActiveHandle.InteractionStart();
-            _targets[0].position += Vector3.forward*.2f; Object.Destroy(_targets[1].gameObject);
+            var initial = _targets[0].position;
+            MoveToSocket(0, false);
+            Object.Destroy(_sockets[0].gameObject);
             yield return null; yield return null;
-            Assert.AreEqual(start,_targets[0].position); Assert.IsFalse(_demo.IsDragging);
-            Assert.AreEqual(1,_demo.SelectionCount);
+            Assert.That(Vector3.Distance(initial, _targets[0].position), Is.LessThan(.001f));
+            Assert.IsNull(_targets[0].parent);
+        }
+
+        [UnityTest]
+        public IEnumerator DestroyedSocketWhileIdleReleasesPartWithoutChangingWorldPose()
+        {
+            MoveToSocket(0);
+            var position = _targets[0].position;
+            Object.Destroy(_sockets[0].gameObject);
+            yield return null; yield return null;
+            Assert.IsNull(_targets[0].parent);
+            Assert.AreEqual(position, _targets[0].position);
+            Assert.AreEqual(HandleType.Position, _demo.ActiveHandle.Type);
+            _demo.ActiveHandle.InteractionStart();
+            Assert.IsTrue(_demo.IsDragging);
+        }
+
+        [UnityTest]
+        public IEnumerator SurvivingDetachedChildBecomesFreeWhenItsParentIsDestroyed()
+        {
+            MoveToSocket(0); MoveToSocket(1);
+            _demo.ActiveHandle.InteractionStart();
+            _targets[1].SetParent(null, true); // External owner preserves this child before destruction.
+            Object.Destroy(_targets[0].gameObject);
+            yield return null; yield return null;
+            Assert.NotNull(_targets[1]); Assert.IsNull(_targets[1].parent);
+            Assert.AreEqual(HandleType.Position, _demo.ActiveHandle.Type);
+            Assert.IsFalse(_demo.IsDragging);
+        }
+
+        [UnityTest]
+        public IEnumerator IdleDisableReenableKeepsAssemblyAndRebindsControls()
+        {
+            MoveToSocket(0); MoveToSocket(1);
+            _demo.enabled = false; yield return null;
+            Assert.AreSame(_originalCamera, _manager.MainCamera);
+            _demo.enabled = true; yield return null;
+            Assert.AreSame(_base, _targets[0].parent);
+            Assert.AreSame(_targets[0], _targets[1].parent);
+            _demo.SelectTarget(_targets[1]); Call("RefreshUi");
+            Assert.IsTrue(Get<Button>("_detachButton").enabledSelf);
+            Assert.IsFalse(Get<Button>("_moveButton").enabledSelf);
         }
 
         [Test]
-        public void FinishChangesOnlySelectedOwnedMaterialsAndSurvivesReenable()
+        public void ResetRestoresExplodedLayoutAndKeepsSizeAndBorrowedHandles()
         {
-            var first=_targets[0].GetComponentInChildren<Renderer>();var second=_targets[1].GetComponentInChildren<Renderer>();
-            Select();var initial=first.sharedMaterial.color;_demo.SetFinish(1);var chosen=first.sharedMaterial.color;
-            Assert.AreNotEqual(initial,chosen); Assert.AreEqual(initial,second.sharedMaterial.color);
-            _demo.enabled=false;Assert.AreSame(_originalMaterials[0],first.sharedMaterial);
-            _demo.enabled=true;Assert.AreEqual(chosen,first.sharedMaterial.color);
-            _demo.ResetLayout();Assert.AreEqual(initial,first.sharedMaterial.color);
+            var borrowed = _manager.CreateHandle(_camera.transform); _extraHandles.Add(borrowed);
+            Select(); Call("SetHandleSize", 256f);
+            MoveToSocket(0); MoveToSocket(1); _demo.ResetLayout();
+            Assert.AreEqual(256, Get<int>("_handleSizePixels")); Assert.IsTrue(borrowed != null);
+            Assert.IsNull(_targets[0].parent); Assert.IsNull(_targets[1].parent);
+            Assert.AreEqual(new Vector3(-1.5f,0,0), _targets[0].position);
+            Assert.AreEqual(new Vector3(1.5f,0,0), _targets[1].position);
         }
 
         [Test]
-        public void MixedFinishAndGroupFinishAreReflectedInInspector()
+        public void AttachedHeadUsesRealCoreRotationAndArcUnderRotatedArmAcrossGrabs()
         {
-            Select();_demo.SetFinish(1);_demo.SelectTarget(_targets[1],true);Call("RefreshUi");
-            StringAssert.Contains("Mixed",Get<Label>("_finishLabel").text);
-            _demo.SetFinish(2);Assert.AreEqual("Finish · Sand",Get<Label>("_finishLabel").text);
-            Assert.AreEqual(_targets[0].GetComponentInChildren<Renderer>().sharedMaterial.color,_targets[1].GetComponentInChildren<Renderer>().sharedMaterial.color);
+            MoveToSocket(0);
+            _targets[0].localRotation = Quaternion.Euler(25,0,0);
+            MoveToSocket(1);
+            _targets[1].localRotation = Quaternion.Euler(-10,0,0);
+            _demo.SelectTarget(_targets[1]);
+            DriveHinge(100, 60, 70);
+            DriveHinge(-20, 40, -20);
         }
 
-        [Test]
-        public void ResetKeepsPixelPreferenceAndBorrowedHandles()
+        private void DriveHinge(float pointerAngle, float expectedJoint, float expectedArc)
         {
-            var borrowed=_manager.CreateHandle(_camera.transform);_extraHandles.Add(borrowed);
-            Select();Call("SetHandleSize",256f);_demo.SetFinish(2);_targets[0].position+=Vector3.forward*.2f;
-            _demo.ResetLayout();Assert.AreEqual(256,Get<int>("_handleSizePixels"));Assert.IsTrue(borrowed!=null);
-            Assert.AreEqual(0,_demo.SelectionCount);Assert.AreEqual(new Vector3(-1.5f,0,0),_targets[0].position);
-            _demo.enabled=false;Assert.AreSame(_originalCamera,_manager.MainCamera);Assert.AreSame(_originalSettings,_manager.Settings);Assert.IsFalse(_manager.BlockWhenPointerOverUI);
+            var h = _demo.ActiveHandle;
+            var axis = h.GetComponentInChildren<RotationAxis>();
+            var root = _targets[1]; var pivot = root.position;
+            var worldAxis = root.right; var up = root.up; var forward = root.forward;
+            _camera.transform.SetPositionAndRotation(pivot - worldAxis * 5, Quaternion.LookRotation(worldAxis, up));
+            PlaceRay(pivot + up, pivot, worldAxis);
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            Assert.IsTrue((bool)typeof(TransformHandleManager).GetMethod("BeginInteraction", flags).Invoke(_manager, new object[] { axis, pivot + up }));
+            float radians = pointerAngle * Mathf.Deg2Rad;
+            PlaceRay(pivot + up * Mathf.Cos(radians) + forward * Mathf.Sin(radians), pivot, worldAxis);
+            axis.Interact(Vector3.zero);
+            typeof(TransformHandleManager).GetMethod("OnInteraction", flags).Invoke(_manager, null);
+            Assert.That(Quaternion.Angle(Quaternion.Euler(expectedJoint,0,0), root.localRotation), Is.LessThan(.04f));
+            Assert.That(Vector3.Distance(_sockets[1].position, root.position), Is.LessThan(.001f));
+            var mesh = (Mesh)typeof(RotationAxis).GetField("_arcMesh", flags).GetValue(axis);
+            var v = mesh.vertices;
+            Assert.That(Vector3.SignedAngle(v[0]-v[v.Length-1],v[v.Length-2]-v[v.Length-1],worldAxis), Is.EqualTo(expectedArc).Within(.04f));
+            Set("_releasePending", true);
+            typeof(TransformHandleManager).GetMethod("CancelInteraction", flags).Invoke(_manager, new object[] { h });
+            Set("_releasePending", false);
         }
 
-        [Test]
-        public void DragDisablesFinishResetSizeAndSelectionCommands()
+        private void PlaceRay(Vector3 destination, Vector3 pivot, Vector3 normal)
         {
-            Select();var h=_demo.ActiveHandle;h.InteractionStart();Call("RefreshUi");
-            var material=_targets[0].GetComponentInChildren<Renderer>().sharedMaterial;var color=material.color;
-            _demo.SetFinish(2);_demo.ResetLayout();_demo.SelectTarget(_targets[1]);_demo.ToggleSpace();Call("SetHandleSize",300f);
-            Assert.AreEqual(color,material.color);Assert.AreSame(h,_demo.ActiveHandle);Assert.AreEqual(1,_demo.SelectionCount);
-            Assert.AreEqual(Space.World,h.Space);Assert.AreEqual(192,Get<int>("_handleSizePixels"));
-            Assert.IsFalse(Get<Button>("_whiteButton").enabledSelf);Assert.IsFalse(Get<Button>("_resetButton").enabledSelf);
+            var ray = _camera.ScreenPointToRay(TransformHandles.Utils.InputWrapper.MousePosition);
+            Assert.IsTrue(new Plane(normal, pivot).Raycast(ray, out var distance));
+            _camera.transform.position += destination - ray.GetPoint(distance);
         }
 
         [Test]
@@ -288,37 +392,20 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
         }
 
         [Test]
-        public void ActualManagerCancellationRestoresValidPreviewBeforeNavigation()
+        public void ActualManagerCancellationRestoresPreview()
         {
-            Group(); var starts=_targets.Select(t=>t.position).ToArray();var h=_demo.ActiveHandle;
-            var axis=h.GetComponentInChildren<PositionPlane>();
-            Assert.IsTrue((bool)typeof(TransformHandleManager).GetMethod("BeginInteraction",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(_manager,new object[]{axis,axis.transform.position}));
-            foreach(var t in _targets)t.position+=Vector3.forward*.2f;
-            _manager.enabled=false;
-            for(var i=0;i<2;i++)Assert.AreEqual(starts[i],_targets[i].position);
+            Select(); var start = _targets[0].position; var h = _demo.ActiveHandle;
+            var axis = h.GetComponentInChildren<PositionPlane>();
+            Assert.IsTrue((bool)typeof(TransformHandleManager).GetMethod("BeginInteraction", BindingFlags.Instance|BindingFlags.NonPublic).Invoke(_manager,new object[]{axis,axis.transform.position}));
+            _targets[0].position += Vector3.forward;
+            _manager.enabled = false;
+            Assert.AreEqual(start, _targets[0].position);
             Assert.IsFalse(_demo.IsDragging);
-        }
-
-        [Test]
-        public void GroupYawRotatesPositionsAroundSharedCenterInBothSpaces()
-        {
-            foreach(var space in new[]{Space.World,Space.Self})
-            {
-                _demo.ResetLayout();Group();if(space==Space.Self)_demo.ToggleSpace();_demo.SetMode(HandleType.Rotation);
-                var h=_demo.ActiveHandle;var center=h.Pivot.position;var starts=_targets.Select(t=>t.position).ToArray();
-                h.InteractionStart();var rotation=Quaternion.Euler(0,20,0);
-                _manager.UpdateGroupRotation(h.Pivot.GetComponent<Ghost>(),rotation);Release();
-                for(var i=0;i<2;i++)
-                {
-                    Assert.That(Vector3.Distance(center+rotation*(starts[i]-center),_targets[i].position),Is.LessThan(.001f));
-                    Assert.That(Quaternion.Angle(rotation,_targets[i].rotation),Is.LessThan(.001f));
-                }
-            }
         }
 
 #if UNITY_EDITOR
         [UnityTest]
-        public IEnumerator SuppliedSceneProductsFitDeskAndResolveTheirChildColliders()
+        public IEnumerator SuppliedSceneHasTwoSelectablePartsAndFixedBase()
         {
             _root.SetActive(false);
             var scenes=UnityEditor.AssetDatabase.FindAssets("ProductConfigurator t:Scene",new[]{"Assets"});
@@ -330,13 +417,12 @@ namespace TransformHandles.Samples.ProductConfigurator.Tests
             yield return null;
             var controller=Object.FindObjectOfType<ProductConfiguratorDemo>();Assert.NotNull(controller);Assert.IsTrue(controller.enabled);
             var flags=BindingFlags.Instance|BindingFlags.NonPublic;
-            var parts=(System.Array)typeof(ProductConfiguratorDemo).GetField("products",flags).GetValue(controller);
-            Assert.AreEqual(3,parts.Length);
+            var parts=(System.Array)typeof(ProductConfiguratorDemo).GetField("parts",flags).GetValue(controller);
+            Assert.AreEqual(2,parts.Length);
             foreach(var part in parts)
             {
                 var root=(Transform)part.GetType().GetField("root").GetValue(part);
-                Assert.IsTrue((bool)typeof(ProductConfiguratorDemo).GetMethod("FitsDesk",flags).Invoke(controller,new object[]{root}));
-                Assert.Greater(root.GetComponentsInChildren<MeshFilter>().Length,2);
+                Assert.GreaterOrEqual(root.GetComponentsInChildren<MeshFilter>().Length,3);
                 controller.SelectTarget(root.GetComponentInChildren<Collider>().transform);
                 Assert.AreEqual(1,controller.SelectionCount);
             }

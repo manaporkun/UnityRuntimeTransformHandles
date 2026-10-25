@@ -10,39 +10,51 @@ using InputWrapper = TransformHandles.Utils.InputWrapper;
 
 namespace TransformHandles.Samples.ProductConfigurator
 {
-    /// <summary>A bounded desktop product configurator using only the public Core API.</summary>
+    /// <summary>A socket assembly and constrained hinge sample using the public Core API.</summary>
     [DefaultExecutionOrder(-100)]
     public sealed class ProductConfiguratorDemo : MonoBehaviour
     {
         [SerializeField] private Camera sceneCamera;
+        private enum AssemblyState { Free, Attaching, Attached }
         [Serializable]
-        private sealed class ProductPart
+        private sealed class AssemblyPart
         {
             public Transform root;
             public string displayName;
-            public Renderer[] finishRenderers;
+            public Transform socket;
+            public Transform parentRoot;
+            public Vector2 angleLimits = new Vector2(-30, 60);
+            [NonSerialized] public AssemblyState state;
         }
-        [SerializeField] private ProductPart[] products;
-        [SerializeField] private Vector2 deskSize = new Vector2(8, 4);
-        [SerializeField] private Vector3 deskCenter = Vector3.zero;
-        private readonly Dictionary<Transform, Bounds> _bounds = new Dictionary<Transform, Bounds>();
-        private readonly Dictionary<Transform, PosRotScale> _dragStart = new Dictionary<Transform, PosRotScale>();
-        private readonly Dictionary<Renderer, Material> _ownedMaterials = new Dictionary<Renderer, Material>();
-        private readonly Dictionary<Transform, int> _finishes = new Dictionary<Transform, int>();
-        private static readonly Color[] FinishColors = { new Color(.91f,.92f,.93f), new Color(.24f,.27f,.31f), new Color(.76f,.67f,.52f) };
-        private Space _space = Space.World;
-        private bool _pressAdditive, _rebuildPending;
-        private Button _spaceButton, _whiteButton, _graphiteButton, _sandButton;
-        private Label _finishLabel;
-        [SerializeField] private Material targetMaterial;
+        private struct PartSnapshot
+        {
+            public Transform parent;
+            public Vector3 localPosition;
+            public Quaternion localRotation;
+            public PosRotScale world;
+            public AssemblyState state;
+        }
+        [SerializeField] private AssemblyPart[] parts;
+        [SerializeField] private Material previewMaterial;
+        [SerializeField] private Mesh socketMarkerMesh;
+        private const float SnapDistance = .25f, AttachDuration = .18f;
+        private readonly Dictionary<Transform, AssemblyPart> _parts = new Dictionary<Transform, AssemblyPart>();
+        private readonly Dictionary<AssemblyPart, PartSnapshot> _dragStart = new Dictionary<AssemblyPart, PartSnapshot>();
+        private bool _rebuildPending;
+        private AssemblyPart _candidate, _attaching;
+        private readonly List<MeshFilter> _previewMeshes = new List<MeshFilter>();
+        private MaterialPropertyBlock _markerProperties;
+        private Vector3 _attachStartPosition;
+        private Quaternion _attachStartRotation;
+        private float _attachTime;
+        private Button _detachButton;
+        private Label _jointLabel;
         [SerializeField] private TransformHandleSettings interactionSettings;
         [SerializeField] private VisualTreeAsset uiLayout;
         [SerializeField] private PanelSettings uiPanelSettings;
 
         private readonly List<Transform> _selection = new List<Transform>();
         private readonly Dictionary<Transform, PosRotScale> _initial = new Dictionary<Transform, PosRotScale>();
-        private readonly List<Material> _materials = new List<Material>();
-        private readonly Dictionary<Renderer, Material> _originalMaterials = new Dictionary<Renderer, Material>();
         private readonly List<RaycastResult> _uiHits = new List<RaycastResult>();
         private TransformHandleManager _manager, _ownedManager;
         private TransformHandleSettings _previousSettings;
@@ -68,7 +80,7 @@ namespace TransformHandles.Samples.ProductConfigurator
         private Button _moveButton, _rotateButton, _resetButton, _helpToggleButton, _helpCloseButton;
         private bool _helpPanelOpen, _closeHelpPanelPending;
         private string _uiState;
-        private string _notice = "Select a product to arrange your desk.";
+        private string _notice = "Start with the arm. Move its hinge to the base socket.";
         private float _yaw = 25f, _pitch = 42f, _distance = 12f;
         private Vector3 _cameraFocus = new Vector3(-1.2f, .4f, 0);
         private int _navigationButton = -1;
@@ -91,50 +103,38 @@ namespace TransformHandles.Samples.ProductConfigurator
         private void Awake()
         {
 #if ENABLE_INPUT_SYSTEM && !TH_INPUTSYSTEM
-            Debug.LogError("Product Configurator requires Input System 1.1.1 or later when the new input backend is enabled.", this);
+            Debug.LogError("Lamp Assembly requires Input System 1.1.1 or later when the new input backend is enabled.", this);
             enabled = false;
             return;
 #endif
-            if (sceneCamera == null || targetMaterial == null || interactionSettings == null ||
-                interactionSettings.EnableShortcuts || products == null || products.Length == 0 ||
-                !Finite(deskSize.x) || !Finite(deskSize.y) || deskSize.x <= 0 || deskSize.y <= 0 ||
-                !Finite(deskCenter.x) || !Finite(deskCenter.y) || !Finite(deskCenter.z) ||
-                products.Any(p => p == null || !ValidProduct(p.root) || p.finishRenderers == null ||
-                    p.finishRenderers.Length == 0 || p.finishRenderers.Any(r => r == null || !r.transform.IsChildOf(p.root))) ||
-                products.Select(p => p.root).Distinct().Count() != products.Length)
+            if (sceneCamera == null || previewMaterial == null || socketMarkerMesh == null ||
+                interactionSettings == null || interactionSettings.EnableShortcuts || !ValidAssembly())
             {
-                Debug.LogError("Product Configurator requires its camera, material, shortcuts-disabled settings, finite desk and distinct unparented unit-scale products at desk height with yaw-only rotation and child meshes/colliders/finish renderers.", this);
+                Debug.LogError("Lamp Assembly requires its camera, materials, marker mesh, shortcuts-disabled settings and an acyclic assembly with unit-scale roots, sockets and valid hinge limits.", this);
                 enabled = false;
                 return;
             }
             if (uiLayout == null || uiPanelSettings == null)
             {
-                Debug.LogError("Product Configurator requires its UI Toolkit layout and panel settings. Reimport the complete sample before playing.", this);
+                Debug.LogError("Lamp Assembly requires its UI Toolkit layout and panel settings. Reimport the complete sample before playing.", this);
                 enabled = false;
                 return;
             }
             var layer = LayerMask.NameToLayer("TransformHandle");
             if (layer < 0)
             {
-                Debug.LogError("Run Tools > Transform Handles > Setup Layer before playing the Product Configurator sample.", this);
+                Debug.LogError("Run Tools > Transform Handles > Setup Layer before playing the Lamp Assembly sample.", this);
                 enabled = false;
                 return;
             }
             _pickMask = ~(1 << layer);
-            foreach (var product in products)
+            foreach (var part in parts)
             {
-                _initial.Add(product.root, Capture(product.root));
-                _bounds.Add(product.root, CalculateBounds(product.root));
-                _finishes.Add(product.root, 0);
-                if (!FitsDesk(product.root))
-                {
-                    Debug.LogError("Product Configurator products must initially fit entirely on the desk.", this);
-                    enabled = false;
-                    return;
-                }
+                _parts.Add(part.root, part);
+                _initial.Add(part.root, Capture(part.root));
             }
-            foreach (var product in products)
-                foreach (var renderer in product.finishRenderers.Distinct()) SetMaterial(renderer, FinishColors[0], false);
+            _markerProperties = new MaterialPropertyBlock();
+            _markerProperties.SetColor("_Color", new Color(.14f, .55f, .47f, .85f));
             BuildUi();
             _initialized = true;
             UpdateCamera();
@@ -155,7 +155,6 @@ namespace TransformHandles.Samples.ProductConfigurator
             _manager.MainCamera = sceneCamera;
             _manager.Settings = interactionSettings;
             _manager.BlockWhenPointerOverUI = true;
-            foreach (var pair in _ownedMaterials) if (pair.Key != null) pair.Key.sharedMaterial = pair.Value;
             _uiObject.SetActive(true);
             BindUi();
             if (_ownedEventSystem != null) _ownedEventSystem.SetActive(true);
@@ -168,6 +167,9 @@ namespace TransformHandles.Samples.ProductConfigurator
         private void Update()
         {
             if (!_initialized || _manager == null) return;
+            if ((_dragging || _attaching != null) && _dragStart.Keys.Any(p => p.root == null || p.socket == null || p.parentRoot == null))
+                CancelDrag();
+            ReconcileAttachments();
             if (_selection.Any(t => t == null))
             {
                 CancelDrag();
@@ -182,7 +184,6 @@ namespace TransformHandles.Samples.ProductConfigurator
                 var overUi = PointerOverUi();
                 if (_sizeEditing && !overUi) FinishSizeEdit(false);
                 BeginSelectionPress(Time.frameCount, mouse, overUi || editingSize);
-                _pressAdditive = InputWrapper.GetKey(KeyCode.LeftShift) || InputWrapper.GetKey(KeyCode.RightShift);
             }
             if (InputWrapper.GetMouseButtonUp(0))
             {
@@ -191,7 +192,7 @@ namespace TransformHandles.Samples.ProductConfigurator
                 _releaseBlocked = PointerOverUi();
             }
             if (InputWrapper.GetKeyDown(KeyCode.Escape)) HandleEscape(Time.frameCount);
-            if (!_dragging)
+            if (!_dragging && _attaching == null)
             {
                 if (!editingSize && InputWrapper.GetKeyDown(KeyCode.W)) SetMode(HandleType.Position);
                 if (!editingSize && InputWrapper.GetKeyDown(KeyCode.E)) SetMode(HandleType.Rotation);
@@ -201,6 +202,8 @@ namespace TransformHandles.Samples.ProductConfigurator
         private void LateUpdate()
         {
             if (!_initialized || _manager == null) return;
+            AdvanceAttachment(Time.unscaledDeltaTime);
+            DrawAssemblyPreview();
             // All manager Updates have completed. Our earlier LateUpdate moves the camera
             // before Core synchronizes handle visuals, without relying on Update ordering.
             ProcessNavigation(InputWrapper.MousePosition,
@@ -216,9 +219,9 @@ namespace TransformHandles.Samples.ProductConfigurator
                     var ray = sceneCamera.ScreenPointToRay(_releasePosition);
                     Transform picked = null;
                     if (Physics.Raycast(ray, out var hit, 1000, _pickMask))
-                        picked = ResolveProduct(hit.transform);
-                    if (picked != null) SelectTarget(picked, _pressAdditive);
-                    else if (!_pressAdditive) ClearSelection();
+                        picked = ResolvePart(hit.transform);
+                    if (picked != null) SelectTarget(picked);
+                    else ClearSelection();
                 }
                 _pressFrame = -1;
             }
@@ -237,27 +240,29 @@ namespace TransformHandles.Samples.ProductConfigurator
 
         private bool CanSelectOnRelease(Vector3 position, bool overUi)
         {
-            return _pressFrame >= 0 && !_pressCancelled && !_pressBlocked && !overUi && !_dragging &&
+            return _pressFrame >= 0 && !_pressCancelled && !_pressBlocked && !overUi && !_dragging && _attaching == null &&
                 _lastStartFrame < _pressFrame && LogicalPointerDistance(position, _pressPosition) < 6f;
         }
 
-        public void SelectTarget(Transform target, bool additive = false)
+        public void SelectTarget(Transform target)
         {
-            if (!_initialized || !isActiveAndEnabled || _dragging) return;
-            target = ResolveProduct(target);
+            if (!CanChange()) return;
+            target = ResolvePart(target);
             if (target == null) return;
-            if (!additive) _selection.Clear();
-            if (additive && _selection.Contains(target)) _selection.Remove(target);
-            else _selection.Add(target);
+            _selection.Clear();
+            _selection.Add(target);
             RebuildHandle();
-            _notice = "Drag to arrange products. Keep every product on the desk.";
+            _notice = Selected.state == AssemblyState.Attached
+                ? "Rotate the hinge, or detach to move this part." : "Move the hinge into the highlighted socket.";
         }
 
-        private Transform ResolveProduct(Transform hit)
+        private AssemblyPart Selected => _selection.Count == 1 && _selection[0] != null && _parts.TryGetValue(_selection[0], out var part) ? part : null;
+
+        private Transform ResolvePart(Transform hit)
         {
             while (hit != null)
             {
-                if (_initial.ContainsKey(hit)) return hit;
+                if (_parts.ContainsKey(hit)) return hit;
                 hit = hit.parent;
             }
             return null;
@@ -270,39 +275,53 @@ namespace TransformHandles.Samples.ProductConfigurator
             _rebuildPending = false;
             RemoveOwnedHandle();
             _selection.Clear();
-            _notice = "Selection cleared. Your layout is kept.";
+            _candidate = null;
+            _notice = "Select the arm or lamp head to continue assembling.";
         }
 
         public void SetMode(HandleType mode)
         {
-            if (!CanChange() || (mode != HandleType.Position && mode != HandleType.Rotation)) return;
-            _mode = mode;
-            ConfigureHandle();
+            if (!CanChange() || Selected == null) return;
+            var allowed = Selected.state == AssemblyState.Attached ? HandleType.Rotation : HandleType.Position;
+            if (mode == allowed) ConfigureHandle();
+        }
+
+        public void DetachSelected()
+        {
+            if (!CanChange() || Selected == null || Selected.state != AssemblyState.Attached) return;
+            var part = Selected;
+            RemoveOwnedHandle();
+            part.root.SetParent(null, true);
+            part.state = AssemblyState.Free;
+            RebuildHandle();
+            _notice = "Detached. Attached children travel with this part.";
         }
 
         public void ResetLayout()
         {
-            if (!_initialized || !isActiveAndEnabled || _dragging) return;
+            if (!_initialized || !isActiveAndEnabled) return;
             ClearSelection();
-            foreach (var pair in _initial) if (pair.Key != null) Restore(pair.Key, pair.Value);
-            _mode = HandleType.Position;
-            _space = Space.World;
-            foreach (var product in products) if (product.root != null) ApplyFinish(product, 0);
+            foreach (var part in parts) if (part.root != null) part.root.SetParent(null, true);
+            foreach (var part in parts)
+            {
+                if (part.root != null) Restore(part.root, _initial[part.root]);
+                part.state = AssemblyState.Free;
+            }
             CancelNavigation();
             _yaw = 25f; _pitch = 42f; _distance = 12f;
             _cameraFocus = new Vector3(-1.2f, .4f, 0);
             UpdateCamera();
-            _notice = "Scene reset. Handle size preference is kept.";
+            _notice = "Start with the arm. Move its hinge to the base socket.";
         }
 
-        private bool CanChange() => _initialized && isActiveAndEnabled && !_dragging && _manager != null;
+        private bool CanChange() => _initialized && isActiveAndEnabled && !_dragging && _attaching == null && _manager != null;
 
         private void RebuildHandle()
         {
             RemoveOwnedHandle();
             _selection.RemoveAll(t => t == null);
             if (_selection.Count == 0 || _manager == null || !isActiveAndEnabled) return;
-            _handle = _manager.CreateHandleFromList(new List<Transform>(_selection));
+            _handle = _manager.CreateHandle(_selection[0]);
             if (_handle == null) return;
             _handle.LocalSpaceReference = _selection[_selection.Count - 1];
             _handle.AutoScale = true;
@@ -315,39 +334,98 @@ namespace TransformHandles.Samples.ProductConfigurator
 
         private void ConfigureHandle()
         {
-            if (_handle == null) return;
+            var part = Selected;
+            if (_handle == null || part == null) return;
+            _mode = part.state == AssemblyState.Attached ? HandleType.Rotation : HandleType.Position;
             TransformHandleManager.ChangeHandleType(_handle, _mode);
-            _handle.Axes = _mode == HandleType.Position ? HandleAxes.XZ : HandleAxes.Y;
-            _manager.ChangeHandleSpace(_handle, _space);
-            _handle.SnappingType = _mode == HandleType.Position ? SnappingType.Absolute : SnappingType.Relative;
+            _handle.Axes = _mode == HandleType.Position ? HandleAxes.XYZ : HandleAxes.X;
+            _manager.ChangeHandleSpace(_handle, _mode == HandleType.Position ? Space.World : Space.Self);
             _handle.PositionSnap = Vector3.zero;
             _handle.RotationSnap = 0;
         }
 
+        private float JointAngle(AssemblyPart part)
+        {
+            var relative = Quaternion.Inverse(part.socket.rotation) * part.root.rotation;
+            return Mathf.Clamp(Mathf.DeltaAngle(0, 2 * Mathf.Atan2(relative.x, relative.w) * Mathf.Rad2Deg),
+                part.angleLimits.x, part.angleLimits.y);
+        }
+
         private void OnDragStart(Handle handle)
         {
-            if (handle != _handle || _tearingDown) return;
+            if (handle != _handle || _tearingDown || Selected == null) return;
             _lastStartFrame = Time.frameCount;
             CancelNavigation();
             _dragging = true;
             _dragStart.Clear();
-            foreach (var target in _selection) if (target != null) _dragStart.Add(target, Capture(target));
+            foreach (var part in parts)
+                if (part.root != null) _dragStart.Add(part, new PartSnapshot {
+                    parent = part.root.parent, localPosition = part.root.localPosition,
+                    localRotation = part.root.localRotation, world = Capture(part.root), state = part.state });
+            if (Selected.state == AssemblyState.Attached && !HasLiveAttachment(Selected))
+            {
+                CancelDrag();
+                ReconcileAttachments();
+                return;
+            }
+            if (Selected.state == AssemblyState.Attached)
+            {
+                float angle = JointAngle(Selected);
+                handle.GetComponentInChildren<RotationAxis>().DragAngleLimits =
+                    new Vector2(Selected.angleLimits.x - angle, Selected.angleLimits.y - angle);
+            }
+        }
+
+        private static bool HasLiveAttachment(AssemblyPart part) => part.root != null && part.socket != null &&
+            part.parentRoot != null && part.root.parent == part.parentRoot && part.socket.IsChildOf(part.parentRoot);
+
+        private void ReconcileAttachments()
+        {
+            foreach (var part in parts)
+            {
+                if (part.state != AssemblyState.Attached || HasLiveAttachment(part)) continue;
+                if (part.root != null) part.root.SetParent(null, true);
+                part.state = AssemblyState.Free;
+                _rebuildPending = true;
+                _notice = "A joint was removed. The surviving part is free to move.";
+            }
+        }
+
+        private bool CanAttach(AssemblyPart part)
+        {
+            if (part == null || part.root == null || part.socket == null || part.parentRoot == null || part.state != AssemblyState.Free) return false;
+            return !_parts.TryGetValue(part.parentRoot, out var parentPart) || parentPart.state == AssemblyState.Attached;
         }
 
         private void OnDrag(Handle handle)
         {
             if (handle != _handle || !_dragging || _tearingDown) return;
-            _notice = _selection.All(t => t != null && FitsDesk(t))
-                ? "Release to place your selection." : "Outside the desk. Release to restore this move.";
+            var part = Selected;
+            _candidate = CanAttach(part) && Vector3.Distance(part.root.position, part.socket.position) <= SnapDistance ? part : null;
+            _notice = part != null && part.state == AssemblyState.Attached ? "Rotate within the joint limits."
+                : _candidate != null ? "Release to attach." : CanAttach(part) ? "Bring the hinge closer to its socket." : "Attach the arm to the base first.";
         }
 
         private void CancelDrag()
         {
-            if (!_dragging) return;
-            RemoveOwnedHandle(); // Unsubscribe before Core ends its interaction and releases group state.
-            foreach (var pair in _dragStart) if (pair.Key != null) Restore(pair.Key, pair.Value);
+            if (!_dragging && _attaching == null) return;
+            RemoveOwnedHandle();
+            _attaching = _candidate = null;
+            // Detach all survivors first so restoring a parent cannot transform a restored child twice.
+            foreach (var pair in _dragStart) if (pair.Key.root != null) pair.Key.root.SetParent(null, true);
+            foreach (var pair in _dragStart)
+            {
+                var part = pair.Key; var state = pair.Value;
+                if (part.root == null) continue;
+                part.root.SetParent(state.parent, false);
+                if (state.parent != null) { part.root.localPosition = state.localPosition; part.root.localRotation = state.localRotation; part.root.localScale = state.world.Scale; }
+                else Restore(part.root, state.world);
+                part.state = state.state;
+            }
+            ReconcileAttachments();
             _dragStart.Clear();
-            _notice = "Placement cancelled. The previous layout is restored.";
+            _rebuildPending = true;
+            _notice = "Assembly change cancelled. The previous pose is restored.";
         }
 
         private void OnDragEnd(Handle handle)
@@ -357,19 +435,61 @@ namespace TransformHandles.Samples.ProductConfigurator
                 (!_releasePending && !InputWrapper.GetMouseButtonUp(0)))
             {
                 CancelDrag();
-                _rebuildPending = true;
                 return;
             }
-            if (_selection.Any(t => t == null || !FitsDesk(t)))
-            {
-                CancelDrag();
-                _rebuildPending = true;
-                _notice = "Keep every product on the desk. The whole move was restored.";
-                return;
-            }
+            OnDrag(handle); // Re-evaluate the socket at the final position, not the previous frame.
+            var candidate = _candidate;
             _dragging = false;
+            if (candidate != null)
+            {
+                RemoveOwnedHandle();
+                _attaching = candidate;
+                candidate.state = AssemblyState.Attaching;
+                _attachStartPosition = candidate.root.position;
+                _attachStartRotation = candidate.root.rotation;
+                _attachTime = 0;
+                _notice = "Attaching…";
+            }
+            else { _dragStart.Clear(); _notice = Selected != null && Selected.state == AssemblyState.Attached ? "Joint pose updated." : "Part moved. Bring its hinge to the socket to attach."; }
+            _candidate = null;
+        }
+
+        private void AdvanceAttachment(float deltaTime)
+        {
+            if (_attaching == null) return;
+            var part = _attaching;
+            if (part.root == null || part.socket == null || part.parentRoot == null || _manager == null || !_manager.isActiveAndEnabled)
+            { CancelDrag(); return; }
+            _attachTime += deltaTime;
+            float t = Mathf.SmoothStep(0, 1, Mathf.Clamp01(_attachTime / AttachDuration));
+            part.root.SetPositionAndRotation(Vector3.Lerp(_attachStartPosition, part.socket.position, t),
+                Quaternion.Slerp(_attachStartRotation, part.socket.rotation, t));
+            if (_attachTime < AttachDuration) return;
+            part.root.SetParent(part.parentRoot, true);
+            part.root.SetPositionAndRotation(part.socket.position, part.socket.rotation);
+            part.state = AssemblyState.Attached;
+            _attaching = null;
             _dragStart.Clear();
-            _notice = "Placement updated.";
+            RebuildHandle();
+            _notice = "Attached. Rotate the hinge or select the next part.";
+        }
+
+        private void DrawAssemblyPreview()
+        {
+            var part = Selected;
+            if (!CanAttach(part)) return;
+            var socket = Matrix4x4.TRS(part.socket.position, part.socket.rotation, Vector3.one * .48f);
+            Graphics.DrawMesh(socketMarkerMesh, socket, previewMaterial, 2, sceneCamera, 0, _markerProperties,
+                UnityEngine.Rendering.ShadowCastingMode.Off, false);
+            if (_candidate != part) return;
+            var finalPose = Matrix4x4.TRS(part.socket.position, part.socket.rotation, Vector3.one) * part.root.worldToLocalMatrix;
+            part.root.GetComponentsInChildren(false, _previewMeshes);
+            foreach (var mesh in _previewMeshes)
+            {
+                if (mesh.sharedMesh == null) continue;
+                Graphics.DrawMesh(mesh.sharedMesh, finalPose * mesh.transform.localToWorldMatrix, previewMaterial, 2,
+                    sceneCamera, 0, null, UnityEngine.Rendering.ShadowCastingMode.Off, false);
+            }
         }
 
         private void RemoveOwnedHandle()
@@ -402,8 +522,6 @@ namespace TransformHandles.Samples.ProductConfigurator
             _releasePending = false;
             if (!_initialized) return;
             ClearSelection();
-            foreach (var pair in _originalMaterials)
-                if (pair.Key != null && _materials.Contains(pair.Key.sharedMaterial)) pair.Key.sharedMaterial = pair.Value;
             _helpPanelOpen = _closeHelpPanelPending = false;
             UnbindUi();
             if (_uiObject != null) _uiObject.SetActive(false);
@@ -423,9 +541,6 @@ namespace TransformHandles.Samples.ProductConfigurator
             TH_ProductConfiguratorReleaseScroll();
 #endif
             if (_ownedManager != null) Destroy(_ownedManager.gameObject);
-            foreach (var pair in _originalMaterials)
-                if (pair.Key != null && _materials.Contains(pair.Key.sharedMaterial)) pair.Key.sharedMaterial = pair.Value;
-            foreach (var material in _materials) if (material != null) Destroy(material);
             if (_uiObject != null) Destroy(_uiObject);
             if (_runtimePanelSettings != null) Destroy(_runtimePanelSettings);
             if (_ownedEventSystem != null) Destroy(_ownedEventSystem);
@@ -433,79 +548,30 @@ namespace TransformHandles.Samples.ProductConfigurator
 
         private static PosRotScale Capture(Transform t) => new PosRotScale { Position = t.position, Rotation = t.rotation, Scale = t.localScale };
         private static void Restore(Transform t, PosRotScale state) { t.SetPositionAndRotation(state.Position, state.Rotation); t.localScale = state.Scale; }
-        private bool ValidProduct(Transform t)
+        private bool ValidAssembly()
         {
-            if (t == null || t.parent != null || (t.localScale - Vector3.one).sqrMagnitude > .000001f) return false;
-            var p = t.position;
-            return Finite(p.x) && Finite(p.y) && Finite(p.z) && Mathf.Abs(p.y - deskCenter.y) < .0001f &&
-                Quaternion.Angle(t.rotation, Quaternion.Euler(0, t.eulerAngles.y, 0)) < .01f &&
-                t.GetComponentsInChildren<Collider>().Any(c => c.enabled && !c.isTrigger) &&
-                t.GetComponentsInChildren<MeshFilter>().Any(m => m.sharedMesh != null);
-        }
-
-        private static IEnumerable<Vector3> Corners(Bounds bounds)
-        {
-            for (var i = 0; i < 8; i++) yield return bounds.center + Vector3.Scale(bounds.extents,
-                new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
-        }
-
-        private static Bounds CalculateBounds(Transform root)
-        {
-            var result = new Bounds(); var first = true;
-            foreach (var mesh in root.GetComponentsInChildren<MeshFilter>(true))
+            if (parts == null || parts.Length == 0 || parts.Any(p => p == null || p.root == null || p.socket == null || p.parentRoot == null)) return false;
+            if (parts.Select(p => p.root).Distinct().Count() != parts.Length) return false;
+            foreach (var part in parts)
             {
-                if (mesh.sharedMesh == null) continue;
-                foreach (var corner in Corners(mesh.sharedMesh.bounds))
+                if (part.root.parent != null || !UnitScale(part.root) || !UnitScale(part.parentRoot) || !UnitScale(part.socket) ||
+                    !part.socket.IsChildOf(part.parentRoot) || part.socket.IsChildOf(part.root) ||
+                    !Finite(part.angleLimits.x) || !Finite(part.angleLimits.y) || part.angleLimits.x > 0 || part.angleLimits.y < 0 ||
+                    part.angleLimits.y - part.angleLimits.x > 180 ||
+                    !part.root.GetComponentsInChildren<Collider>().Any(c => c.enabled && !c.isTrigger)) return false;
+                var visited = new HashSet<Transform> { part.root };
+                var parent = part.parentRoot;
+                while (parent != null)
                 {
-                    var local = root.InverseTransformPoint(mesh.transform.TransformPoint(corner));
-                    if (first) { result = new Bounds(local, Vector3.zero); first = false; }
-                    else result.Encapsulate(local);
+                    if (!visited.Add(parent)) return false;
+                    var next = parts.FirstOrDefault(p => p.root == parent);
+                    parent = next == null ? null : next.parentRoot;
                 }
-            }
-            return result;
-        }
-
-        private bool FitsDesk(Transform target)
-        {
-            if (target == null || !_bounds.TryGetValue(target, out var bounds)) return false;
-            var position = target.position;
-            if (!Finite(position.x) || !Finite(position.y) || !Finite(position.z) ||
-                Mathf.Abs(position.y - deskCenter.y) > .001f ||
-                Quaternion.Angle(target.rotation, Quaternion.Euler(0, target.eulerAngles.y, 0)) > .01f ||
-                (target.lossyScale - Vector3.one).sqrMagnitude > .000001f) return false;
-            foreach (var corner in Corners(bounds))
-            {
-                var p = target.TransformPoint(corner) - deskCenter;
-                if (!Finite(p.x) || !Finite(p.z) || Mathf.Abs(p.x) > deskSize.x * .5f + .0001f ||
-                    Mathf.Abs(p.z) > deskSize.y * .5f + .0001f) return false;
             }
             return true;
         }
 
-        public void ToggleSpace()
-        {
-            if (!CanChange()) return;
-            _space = _space == Space.World ? Space.Self : Space.World;
-            ConfigureHandle();
-        }
-
-        public void SetFinish(int index)
-        {
-            if (!CanChange() || index < 0 || index >= FinishColors.Length) return;
-            foreach (var product in products) if (product.root != null && _selection.Contains(product.root)) ApplyFinish(product, index);
-            RefreshUi();
-        }
-
-        private void ApplyFinish(ProductPart product, int index)
-        {
-            _finishes[product.root] = index;
-            foreach (var renderer in product.finishRenderers)
-                if (renderer != null && _ownedMaterials.TryGetValue(renderer, out var material)) material.color = FinishColors[index];
-        }
-
-        private void White() => SetFinish(0);
-        private void Graphite() => SetFinish(1);
-        private void Sand() => SetFinish(2);
+        private static bool UnitScale(Transform t) => (t.lossyScale - Vector3.one).sqrMagnitude < .000001f;
 
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
@@ -519,16 +585,6 @@ namespace TransformHandles.Samples.ProductConfigurator
             _uiHits.Clear();
             system.RaycastAll(new PointerEventData(system) { position = InputWrapper.PointerPosition }, _uiHits);
             return _uiHits.Any(hit => hit.module is UnityEngine.UI.GraphicRaycaster || hit.module is PanelRaycaster);
-        }
-
-        private void SetMaterial(Renderer renderer, Color color, bool grid)
-        {
-            _originalMaterials[renderer] = renderer.sharedMaterial;
-            var material = new Material(targetMaterial) { color = color, name = "Product Configurator " + renderer.name };
-            material.SetFloat("_Grid", grid ? 1 : 0);
-            _materials.Add(material);
-            _ownedMaterials.Add(renderer, material);
-            renderer.sharedMaterial = material;
         }
 
         private void CancelNavigation()
@@ -555,7 +611,7 @@ namespace TransformHandles.Samples.ProductConfigurator
             bool leftHeld, bool rightHeld, bool middleHeld, bool overUi, bool editing, float scroll, int frame)
         {
             // A handle press owns the whole gesture, even if its callbacks ended it this frame.
-            if (_dragging || _lastStartFrame == frame)
+            if (_dragging || _attaching != null || _lastStartFrame == frame)
             {
                 CancelNavigation();
                 return;
@@ -653,14 +709,14 @@ namespace TransformHandles.Samples.ProductConfigurator
         {
             if (EventSystem.current == null)
             {
-                _ownedEventSystem = new GameObject("Product Configurator Event System", typeof(EventSystem));
+                _ownedEventSystem = new GameObject("Lamp Assembly Event System", typeof(EventSystem));
 #if ENABLE_INPUT_SYSTEM && TH_INPUTSYSTEM
                 _ownedEventSystem.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>().AssignDefaultActions();
 #else
                 _ownedEventSystem.AddComponent<StandaloneInputModule>();
 #endif
             }
-            _uiObject = new GameObject("Product Configurator Controls");
+            _uiObject = new GameObject("Lamp Assembly Controls");
             _uiObject.SetActive(false);
             _document = _uiObject.AddComponent<UIDocument>();
             _runtimePanelSettings = Instantiate(uiPanelSettings);
@@ -680,11 +736,8 @@ namespace TransformHandles.Samples.ProductConfigurator
             _moveButton = _uiRoot.Q<Button>("move");
             _rotateButton = _uiRoot.Q<Button>("rotate");
             _resetButton = _uiRoot.Q<Button>("reset");
-            _spaceButton = _uiRoot.Q<Button>("space");
-            _whiteButton = _uiRoot.Q<Button>("finish-white");
-            _graphiteButton = _uiRoot.Q<Button>("finish-graphite");
-            _sandButton = _uiRoot.Q<Button>("finish-sand");
-            _finishLabel = _uiRoot.Q<Label>("finish-label");
+            _detachButton = _uiRoot.Q<Button>("detach");
+            _jointLabel = _uiRoot.Q<Label>("joint-limits");
             _helpToggleButton = _uiRoot.Q<Button>("help-toggle");
             _helpCloseButton = _uiRoot.Q<Button>("help-close");
             _helpBackdrop = _uiRoot.Q<VisualElement>("help-backdrop");
@@ -693,8 +746,7 @@ namespace TransformHandles.Samples.ProductConfigurator
             _sizeInput = _uiRoot.Q<TextField>("size-input");
             _sizeInput.SetValueWithoutNotify(_handleSizePixels.ToString());
             _sizeSlider.SetValueWithoutNotify(_handleSizePixels);
-            _spaceButton.clicked += ToggleSpace;
-            _whiteButton.clicked += White; _graphiteButton.clicked += Graphite; _sandButton.clicked += Sand;
+            _detachButton.clicked += DetachSelected;
             _moveButton.clicked += Move;
             _rotateButton.clicked += Rotate;
             _resetButton.clicked += ResetLayout;
@@ -715,8 +767,7 @@ namespace TransformHandles.Samples.ProductConfigurator
         private void UnbindUi()
         {
             if (_uiRoot == null) return;
-            _spaceButton.clicked -= ToggleSpace;
-            _whiteButton.clicked -= White; _graphiteButton.clicked -= Graphite; _sandButton.clicked -= Sand;
+            _detachButton.clicked -= DetachSelected;
             _moveButton.clicked -= Move;
             _rotateButton.clicked -= Rotate;
             _resetButton.clicked -= ResetLayout;
@@ -824,7 +875,7 @@ namespace TransformHandles.Samples.ProductConfigurator
 
         private void ToggleHelpPanel()
         {
-            if (_dragging) return;
+            if (_dragging || _attaching != null) return;
             if (_helpPanelOpen) { RequestCloseHelpPanel(); return; }
             CancelNavigation();
             _pressBlocked = _pressCancelled = true;
@@ -864,34 +915,29 @@ namespace TransformHandles.Samples.ProductConfigurator
         private void RefreshUi()
         {
             if (_uiRoot == null) return;
-            var selectionName = _selection.Count == 1 && _selection[0] != null
-                ? products.First(p => p.root == _selection[0]).displayName : _selection.Count + " products";
-            var finishes = _selection.Where(t => t != null).Select(t => _finishes[t]).Distinct().ToArray();
-            var finish = finishes.Length == 1 ? finishes[0] : -1;
-            var state = $"{selectionName}|{_mode}|{_dragging}|{_handle != null}|{_notice}|{_helpPanelOpen}|{_space}|{finish}";
+            var part = Selected;
+            var busy = _dragging || _attaching != null;
+            var attached = part != null && part.state == AssemblyState.Attached;
+            var selectionName = part != null ? part.displayName : "Select a part";
+            var state = $"{selectionName}|{attached}|{busy}|{_handle != null}|{_notice}|{_helpPanelOpen}";
             if (state == _uiState) return;
             _uiState = state;
-            var selected = _selection.Count > 0;
-            _selectionLabel.text = selected ? selectionName.Replace('\n', ' ').Replace('\r', ' ') : "Select a product";
-            _selectionLabel.tooltip = selected ? selectionName : "";
-            // Placement feedback stays next to the selection, above scrollable settings.
-            _selectionHint.text = selected ? _notice : "Click a product. Shift-click adds to selection.";
-            _moveButton.SetEnabled(!_dragging && _handle != null);
-            _rotateButton.SetEnabled(!_dragging && _handle != null);
-            _resetButton.SetEnabled(!_dragging);
-            _helpToggleButton.SetEnabled(!_dragging);
-            _sizeInput.SetEnabled(!_dragging);
-            _sizeSlider.SetEnabled(!_dragging);
-            _moveButton.EnableInClassList("selected", selected && _mode == HandleType.Position);
-            _rotateButton.EnableInClassList("selected", selected && _mode == HandleType.Rotation);
+            _selectionLabel.text = selectionName.Replace('\n', ' ').Replace('\r', ' ');
+            _selectionLabel.tooltip = part != null ? selectionName : "";
+            _selectionHint.text = _notice;
+            _moveButton.SetEnabled(!busy && part != null && !attached);
+            _rotateButton.SetEnabled(!busy && part != null && attached);
+            _detachButton.SetEnabled(!busy && attached);
+            _resetButton.SetEnabled(!busy);
+            _helpToggleButton.SetEnabled(!busy);
+            _sizeInput.SetEnabled(!busy);
+            _sizeSlider.SetEnabled(!busy);
+            _moveButton.EnableInClassList("selected", part != null && !attached);
+            _rotateButton.EnableInClassList("selected", attached);
             _helpToggleButton.EnableInClassList("selected", _helpPanelOpen);
-            _spaceButton.text = _space == Space.World ? "World" : "Local";
-            _spaceButton.SetEnabled(!_dragging && selected);
-            _whiteButton.SetEnabled(!_dragging && selected); _graphiteButton.SetEnabled(!_dragging && selected); _sandButton.SetEnabled(!_dragging && selected);
-            _whiteButton.EnableInClassList("selected", finish == 0);
-            _graphiteButton.EnableInClassList("selected", finish == 1);
-            _sandButton.EnableInClassList("selected", finish == 2);
-            _finishLabel.text = !selected ? "Finish" : finish < 0 ? "Finish · Mixed" : "Finish · " + new[] { "White", "Graphite", "Sand" }[finish];
+            _jointLabel.text = part == null ? "Arm → base, then head → arm."
+                : attached ? $"Local X hinge · {part.angleLimits.x:0}° to {part.angleLimits.y:0}°"
+                : "Free movement · XYZ";
             _status.text = _notice;
         }
     }

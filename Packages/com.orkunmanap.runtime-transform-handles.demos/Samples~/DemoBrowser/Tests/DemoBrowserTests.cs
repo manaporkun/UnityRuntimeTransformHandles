@@ -110,10 +110,10 @@ namespace TransformHandles.Samples.DemoBrowser.Tests
                 }
                 else if (type.Name == "ProductConfiguratorDemo")
                 {
-                    var parts = (System.Array)type.GetField("products", flags).GetValue(controller);
+                    var parts = (System.Array)type.GetField("parts", flags).GetValue(controller);
                     var part = parts.GetValue(0);
                     var target = (Transform)part.GetType().GetField("root").GetValue(part);
-                    type.GetMethod("SelectTarget", flags).Invoke(controller, new object[] { target, false });
+                    type.GetMethod("SelectTarget", flags).Invoke(controller, new object[] { target });
                 }
                 else type.GetMethod("SelectSingle", flags).Invoke(controller, new object[] { GameObject.Find("Target_0").transform });
                 yield return null;

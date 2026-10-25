@@ -4,8 +4,8 @@
         <ui:VisualElement name="header" class="header">
             <ui:VisualElement class="identity" picking-mode="Ignore">
                 <ui:Button name="demo-gallery" text="‹ Demos" class="demo-gallery-link" />
-                <ui:Label text="Product configurator" class="app-title" />
-                <ui:Label text="Desk collection" class="project-name" />
+                <ui:Label text="Lamp assembly" class="app-title" />
+                <ui:Label text="Articulated lamp" class="project-name" />
             </ui:VisualElement>
             <ui:VisualElement class="header-actions" picking-mode="Ignore">
                 <ui:Button name="reset" text="Reset scene" class="quiet-button" />
@@ -14,8 +14,8 @@
         </ui:VisualElement>
         <ui:ScrollView name="inspector" class="inspector" horizontal-scroller-visibility="Hidden">
             <ui:Label text="SELECTION" class="eyebrow" />
-            <ui:Label name="selection-name" text="Select a product" class="selection-name" />
-            <ui:Label name="selection-hint" text="Click a product. Shift-click adds to selection." class="description selection-hint" />
+            <ui:Label name="selection-name" text="Select a part" class="selection-name" />
+            <ui:Label name="selection-hint" text="Attach the arm to the base, then add the head." class="description selection-hint" />
             <ui:VisualElement class="tools">
                 <ui:Button name="move" class="tool-button">
                     <ui:VisualElement class="tool-icon move-icon" picking-mode="Ignore" />
@@ -26,14 +26,8 @@
                     <ui:Label text="Rotate" />
                 </ui:Button>
             </ui:VisualElement>
-            <ui:VisualElement class="constraints"><ui:Label text="Space" class="muted" /><ui:Button name="space" text="World" class="constraint-button" /></ui:VisualElement>
-            <ui:VisualElement class="divider" picking-mode="Ignore" />
-            <ui:Label name="finish-label" text="Finish" class="section-title" />
-            <ui:VisualElement class="finish-options">
-                <ui:Button name="finish-white" text="White" class="finish-option white" />
-                <ui:Button name="finish-graphite" text="Graphite" class="finish-option graphite" />
-                <ui:Button name="finish-sand" text="Sand" class="finish-option sand" />
-            </ui:VisualElement>
+            <ui:Label name="joint-limits" text="Arm → base, then head → arm." class="description" />
+            <ui:Button name="detach" text="Detach part" class="quiet-button" />
             <ui:VisualElement class="divider" picking-mode="Ignore" />
             <ui:VisualElement class="size-row">
                 <ui:Label text="Handle size" class="section-title" />
@@ -54,13 +48,13 @@
                     <ui:Label text="Workshop controls" class="section-title" />
                     <ui:Button name="help-close" text="×" class="close-button" />
                 </ui:VisualElement>
-                <ui:VisualElement class="help-row"><ui:Label text="Move / Rotate" /><ui:Label text="W / E" class="muted" /></ui:VisualElement>
+                <ui:VisualElement class="help-row"><ui:Label text="Move / Hinge" /><ui:Label text="W / E" class="muted" /></ui:VisualElement>
                 <ui:VisualElement class="help-row"><ui:Label text="Orbit" /><ui:Label text="Left-drag" class="muted" /></ui:VisualElement>
                 <ui:VisualElement class="help-row"><ui:Label text="Pan" /><ui:Label text="Right-drag" class="muted" /></ui:VisualElement>
                 <ui:VisualElement class="help-row"><ui:Label text="Zoom" /><ui:Label text="Scroll" class="muted" /></ui:VisualElement>
                 <ui:VisualElement class="divider" picking-mode="Ignore" />
                 <ui:Label name="status" class="description status" />
-                <ui:Label text="Keep the whole product on the desk. An invalid placement restores the entire move. Products can overlap. Reset restores positions and finishes." class="description help-note" />
+                <ui:Label text="Move a free part into its highlighted socket and release to attach. Attached parts rotate at their hinges. Detach keeps their pose and attached children. Escape cancels the current change. Reset restores the exploded assembly." class="description help-note" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

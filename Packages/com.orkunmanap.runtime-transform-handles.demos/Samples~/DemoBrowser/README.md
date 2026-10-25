@@ -34,4 +34,4 @@ The PlayMode suite resolves absent and ambiguous scenes, verifies gallery entrie
 
 Edit `UI/DemoBrowser.uxml` and `UI/DemoBrowser.uss` in UI Builder. Panel settings and the licensed font are local to this sample. Unity 2021.3.0f1 or later, uGUI and UI Toolkit are required; Input System is optional (1.1.1 or later when enabled).
 
-Product Configurator appears as the fourth workspace when its scene is included in Build Settings. Its sample is optional for consumer galleries; the repository combined-build helper imports all four workspaces. Four cards wrap within the scrollable gallery at narrow widths.
+Lamp Assembly appears as the fourth workspace when its scene is included in Build Settings. Its sample is optional for consumer galleries; the repository combined-build helper imports all four workspaces. Four cards wrap within the scrollable gallery at narrow widths.

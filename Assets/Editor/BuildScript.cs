@@ -55,14 +55,14 @@ public static class BuildScript
 
     public static void PrepareProductConfiguratorWebGL()
     {
-        ResolveSampleScenePath("Product Configurator", "ProductConfigurator", "ProductConfigurator");
-        Debug.Log("Product Configurator imported. Run BuildProductConfiguratorWebGL in a new Editor invocation after compilation.");
+        ResolveSampleScenePath("Lamp Assembly", "ProductConfigurator", "ProductConfigurator");
+        Debug.Log("Lamp Assembly imported. Run BuildProductConfiguratorWebGL in a new Editor invocation after compilation.");
     }
 
     public static void BuildProductConfiguratorWebGL()
     {
         BuildWebGL(GetCommandLineArgument("-buildPath") ?? "Build/ProductConfiguratorWebGL",
-            "Product Configurator", "ProductConfigurator", "ProductConfigurator");
+            "Lamp Assembly", "ProductConfigurator", "ProductConfigurator");
     }
 
     private static void BuildWebGL(string outputPath, string sampleName, string sampleFolder, string sceneName)
@@ -106,7 +106,7 @@ public static class BuildScript
             ResolveSampleScenePath("Modular Building", "ModularBuilding", "ModularBuilding"),
             ResolveSampleScenePath("Level Editor", "LevelEditor", "LevelEditor"),
             ResolveSampleScenePath("Runtime Transform Handles Demo", "Demo", "RuntimeTransformHandlesDemo"),
-            ResolveSampleScenePath("Product Configurator", "ProductConfigurator", "ProductConfigurator")
+            ResolveSampleScenePath("Lamp Assembly", "ProductConfigurator", "ProductConfigurator")
         };
     }
 
