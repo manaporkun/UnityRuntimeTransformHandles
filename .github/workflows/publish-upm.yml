@@ -338,13 +338,70 @@ jobs:
       - name: Verify candidate unchanged
         run: python3 ci/release-candidate.py verify
 
+  consumer-activation:
+    name: Minimum consumer activation and return
+    needs: [preflight, candidate, test, demos-test]
+    if: >-
+      !cancelled() && needs.test.result == 'success' && needs.demos-test.result == 'success' &&
+      needs.preflight.outputs.has-unity-secrets == 'true' &&
+      (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      UNITY_LICENSE: ''
+      UNITY_LICENSING_SERVER: ''
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Download fixed candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Generate a fresh minimum consumer
+        run: python3 ci/consumer-project.py prepare --candidate artifacts/candidate --work artifacts/consumer-work --profile 2021-legacy --transport tarball --mount-root /github/workspace/artifacts/consumer-work
+
+      # One bounded attempt must prove real UPM bootstrap and an explicit license
+      # return before any matrix row can repeatedly acquire the same account seat.
+      - name: Resolve Core and return the assigned seat
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: core-resolve
+          image: unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6
+          github-token: ${{ github.token }}
+
+      - name: Upload minimum activation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: consumer-minimum-activation
+          path: |
+            artifacts/consumer-work/run.json
+            artifacts/consumer-work/evidence
+            artifacts/consumer-work/projects/*/.journey/editor
+          if-no-files-found: error
+
   consumer:
     name: Consumer (${{ matrix.profile }}, ${{ matrix.transport }}, ${{ matrix.scope }})
     # Wait for the existing licensed suites so the new max-parallel budget does not
     # add two concurrent seats on top of the Core/Demos matrices.
-    needs: [preflight, candidate, test, demos-test]
+    needs: [preflight, candidate, test, demos-test, consumer-activation]
     if: >-
       !cancelled() && needs.test.result == 'success' && needs.demos-test.result == 'success' &&
+      needs.consumer-activation.result == 'success' &&
       needs.preflight.outputs.has-unity-secrets == 'true' &&
       (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
     runs-on: ubuntu-latest

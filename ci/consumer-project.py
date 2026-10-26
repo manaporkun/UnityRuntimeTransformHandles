@@ -25,6 +25,7 @@ PROFILE_POLICY = {
     '6-input': ('6000.3.16f1', 1, False),
     '6-urp': ('6000.3.16f1', 1, True)
 }
+CLI_LINUX_SHA256 = 'a14afcb203920e3bf457b1a8d231c6795e4cda2f3be2dce6a1f32800c7b1bc66'
 OUTPUT_POLICY = {
     'phase': ['editor.log', 'resolution.json', 'record.json'],
     'editor': ['editor.json'],
@@ -44,6 +45,20 @@ def scope_for(profile, transport):
 def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + '\n')
+
+
+def read_editor_evidence(fixture):
+    path = fixture / 'editor-evidence.json'
+    require(path.is_file(), 'missing reviewed Editor evidence; historical consumer fixture unsupported')
+    data = json.loads(path.read_text())
+    require(data.get('schema') == 1 and set(data) == {'schema', 'layerSetupAssertions'}, 'unsupported Editor evidence schema')
+    versions = data['layerSetupAssertions']
+    require(set(versions) == {profile[0] for profile in PROFILE_POLICY.values()}, 'reviewed Editor versions differ from current policy')
+    for messages in versions.values():
+        require(isinstance(messages, list) and len(messages) == 4 and all(isinstance(message, str) and message for message in messages) and
+                messages[0] == messages[2] and messages[1] == messages[3] and messages[0] != messages[1],
+                'invalid reviewed public SetupLayer dialog sequence')
+    return data
 
 
 def required_stages(profile, transport):
@@ -149,6 +164,7 @@ def prepare(out, work, profile, transport, mount_root=None, build_target='Standa
     contract = json.loads((out / 'consumer/contract.json').read_text())
     require(contract.get('schema') == 1 and set(contract['profiles']) == set(PROFILES), 'unsupported consumer profiles')
     require(contract.get('outputs') == OUTPUT_POLICY, 'unsupported consumer output contract')
+    read_editor_evidence(out / 'consumer')
     for key, expected in PROFILE_POLICY.items():
         require(tuple(contract['profiles'][key][field] for field in ('unity', 'input', 'urp')) == expected,
                 'frozen profile differs from current workflow policy: ' + key)
@@ -320,7 +336,7 @@ def before_stage(work, stage):
         state['pending']['manifestBeforeTests'] = json.loads((project / 'Packages/manifest.json').read_text())
         state['pending']['lockBeforeTests'] = json.loads((project / 'Packages/packages-lock.json').read_text())
     write_json(work / 'run.json', state)
-    return {'project': project.as_posix(), 'method': method, 'testMode': test_mode, 'testFilter': test_filter,
+    return {'project': project.as_posix(), 'method': method, 'testMode': test_mode, 'testFilter': test_filter, 'unity': state['unity'],
             'artifacts': (work / 'evidence' / stage).as_posix(), 'stage': stage}
 
 
@@ -504,13 +520,34 @@ def load_verifier():
     return verifier
 
 
-def verify_editor_log(path, state, stage, tests=False):
+def verify_editor_log(path, state, stage, editor_evidence=None):
     text = path.read_text(errors='replace')
     observed = re.findall(r'^CONSUMER_ENGINE ([^ ]+) ' + re.escape(state['runId']) + ' ' + re.escape(stage) + r'$', text, re.M)
     require(observed and set(observed) == {state['unity']}, 'missing/wrong actual Editor initialization readback')
     require('CONSUMER_INVOCATION ' + state['runId'] + ' ' + stage in text, 'Editor log belongs to another invocation')
-    if not tests:
-        require(not re.search(r'^(?:Error|Exception|Assert):', text, re.M), 'Editor logged an error/exception/assertion')
+    headers = list(re.finditer(r'^(Log|Warning|Error|Assert|Exception): ', text, re.M))
+    entries = [(header.group(1), text[header.end():headers[index + 1].start() if index + 1 < len(headers) else len(text)].rstrip())
+               for index, header in enumerate(headers)]
+    require(not any(kind in ('Error', 'Exception') for kind, _ in entries), 'Editor logged an error/exception/assertion')
+    setup_stages = {'core-setup', 'upgrade-setup'} | {'sample-' + name + '-import' for name in
+                    ('Demo', 'LevelEditor', 'ModularBuilding', 'ProductConfigurator', 'DemoBrowser')}
+    assertions = [body for kind, body in entries if kind == 'Assert']
+    if stage not in setup_stages:
+        require(not assertions, 'Editor logged an error/exception/assertion')
+        return
+    require(editor_evidence is not None and editor_evidence.get('schema') == 1, 'missing reviewed Editor evidence')
+    expected = editor_evidence['layerSetupAssertions'][state['unity']]
+    require(len(expected) == 4 and expected[0] == expected[2] and expected[1] == expected[3] and expected[0] != expected[1],
+            'invalid reviewed public SetupLayer dialog sequence')
+    actual = []
+    for body in assertions:
+        message, separator, stack = body.partition('\nUnityEditor.EditorUtility:DisplayDialog ')
+        frames = re.findall(r'^(TransformHandles\.Editor\.TransformHandleLayerSetup:SetupLayer|ConsumerJourney\.ConsumerProject:CheckLayerSetup) \(\)(?: \(at [^\n]+\))?$', stack, re.M)
+        require(separator and frames == ['TransformHandles.Editor.TransformHandleLayerSetup:SetupLayer',
+                                         'ConsumerJourney.ConsumerProject:CheckLayerSetup'],
+                'assertion did not come from the reviewed public SetupLayer call')
+        actual.append(message)
+    require(actual == expected, 'missing, extra or changed public SetupLayer dialog diagnostics')
 
 
 def after_stage(work, stage):
@@ -528,8 +565,10 @@ def after_stage(work, stage):
               'editorFinished': finished, 'builds': [], 'players': [], 'tests': None}
     log = project / '.journey/editor' / (stage + '.log')
     require(log.exists(), 'Editor never initialized the frozen consumer bootstrap')
+    if state['profile'] == '2021-legacy' and state['buildTarget'] == 'StandaloneLinux64':
+        verify_minimum_license(out / 'license.json', state, stage)
     shutil.copy2(log, out / 'editor.log')
-    verify_editor_log(log, state, stage, tests=bool(pending['testMode']))
+    verify_editor_log(log, state, stage, editor_evidence=read_editor_evidence(work / 'candidate/consumer'))
     record['editorPids'] = sorted(set(re.findall(r'^CONSUMER_PID ([0-9]+)$', log.read_text(), re.M)))
     require(record['editorPids'], 'missing actual Editor process identity')
     verifier = load_verifier()
@@ -633,6 +672,62 @@ def after_stage(work, stage):
     return record
 
 
+def minimum_cli_command(work, stage, cli, image):
+    state = json.loads((work / 'run.json').read_text())
+    require(state['profile'] == '2021-legacy' and state['unity'] == '2021.3.0f1' and state['buildTarget'] == 'StandaloneLinux64',
+            'named-user CLI adapter is limited to the reviewed minimum Linux profile')
+    pending = state['pending']
+    require(pending['stage'] == stage, 'wrong named-user CLI phase')
+    require(image == 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6', 'minimum Editor image changed')
+    project = work / 'projects' / pending['project']
+    common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
+              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=serial', '--licenseRetryMaxAttempts=1']
+    if not os.environ.get('UNITY_SERIAL'):
+        common.append('--unitySerial=')
+    # Unity documents -serial without a key for assigned named-user seats. The
+    # old Personal path uses a different activation endpoint. Credentials stay in
+    # environment variables; the pinned CLI retains activation and return in one run.
+    if pending['testMode']:
+        return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
+                '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',
+                '--customParameters=-testFilter ' + pending['testFilter'], *common]
+    return [str(cli), 'build', str(project), '--targetPlatform=StandaloneLinux64', '--buildMethod=' + pending['method'],
+            '--customParameters=-consumerConfig .journey/config.json', '--versioningStrategy=None', '--allowDirtyBuild', *common]
+
+
+def licensed_command_result(command):
+    returned, warning = False, False
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1) as process:
+        for line in process.stdout:
+            print(line, end='', flush=True)
+            if re.search(r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned', line):
+                returned = True
+            if re.search(r'::warning::(?:Failed to return|Could not return)', line):
+                warning = True
+        code = process.wait()
+    return {'exitCode': code, 'returnSucceeded': returned, 'returnWarning': warning}
+
+
+def verify_minimum_license(path, state, stage):
+    require(json.loads(path.read_text()) == {'runId': state['runId'], 'stage': stage, 'exitCode': 0,
+                                            'returnSucceeded': True, 'returnWarning': False},
+            'minimum Editor license return failed or was not confirmed')
+
+
+def run_minimum_cli(work, stage, cli, image):
+    require(cli.is_file() and digest(cli) == CLI_LINUX_SHA256, 'pinned GameCI CLI binary checksum differs')
+    state = json.loads((work / 'run.json').read_text())
+    try:
+        result = licensed_command_result(minimum_cli_command(work, stage, cli, image))
+    finally:
+        # The container owns generated files until this guarded handoff. The
+        # host must regain them before writing its sanitized return receipt.
+        subprocess.run(['bash', str(Path(__file__).with_name('consumer-permissions.sh')), str(work), 'runner'], check=True)
+    path = work / 'evidence' / stage / 'license.json'
+    write_json(path, {'runId': state['runId'], 'stage': stage, **result})
+    verify_minimum_license(path, state, stage)
+
+
 def run_editor(work, name, unity, method='ConsumerJourney.ConsumerBootstrap.Run', timeout=900):
     project = work / 'projects' / name
     config = json.loads((project / '.journey/config.json').read_text())
@@ -672,7 +767,7 @@ def run_editor(work, name, unity, method='ConsumerJourney.ConsumerBootstrap.Run'
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('prepare', 'create', 'stage', 'before', 'after', 'fixture', 'sample-fixture', 'run-editor'))
+    parser.add_argument('command', choices=('prepare', 'create', 'stage', 'before', 'after', 'fixture', 'sample-fixture', 'run-editor', 'run-cli'))
     parser.add_argument('--candidate', type=Path, default=Path('artifacts/candidate'))
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--profile', choices=PROFILES)
@@ -685,6 +780,8 @@ def main():
     parser.add_argument('--stage')
     parser.add_argument('--sample', default='')
     parser.add_argument('--unity', type=Path)
+    parser.add_argument('--cli', type=Path)
+    parser.add_argument('--image')
     parser.add_argument('--method', default='ConsumerJourney.ConsumerBootstrap.Run')
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--github-output', type=Path)
@@ -713,6 +810,9 @@ def main():
     elif args.command == 'after':
         require(args.stage, '--stage required')
         after_stage(args.work, args.stage)
+    elif args.command == 'run-cli':
+        require(args.cli and args.image and args.stage, '--cli, --image and --stage required')
+        run_minimum_cli(args.work, args.stage, args.cli, args.image)
     else:
         require(args.unity, '--unity required')
         run_editor(args.work, args.project, args.unity, args.method, args.timeout)

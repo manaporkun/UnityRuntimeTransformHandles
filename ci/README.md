@@ -158,6 +158,12 @@ change the baseline or inventories, review and commit the contract/data delibera
 Browser-only discovery is exactly three applicable cases; gallery-dependent cases
 belong to the co-import run. Unexpected skips always fail.
 
+`editor-evidence.json` freezes the four ordered batch-mode dialog cancellation
+messages from successful public `SetupLayer` calls. Their full text and public API
+stack are required in setup and independent-import phases; layer allocation,
+idempotence and preserved user layers are checked separately. Unknown assertions,
+errors, exceptions, extra or missing dialogs fail. Player errors remain disallowed.
+
 For a local candidate, begin with a fresh output and work directory:
 
 ```sh
@@ -180,10 +186,22 @@ transfers only the generated workspace under `artifacts/` to that user before ea
 invocation and returns ownership to the runner afterward, including failed phases.
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
-The 2021.3.0f1 profile selects the existing Unity account credentials directly: its
-older client reports mismatched manual ULF files differently from later versions,
-so the pinned CLI does not reach its normal account fallback. Other profiles retain
-the existing credential selection. No editor substitution or new credential is used.
+The 2021.3.0f1 profile uses the same checksum-pinned CLI directly so it can explicitly
+select assigned named-user activation with `-serial` and no key, using the existing
+account credentials. The older automatic Personal route reaches a legacy endpoint
+that timed out in CI; a Mac-bound ULF also fails on the runner. Activation, the phase
+and license return remain in one CLI/container lifecycle. Other profiles retain the
+pinned action wrappers. The minimum Editor and all acceptance gates stay the same.
+This minimum-version activation still requires a real successful seat grant and
+return; a selected command or activation banner alone is insufficient evidence.
+The `Minimum consumer activation and return` prerequisite runs one fresh Core
+resolution before the eight matrix rows. It permits one activation attempt and
+requires the real bootstrap, UPM observation and explicit successful license return.
+Missing or failed return confirmation stops the matrix. Each minimum-Editor phase
+also records a sanitized `license.json` receipt bound to its run and stage; raw
+authentication output is not uploaded. This prerequisite adds one Editor phase
+outside the full/probe journey counts. Test phases also reject late Editor errors,
+exceptions and assertions, including failures after XML results have been written.
 The pinned builder also requires its standard completion marker for custom Editor
 methods. The bootstrap emits it after persisting the phase observation. It is an
 adapter acknowledgement, not native build evidence: the host verifier still requires

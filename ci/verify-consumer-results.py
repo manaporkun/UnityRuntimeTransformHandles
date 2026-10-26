@@ -473,6 +473,7 @@ def verify_journey(work, candidate_dir, profile, transport):
     require(state.get('completed') == stages and not state.get('pending'), 'mandatory consumer lifecycle stage missing, skipped or reordered')
     contract = read_json(work / 'candidate/consumer/contract.json')
     require(contract.get('outputs') == project.OUTPUT_POLICY, 'unsupported consumer output contract')
+    editor_evidence = project.read_editor_evidence(work / 'candidate/consumer')
     records, sessions, build_ids = {}, set(), set()
     previous_finished = 0
     for stage in stages:
@@ -485,7 +486,9 @@ def verify_journey(work, candidate_dir, profile, transport):
         require(not any(p.is_symlink() for p in out.rglob('*')), 'symlink in lifecycle evidence')
         actual = {p.relative_to(out).as_posix(): digest(p) for p in out.rglob('*') if p.is_file() and p.name != 'record.json'}
         require(actual == record['files'], 'lifecycle artifact missing, extra or changed')
-        project.verify_editor_log(out / 'editor.log', state, stage, tests=stage.endswith('-tests'))
+        project.verify_editor_log(out / 'editor.log', state, stage, editor_evidence=editor_evidence)
+        if profile == '2021-legacy':
+            project.verify_minimum_license(out / 'license.json', state, stage)
         if stage == 'customize':
             text = (out / 'editor.log').read_text()
             require(all(marker + ' ' + state['runId'] in text for marker in ('CONSUMER_IMPORT_PRESERVED', 'CONSUMER_DUPLICATE_REJECTED')),

@@ -1,13 +1,17 @@
 import importlib.util
 import copy
+from contextlib import redirect_stdout
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 import unittest
+from unittest.mock import patch
 
 import test_release_candidate as release_tests
 import test_verify_consumer_results as player_tests
@@ -259,6 +263,109 @@ class ConsumerProjectTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             consumer.after_stage(self.work, 'core-resolve')
 
+    def dialog_log(self, state, stage, evidence):
+        log = 'CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' ' + stage + '\nCONSUMER_PID 123\n'
+        log += 'Log: CONSUMER_INVOCATION ' + state['runId'] + ' ' + stage + '\n'
+        for message in evidence['layerSetupAssertions'][state['unity']]:
+            log += 'Assert: ' + message + '\nUnityEditor.EditorUtility:DisplayDialog (string,string,string)\n'
+            log += 'TransformHandles.Editor.TransformHandleLayerSetup:SetupLayer ()\nConsumerJourney.ConsumerProject:CheckLayerSetup ()\n\n'
+        return log + 'Log: Build succeeded!\n'
+
+    def test_exact_public_setup_dialog_diagnostics_pass_in_both_editors(self):
+        self.prepare()
+        evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
+        path = self.work / 'dialog.log'
+        for unity in ('2021.3.0f1', '6000.3.16f1'):
+            state = {**self.config, 'unity': unity}
+            for stage in ('core-setup', 'upgrade-setup', 'sample-Demo-import'):
+                path.write_text(self.dialog_log(state, stage, evidence))
+                consumer.verify_editor_log(path, state, stage, editor_evidence=evidence)
+
+    def test_setup_diagnostics_cannot_hide_other_assertions_or_errors(self):
+        self.prepare()
+        evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
+        path = self.work / 'dialog.log'
+        original = self.dialog_log(self.config, 'core-setup', evidence)
+        changes = [original.replace('has been created successfully.', 'Failed to create layer.'),
+                   original.replace('ConsumerJourney.ConsumerProject:CheckLayerSetup ()', 'Other:Method ()'),
+                   original.replace('TransformHandles.Editor.TransformHandleLayerSetup:SetupLayer ()\nConsumerJourney.ConsumerProject:CheckLayerSetup ()',
+                                    'ConsumerJourney.ConsumerProject:CheckLayerSetup ()\nTransformHandles.Editor.TransformHandleLayerSetup:SetupLayer ()'),
+                   original + 'Assert: unexpected package assertion\n', original + 'Error: package failed\n',
+                   original + 'Exception: package failed\n', original[:original.index('Assert:')],
+                   original.replace('core-setup', 'core-build')]
+        # An omitted diagnostic and an extra complete expected diagnostic both fail.
+        first, rest = original.split('Assert:', 1)
+        one, tail = rest.split('\n\nAssert:', 1)
+        changes += [first + 'Assert:' + tail, first + 'Assert:' + one + '\n\nAssert:' + rest]
+        for log in changes:
+            with self.subTest(log=log[-80:]):
+                path.write_text(log)
+                stage = 'core-build' if 'core-build' in log else 'core-setup'
+                with self.assertRaises(ValueError):
+                    consumer.verify_editor_log(path, self.config, stage, editor_evidence=evidence)
+        bad = copy.deepcopy(evidence)
+        bad['layerSetupAssertions'][self.config['unity']] = []
+        path.write_text(original)
+        with self.assertRaises(ValueError): consumer.verify_editor_log(path, self.config, 'core-setup', editor_evidence=bad)
+
+    def test_test_phase_cannot_hide_late_editor_errors(self):
+        self.prepare()
+        path = self.work / 'test-editor.log'
+        header = 'CONSUMER_ENGINE ' + self.config['unity'] + ' ' + self.config['runId'] + ' core-tests\n'
+        header += 'Log: CONSUMER_INVOCATION ' + self.config['runId'] + ' core-tests\n'
+        for kind in ('Error', 'Exception', 'Assert'):
+            path.write_text(header + kind + ': late shutdown failure\n')
+            with self.assertRaises(ValueError): consumer.verify_editor_log(path, self.config, 'core-tests')
+
+    def test_license_receipt_requires_real_return_success_and_native_exit(self):
+        self.prepare()
+        path = self.work / 'license.json'
+        for output, code, accepted in [
+                ('Successfully returned the entitlement license', 0, True),
+                ('Successfully returned ULF license', 23, False),
+                ('activation succeeded', 0, False),
+                ('::warning::Failed to return the Unity license', 0, False),
+                ('Successfully returned the entitlement license\n::warning::Could not return the Unity license', 0, False)]:
+            with redirect_stdout(io.StringIO()):
+                result = consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + '); raise SystemExit(' + str(code) + ')'])
+            consumer.write_json(path, {'runId': self.config['runId'], 'stage': 'core-resolve', **result})
+            if accepted:
+                consumer.verify_minimum_license(path, self.config, 'core-resolve')
+                with self.assertRaises(ValueError): consumer.verify_minimum_license(path, self.config, 'core-build')
+            else:
+                with self.assertRaises(ValueError): consumer.verify_minimum_license(path, self.config, 'core-resolve')
+
+    def test_minimum_cli_keeps_named_account_secrets_in_environment_and_uses_full_commands(self):
+        self.prepare()
+        consumer.before_stage(self.work, 'core-resolve')
+        image = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
+        with patch.dict(os.environ, {'UNITY_SERIAL': '', 'UNITY_EMAIL': 'account@example.invalid', 'UNITY_PASSWORD': 'private-password'}):
+            command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
+        self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
+        self.assertIn('--unityLicensingMethod=serial', command)
+        self.assertIn('--unitySerial=', command)
+        self.assertIn('--engineVersion=2021.3.0f1', command)
+        self.assertNotIn('--skipActivation', command)
+        self.assertFalse(any('private-password' in item or 'account@example.invalid' in item for item in command))
+        state = json.loads((self.work / 'run.json').read_text())
+        state['pending'].update(testMode='playmode', testFilter='Sample.One;Sample.Two')
+        consumer.write_json(self.work / 'run.json', state)
+        command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
+        self.assertEqual(command[1], 'test')
+        self.assertIn('--docker', command)
+        self.assertIn('--testPlatforms=playmode', command)
+        self.assertIn('--customParameters=-testFilter Sample.One;Sample.Two', command)
+        self.assertIn('--coverageEnabled=false', command)
+        with self.assertRaises(ValueError):
+            consumer.minimum_cli_command(self.work, 'different-stage', Path('/verified/game-ci'), image)
+
+    def test_minimum_cli_rejects_unverified_binary_before_execution(self):
+        self.prepare()
+        binary = self.work / 'wrong-cli'
+        binary.write_text('not the pinned CLI')
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            consumer.run_minimum_cli(self.work, 'core-resolve', binary, 'unused')
+
     def test_incomplete_or_self_downgraded_journey_cannot_pass(self):
         self.prepare()
         verifier = consumer.load_verifier()
@@ -336,6 +443,27 @@ class ConsumerProjectTests(unittest.TestCase):
             self.assertEqual(self.permission_trace.read_text().splitlines(),
                              ['chown', '-R', '-P', '--no-dereference', identity, '--', str(folder.resolve())])
 
+    def test_minimum_cli_returns_workspace_before_receipt_write_and_on_spawn_failure(self):
+        folder = self.permission_fixture()
+        consumer.write_json(folder / 'run.json', {'runId': 'one-assigned-seat-attempt'})
+        binary = folder / 'verified-cli'
+        binary.write_text('checked test binary')
+        original_write = consumer.write_json
+
+        def runner_write(path, data):
+            self.assertTrue(self.permission_trace.exists(), 'host receipt written before ownership handoff')
+            original_write(path, data)
+
+        with patch.dict(os.environ, self.permission_env), patch.object(consumer, 'CLI_LINUX_SHA256', consumer.digest(binary)):
+            command = [sys.executable, '-c', "print('Successfully returned the entitlement license')"]
+            with patch.object(consumer, 'minimum_cli_command', return_value=command), patch.object(consumer, 'write_json', side_effect=runner_write), redirect_stdout(io.StringIO()):
+                consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
+            self.assertTrue((folder / 'evidence/core-resolve/license.json').is_file())
+            self.permission_trace.unlink()
+            with patch.object(consumer, 'minimum_cli_command', return_value=[str(folder / 'missing-command')]):
+                with self.assertRaises(FileNotFoundError): consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
+            self.assertTrue(self.permission_trace.exists(), 'spawn failure skipped ownership recovery')
+
     def test_ownership_rejects_checkout_outside_paths_and_symlink_escapes(self):
         folder = self.permission_fixture()
         outside = self.root / 'user-owned'
@@ -397,7 +525,12 @@ class ConsumerProjectTests(unittest.TestCase):
                     record['players'].append(dict(path=destination, sample=None, customized=False, negative=negative))
             consumer.write_json(out / 'resolution.json', resolution)
             consumer.write_json(out / 'editor.json', observation)
-            (out / 'editor.log').write_text('CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' ' + stage + '\nCONSUMER_PID ' + str(index + 100) + '\nCONSUMER_INVOCATION ' + state['runId'] + ' ' + stage + '\n')
+            if stage == 'core-setup':
+                evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
+                log = self.dialog_log(state, stage, evidence)
+            else:
+                log = 'CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' ' + stage + '\nCONSUMER_PID ' + str(index + 100) + '\nCONSUMER_INVOCATION ' + state['runId'] + ' ' + stage + '\n'
+            (out / 'editor.log').write_text(log)
             record['files'] = consumer.hashes(out)
             consumer.write_json(out / 'record.json', record)
         summary = verifier.verify_journey(self.work, self.out, '6-legacy', 'git')
