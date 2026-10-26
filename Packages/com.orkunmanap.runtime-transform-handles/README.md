@@ -21,7 +21,8 @@ in-game object manipulation.
 
 ## Validated compatibility
 
-Development-revision macOS ARM64 runs validate Core on Unity 2021.3.0f1 and 6000.3.16f1.
+Development-revision macOS ARM64 runs pass Core's 199 PlayMode / 74 EditMode tests on
+Unity 2021.3.0f1 and 6000.3.16f1.
 Each run includes 24 real Editor Play Mode cycles across all four
 domain/scene reload combinations and both manager creation paths. Unity 6 is tested separately
 with legacy input and the Input System. The 2021.3.0 consumer uses Test Framework 1.1.33,
@@ -33,8 +34,9 @@ release artifacts require fresh consumer validation before publication.
 
 The combined gallery and standalone Lamp Assembly WebGL players passed local Chromium mouse
 and Retina layout checks. Showcase targets use a sample-owned pipeline-independent shader.
-Three inherited hidden URP shader diagnostics remain at log level; physical Mac trackpad
-validation remains open. See the repository development handoff for the exact development results.
+Three inherited hidden URP shader diagnostics remain at log level. The owner confirmed physical
+Mac trackpad validation in the local player. See the repository development handoff for the exact
+development results.
 
 The repository CI checks exact test discovery, zero skips, session evidence and observed settings.
 Local results do not establish remote CI success. See `ci/README.md` in the repository for the

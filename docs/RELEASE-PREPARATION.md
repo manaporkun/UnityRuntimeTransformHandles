@@ -68,9 +68,10 @@ Lamp Assembly; the internal ProductConfigurator identities are intentionally ret
 | 6000.3.16f1 | Input System | Same Core suites/session cycles; samples 119 |
 
 Follow `ci/README.md` for prepare/run/collect/verify; a Unity process exit alone is insufficient.
-Independent sample tests and WebGL mouse/Retina checks must use the candidate artifacts. A physical
-Mac trackpad smoke test requires the owner and remains open until performed. Earlier development
-results do not satisfy these versioned-artifact gates.
+Independent sample tests and WebGL mouse/Retina checks must use the candidate artifacts. Each future
+release candidate also requires an owner-performed physical Mac trackpad smoke test. The owner
+confirmed that check for the current candidate in the local player. Earlier development results
+do not satisfy these versioned-artifact gates.
 
 ## Publish only what passed
 

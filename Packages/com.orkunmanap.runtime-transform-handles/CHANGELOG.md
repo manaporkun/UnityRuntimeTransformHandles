@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- Scale the optional Level Editor interface with resolution and enlarge text/control sizes.
-- Initialize plane controls in the camera-facing quadrant immediately, including rotated pivots.
-- Synchronize handle position, orientation and existing camera-dependent size before creation
-  returns, including creation in LateUpdate, membership recentering and mode/axes rebuilds.
-  Custom transformation overrides that detach a handle cannot make a factory return it as owned.
-
 ### Added
 - Optional `RotationAxis.DragAngleLimits` keeps joint rotation and its arc within grab-relative bounds, with immediate reversal after overshoot and explicit configuration lifetime. The default remains unrestricted.
 - Opt-in LocalSpaceReference and UniformGroupScale controls for shared-center group rotation and proportional scaling. The optional Level Editor exposes group Rotate and uniform Scale, preserving World/Local preference.
@@ -24,21 +17,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BREAKING CHANGE: samples move to the separate optional demos package. Existing imported Assets
   copies remain user-owned; back them up outside Assets before importing the relocated showcase.
   Core package identity and existing runtime API remain compatible; the new controls are opt-in.
-
-### Documentation
-- Recorded local compatibility results for Unity 2021.3.0f1, 2021.3.45f1 and 6000.3.16f1.
-- Completed default script importer metadata without changing GUIDs or execution order, preventing
-  older Editors from rewriting those files during package import.
-- Added explicit isolated CI session-test opt-in and strict test/session evidence checks; Unity 6
-  CI is configured for both input backends. Remote CI results are tracked separately from local QC.
-- Documented repeated Editor Play Mode session coverage across all domain/scene reload combinations
-  and both scene-authored and runtime-created managers. Added eight Editor tests with three real
-  sessions each; runtime behavior is unchanged.
-- Clarified explicit `Instance` access during bulk cleanup, final destruction and nested cleanup,
-  including deferred recreation and standalone `Ghost.Initialize` ownership. Added lifecycle
-  regression coverage without changing the explicit factory behavior.
+- Interaction end is now delivered exactly once when an active drag is interrupted by removal, manager
+  teardown, direct destruction, scene unload, or `SetActive(false)` — not only by a mouse release.
+- Changing the active scene retains ownership of handles that are still alive instead of clearing all
+  tracked handles. Handles in an unloaded scene unregister as they are destroyed.
+- `RemoveHandle` and `GetTargets` accept an already-destroyed handle reference as a teardown-safe
+  no-op (an explicit `null` still throws).
+- `GetTargets` now prunes destroyed membership but does not cancel or destroy; pending target-loss
+  cleanup (end event, pivot recenter, empty-handle teardown) runs on the next manager `Update`.
+  `BeginInteraction` rejects a handle with pending target loss until that cleanup runs.
+- Public `Handle.Disable()` remains an ownership-retaining local suspension; use
+  `Enable(capturedPivot)` to resume it. `RemoveHandle` remains the explicit detach path.
+- Re-enabling a handle component with `enabled=true` from an interaction-end callback is immediate and
+  supported. Reopening its **GameObject** must be deferred: the callback requests reopen and the
+  caller/test calls `SetActive(true)` on the following frame, because Unity rejects immediate
+  reactivation while `OnDisable` is still running. No library scheduler is involved.
+- Manager component/GameObject disable retains ownership and cancels one drag; re-enable resumes the
+  same handles. A replaced `MainCamera` cancels an active drag and refreshes live handle cameras.
 
 ### Fixed
+- Initialize plane controls in the camera-facing quadrant immediately, including rotated pivots.
+- Synchronize handle position, orientation and existing camera-dependent size before creation
+  returns, including creation in LateUpdate, membership recentering and mode/axes rebuilds.
+  Custom transformation overrides that detach a handle cannot make a factory return it as owned.
 - Direct handle destruction now releases ownership and its ghost even when a destruction subscriber
   throws, while preserving event delivery order and exception reporting. Nested manager destruction
   no longer tries to destroy the handle whose destruction callback is already running.
@@ -61,25 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Handle.Targets` and `Handle.OnEnable` now use the non-creating existing manager only; a query or
   standalone handle re-enable cannot instantiate a manager. A detached handle clears a stale camera
   when its manager is gone and remains unowned until explicitly registered.
-
-### Changed
-- Interaction end is now delivered exactly once when an active drag is interrupted by removal, manager
-  teardown, direct destruction, scene unload, or `SetActive(false)` — not only by a mouse release.
-- Changing the active scene retains ownership of handles that are still alive instead of clearing all
-  tracked handles. Handles in an unloaded scene unregister as they are destroyed.
-- `RemoveHandle` and `GetTargets` accept an already-destroyed handle reference as a teardown-safe
-  no-op (an explicit `null` still throws).
-- `GetTargets` now prunes destroyed membership but does not cancel or destroy; pending target-loss
-  cleanup (end event, pivot recenter, empty-handle teardown) runs on the next manager `Update`.
-  `BeginInteraction` rejects a handle with pending target loss until that cleanup runs.
-- Public `Handle.Disable()` remains an ownership-retaining local suspension; use
-  `Enable(capturedPivot)` to resume it. `RemoveHandle` remains the explicit detach path.
-- Re-enabling a handle component with `enabled=true` from an interaction-end callback is immediate and
-  supported. Reopening its **GameObject** must be deferred: the callback requests reopen and the
-  caller/test calls `SetActive(true)` on the following frame, because Unity rejects immediate
-  reactivation while `OnDisable` is still running. No library scheduler is involved.
-- Manager component/GameObject disable retains ownership and cancels one drag; re-enable resumes the
-  same handles. A replaced `MainCamera` cancels an active drag and refreshes live handle cameras.
+- Completed default script importer metadata without changing GUIDs or execution order, preventing
+  older Editors from rewriting those files during package import.
 
 ## [3.3.1] - 2026-10-25
 

@@ -13,6 +13,14 @@ namespace TransformHandles.Editor
         private const string Root = "Packages/com.orkunmanap.runtime-transform-handles/Runtime/";
         private static readonly Color[] Colors = { new Color(.96f,.48f,.51f), new Color(.57f,.85f,.55f), new Color(.48f,.66f,.93f) };
 
+        /// <summary>
+        /// Regenerates the Precision meshes, materials and PrecisionTransformHandle.prefab,
+        /// and rewrites the default TransformHandleManager.prefab to use Precision.
+        /// </summary>
+        /// <remarks>
+        /// Maintainer-only authoring command that writes into the package folder.
+        /// Requires a writable package; it cannot run from a read-only PackageCache.
+        /// </remarks>
         public static void Build()
         {
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(Root + "Shader/PrecisionHandle.shader");

@@ -12,17 +12,19 @@ The serialized settings disable Core's global shortcuts. Buttons and sample shor
 
 The `Tests` folder contains optional Unity Test Framework PlayMode tests guarded by `UNITY_INCLUDE_TESTS`. Tests exercise this controller without changing Core. The original Demo is a separate import with its original controller and layout. Both samples use the manager’s default Precision handle unless a scene manager selects Native.
 
-The compact toolbar shows the active tool, effective World/Local space and snap increment. The
-selection card explains restrictions without covering the left side of the scene. The entire interface scales from a 1280×720 reference with equal width/height weighting.
-Main text is 22 reference pixels, descriptions 20, and controls 56 pixels tall (about 46 at 960×640).
-The toolbar wraps when logical width is limited. Desktop validation covers 960×640 through
-3840×2160, with browser device pixel ratios 1 and 2; high-resolution output grows text and controls. UI labels update only when their state changes. The bundled `UI` PNG sprites
-are referenced by the scene; fixtures without those optional references use text and square panels.
-The sample uses uGUI and Unity's built-in font, with no TMP or additional UI dependencies.
+The UI Toolkit header contains navigation, Reset scene and Help. The scrollable left inspector
+shows the selection, active tool, effective World/Local space, snap increment and handle size.
+The interface scales from a 1280×720 reference with equal width/height weighting. The shared
+theme uses 20 px base text, 18 px descriptions and 44 px buttons; Move/Rotate/Scale buttons
+override the height to 48 px. Desktop validation covers 960×640 through 3840×2160, with browser
+device pixel ratios 1 and 2; high-resolution output grows text and controls. UI labels update
+only when their state changes. A `UIDocument` loads `UI/LevelEditor.uxml`; icons come from the
+PNG references in `UI/LevelEditor.uss`, and `UI/DemoTheme.uss` selects the bundled
+`Fonts/LiberationSans.ttf`. No TMP package or Essential Resources setup is required.
 
 ## Light theme and handle size
 
-The white toolbar groups the transform tools; the viewport uses a light neutral grid and muted
+The white left inspector groups the transform tools; the viewport uses a light neutral grid and muted
 props. The sample settings use a blue hover highlight for contrast on pale surfaces. The imported
 scene owns its camera background; a borrowed manager's settings and camera reference are restored
 as before. The original showcase and Core appearance defaults are unchanged.

@@ -4,20 +4,22 @@ Runtime object manipulation through visual transform handles (position, rotation
 
 ## Validated compatibility
 
-Local macOS ARM64 runs pass all 176 PlayMode and 74 EditMode tests on Unity 2021.3.0f1
-and 6000.3.16f1. Each run includes 24 real Editor Play Mode cycles across all four domain/scene
-reload combinations and both manager creation paths. Unity 6 is tested separately with legacy
-input and the Input System. The 2021.3.0 consumer uses Test Framework 1.1.33, legacy input, no
-Input System package and no URP package. The optional Level Editor passes its 44 PlayMode tests
-in each configuration. Unity 2021.3.45f1 passed the previous 134/70 suite before the Precision
-appearance changes; this revision has not been rerun on that patch. These are measured
-configurations, not a claim that every intermediate Editor or rendering configuration was tested.
+Development-revision macOS ARM64 runs pass Core's 199 PlayMode / 74 EditMode tests on
+Unity 2021.3.0f1 and 6000.3.16f1.
+Each run includes 24 real Editor Play Mode cycles across all four
+domain/scene reload combinations and both manager creation paths. Unity 6 is tested separately
+with legacy input and the Input System. The 2021.3.0 consumer uses Test Framework 1.1.33,
+legacy input, no Input System package and no URP package. Imported optional samples pass
+116 tests on Legacy and 119 on Unity 6 Input System. Unity 2021.3.45f1 is also checked as the
+remote CI floor. These are measured configurations,
+not a claim that every intermediate Editor or rendering configuration was tested. Versioned
+release artifacts require fresh consumer validation before publication.
 
-The Unity 6 canonical sample also builds and supports selection, move, rotation and scale in a
-local Chromium WebGL run. Visual validation remains open: target cubes render magenta in the URP
-build, hidden URP shaders report unsupported variants, and keyboard mode changes leave the demo
-HUD label stale. These sample defects and shader diagnostics are tracked
-separately; this is not a clean WebGL visual signoff.
+The combined gallery and standalone Lamp Assembly WebGL players passed local Chromium mouse
+and Retina layout checks. Showcase targets use a sample-owned pipeline-independent shader.
+Three inherited hidden URP shader diagnostics remain at log level. The owner confirmed physical
+Mac trackpad validation in the local player. See the repository development handoff for the exact
+development results.
 
 The repository CI checks exact test discovery, zero skips, session evidence and observed settings.
 Local results do not establish remote CI success. See `ci/README.md` in the repository for the
