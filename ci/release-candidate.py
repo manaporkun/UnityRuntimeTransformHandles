@@ -15,6 +15,9 @@ import tempfile
 CORE = 'com.orkunmanap.runtime-transform-handles'
 DEMOS = CORE + '.demos'
 PACKAGES = (CORE, DEMOS)
+REQUIRED_FILES = ('required-playmode.txt', 'required-editmode.txt',
+                  'required-samples-input0.txt', 'required-samples-input1.txt',
+                  'required-unity-evidence.json')
 
 
 def require(condition, message):
@@ -89,6 +92,15 @@ def prepare(root, out, repository=None):
     package_source = start if recovery else source
     bump, version = ('none', current) if recovery else version_bump(root, start, current)
     out.mkdir(parents=True)
+    required = out / 'required'
+    required.mkdir()
+    for name in REQUIRED_FILES:
+        result = subprocess.run(['git', '-C', str(root), 'show', package_source + ':ci/' + name],
+                                capture_output=True)
+        require(result.returncode == 0,
+                f'cannot read release test inventory {name} at {package_source}; '
+                'see docs/RELEASE-PREPARATION.md for historical recovery')
+        (required / name).write_bytes(result.stdout)
     # git archive excludes consumer imports, caches, untracked files and OS metadata.
     with tempfile.TemporaryDirectory() as temp:
         staging = Path(temp)
@@ -132,7 +144,7 @@ def prepare(root, out, repository=None):
                     'publishable': bool(repository), 'recovery': recovery,
                     'skip': not recovery and bump == 'none', 'version': version, 'bump': bump,
                     'demos_version': json.loads((demos / 'package.json').read_text())['version'],
-                    'packages': {}}
+                    'required': hashes(required), 'packages': {}}
         for name, folder in zip(PACKAGES, (core, demos)):
             target = out / (name + '.tgz')
             with tarfile.open(target, 'w:gz') as archive:
@@ -148,6 +160,11 @@ def prepare(root, out, repository=None):
 def read_candidate(out):
     metadata = json.loads((out / 'candidate.json').read_text())
     require(metadata['schema'] == 1 and set(metadata['packages']) == set(PACKAGES), 'invalid candidate')
+    require(set(metadata.get('required', {})) == set(REQUIRED_FILES), 'invalid candidate inventory')
+    required = out / 'required'
+    require(required.is_dir() and {p.name for p in required.iterdir()} == set(REQUIRED_FILES),
+            'invalid candidate inventory files')
+    require(hashes(required) == metadata['required'], 'required inventory changed')
     require(digest(out / 'release-notes.md') == metadata['notes_sha256'], 'release notes changed')
     for name, info in metadata['packages'].items():
         require(digest(out / (name + '.tgz')) == info['sha256'], 'archive changed: ' + name)

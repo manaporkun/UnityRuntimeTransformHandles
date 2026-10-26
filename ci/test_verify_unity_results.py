@@ -12,29 +12,52 @@ v = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(v)
 
 
+def write_results(folder, required_dir):
+    """Write synthetic Unity observations for a selected source-controlled inventory."""
+    folder, required_dir = Path(folder), Path(required_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    expectations = json.loads((required_dir / 'required-unity-evidence.json').read_text())
+    files = {}
+    for mode in ('play', 'edit'):
+        names = (required_dir / ('required-' + mode + 'mode.txt')).read_text().splitlines()
+        count = str(len(names))
+        root = ET.Element('test-run', result='Passed', total=count, passed=count,
+                          testcasecount=count, failed='0', skipped='0')
+        for name in names:
+            ET.SubElement(root, 'test-case', fullname=name, result='Passed')
+        p = folder / (mode + '.xml'); ET.ElementTree(root).write(p)
+        files[mode + '_xml'] = str(p)
+        p = folder / (mode + '.log')
+        p.write_text('Initialize engine version: 6000.3.16f1 (abc)\n' +
+                     ''.join(e + '\n' for e in expectations['exceptions'][mode]))
+        files[mode + '_log'] = str(p)
+    rows = []
+    for case in expectations['session_cases']:
+        name = case['name']
+        for i in range(3):
+            rows += [f'{name}\t{i}\t{phase}\tquit={quit}\tends={ends}'
+                     for phase, quit, ends in zip(expectations['phases'],
+                                                  ('False', 'False', 'False', 'True'), (0, 0, 1, 2))]
+        rows.append(f"{name}\t3\tteardown-at-{expectations['phases'][-1]}\tquit=True\tends=2")
+    p = folder / 'transitions.tsv'; p.write_text('\n'.join(rows) + '\n')
+    files['transitions'] = str(p)
+    p = folder / 'settings.tsv'
+    p.write_text(''.join(c['name'] + '\tFalse\t3\tFalse\t3\n' for c in expectations['session_cases']))
+    files['settings'] = str(p)
+    return files
+
+
 class EvidenceTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.out = Path(self.temp.name)
-        files = {}
         for mode in ('play', 'edit'):
-            name = mode + '.Case'
-            (self.out / ('required-' + mode + 'mode.txt')).write_text(name + '\n')
-            root = ET.Element('test-run', result='Passed', total='1', passed='1', testcasecount='1', failed='0', skipped='0')
-            ET.SubElement(root, 'test-case', fullname=name, result='Passed')
-            p = self.out / (mode + '.xml'); ET.ElementTree(root).write(p)
-            files[mode + '_xml'] = str(p)
-            errors = ['disable end', 'end callback', 'destroyed callback', 'end callback 2', 'destroyed callback 2', 'direct end callback', 'end callback', 'destroyed callback', 'direct destruction CSharp', 'direct destruction CSharp', 'direct destruction UnityEvent', 'direct destruction UnityEvent', 'destruction after remove', 'destruction after manager'] if mode == 'play' else []
-            p = self.out / (mode + '.log');p.write_text('Initialize engine version: 6000.3.16f1 (abc)\n' + ''.join('InvalidOperationException: ' + e + '\n' for e in errors));files[mode + '_log'] = str(p)
-        rows = []
-        for case in sorted(v.CASES):
-            for i in range(3):
-                rows += [f'{case}\t{i}\t{phase}\tquit={quit}\tends={ends}' for phase, quit, ends in zip(v.PHASES, ('False','False','False','True'), (0,0,1,2))]
-            rows.append(f'{case}\t3\tteardown-at-exited-and-asserted\tquit=True\tends=2')
-        p = self.out / 'transitions.tsv';p.write_text('\n'.join(rows)+'\n');files['transitions'] = str(p)
-        p = self.out / 'settings.tsv';p.write_text(''.join(c+'\tFalse\t3\tFalse\t3\n' for c in sorted(v.CASES)));files['settings']=str(p)
-        p = self.out / 'run-id.txt';p.write_text('a'*32);files['run_id']=str(p)
+            (self.out / ('required-' + mode + 'mode.txt')).write_text(mode + '.Case\n')
+        (self.out / 'required-unity-evidence.json').write_bytes(
+            Path(__file__).with_name('required-unity-evidence.json').read_bytes())
+        files = write_results(self.out, self.out)
+        p = self.out / 'run-id.txt'; p.write_text('a' * 32); files['run_id'] = str(p)
         self.meta = {'schema':1,'run_id':'a'*32,'commit':'b'*40,'project':str(self.out),
                      'expected':{'unity':'6000.3.16f1','input':0,'package_hash':'c'*64},
                      'observed':{'unity':{'play':['6000.3.16f1'],'edit':['6000.3.16f1']},'settings':{'input':0,'reload':['original']},'package_hash':'c'*64},
@@ -131,6 +154,56 @@ class EvidenceTests(unittest.TestCase):
     def test_unexpected_exception(self):
         self.mutate('edit_log',lambda s:s+'InvalidOperationException: unexpected\n')
         with self.assertRaisesRegex(ValueError,'exception log'):self.check()
+
+    def test_invalid_expectations_rejected(self):
+        path = self.out / 'required-unity-evidence.json'
+        original = path.read_text()
+        mutations = [
+            ('schema', 2), ('schema', True), ('exceptions', {'play': [], 'edit': 'invalid'}),
+            ('session_cases', []), ('session_cases', [{'name': 'case', 'require_quit_on_exit': 1}]),
+            ('session_cases', [{'name': '', 'require_quit_on_exit': True}]),
+            ('phases', []), ('phases', ['one', 'two', 'three', 'three']),
+            ('phases', ['one', 'two', 'three', 4])]
+        for key, value in mutations:
+            with self.subTest(key=key, value=value):
+                data = json.loads(original); data[key] = value
+                path.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ValueError, 'invalid'):
+                    self.check()
+
+    def test_duplicate_session_case_rejected(self):
+        path = self.out / 'required-unity-evidence.json'
+        data = json.loads(path.read_text()); data['session_cases'].append(data['session_cases'][0])
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, 'duplicate session cases'):
+            self.check()
+
+    def test_exception_multiplicity_is_required(self):
+        self.mutate('play_log', lambda s: s.replace('InvalidOperationException: end callback\n', '', 1))
+        with self.assertRaisesRegex(ValueError, 'exception log mismatch'):
+            self.check()
+
+    def test_quit_assertion_uses_inventory_not_case_name(self):
+        self.mutate('transitions', lambda s: s.replace('DisableDomainReload/authored', 'Renamed/authored'))
+        self.mutate('settings', lambda s: s.replace('DisableDomainReload/authored', 'Renamed/authored'))
+        path = self.out / 'required-unity-evidence.json'
+        data = json.loads(path.read_text())
+        for case in data['session_cases']:
+            if case['name'] == 'DisableDomainReload/authored':
+                case['name'] = 'Renamed/authored'
+        path.write_text(json.dumps(data))
+        self.check()
+        self.mutate('transitions', lambda s: s.replace(
+            'Renamed/authored\t0\texited-and-asserted\tquit=True',
+            'Renamed/authored\t0\texited-and-asserted\tquit=False'))
+        with self.assertRaisesRegex(ValueError, 'natural quit flag'):
+            self.check()
+
+    def test_full_reload_does_not_add_an_exit_quit_assertion(self):
+        self.mutate('transitions', lambda s: s.replace(
+            'None/authored\t0\texited-and-asserted\tquit=True',
+            'None/authored\t0\texited-and-asserted\tquit=False'))
+        self.check()
 
 
 if __name__ == '__main__':unittest.main()

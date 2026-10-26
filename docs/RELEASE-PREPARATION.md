@@ -14,7 +14,8 @@ main Core version during integration; do not pre-bump it to 4.0.0 and let automa
 the major bump from the fixed source commit. It prepares Core's final manifest/changelog, promotes
 Demos' initial preview to 1.0.0, finalizes its changelog and sets its Core dependency to 4.0.0.
 It packs both packages as UPM `.tgz` files and records every package file hash, archive hash, source
-commit, package source and release notes hash in `candidate.json`.
+commit, package source and release notes hash in `candidate.json`. It also freezes the five
+test-inventory files under `required/` and records their hashes in the same manifest.
 
 Use Python 3.9+, Git and a fresh output directory. A local preview performs no GitHub writes:
 
@@ -32,7 +33,25 @@ CI uploads the candidate once. Validation, Core tests and Demos tests download a
 artifacts. `apply` requires the checkout's HEAD to match the recorded source; `verify` rejects missing,
 changed or extra package files. Tests never recalculate versions or fetch a newer source revision.
 For an interrupted publication, the candidate contains the previous bump commit's package files and
-notes, even if newer commits exist; those recovered artifacts must pass the current gates again.
+notes, even if newer commits exist. Test inventory comes from that same `package_source` commit:
+the Core and sample test-name lists, expected exception counts, session case identities, quit-flag
+assertions and phase names. Normal preparation takes that inventory from HEAD. Both paths read
+committed Git bytes, so local edits to `ci/` cannot change the candidate's expectations.
+
+Recovered artifacts must pass the current verification policy against their own frozen inventory.
+Current gates still require fresh evidence, exact discovery, no failures/skips, unchanged package
+bytes, observed Unity/input settings and complete session cycles with restored settings. CI runs
+the current verifier code with `--required-dir artifacts/candidate/required`; it does not execute
+historical Python. Missing, extra or changed inventory files fail candidate validation.
+
+Historical releases without all five inventory files cannot use automatic recovery; preparation
+stops with an explicit diagnostic and never substitutes HEAD's expectations. This includes releases
+predating optional Demos. To complete an already-published historical Core release, independently
+verify its original source/version, distributed package tree, matching existing tag, release notes
+and original test evidence first. With owner approval, create only the missing GitHub Release for
+that verified tag. Do not move an existing tag, publish newer main files under the old version or
+invent a historical inventory from current code. If the original evidence is unavailable, leave
+the recovery unresolved until it can be established.
 
 Future stable Demos dependency changes require an explicit new Demos version in the source manifest
 and matching changelog. The script rejects silently changing an existing stable Demos version when

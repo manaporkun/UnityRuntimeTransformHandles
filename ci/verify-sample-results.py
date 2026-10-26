@@ -30,7 +30,7 @@ def prepare(root, out, unity, input_mode):
     (out / 'metadata.json').write_text(json.dumps(data, indent=2) + '\n')
 
 
-def verify(root, out, xml, log):
+def verify(root, out, xml, log, required_dir=Path(__file__).parent):
     metadata = json.loads((out / 'metadata.json').read_text())
     require(xml.stat().st_mtime_ns >= metadata['started_ns'] and
             log.stat().st_mtime_ns >= metadata['started_ns'], 'stale sample results')
@@ -58,9 +58,11 @@ def verify(root, out, xml, log):
             'sample Editor version mismatch')
     tree = ET.parse(xml).getroot()
     cases = tree.findall('.//test-case')
-    expected = {line.strip() for line in (Path(__file__).parent /
+    names = [line.strip() for line in (Path(required_dir) /
                 f"required-samples-input{metadata['input']}.txt").read_text().splitlines()
-                if line.strip() and not line.startswith('#')}
+                if line.strip() and not line.startswith('#')]
+    require(names and len(set(names)) == len(names), 'invalid expected sample names')
+    expected = set(names)
     actual = [case.get('fullname') for case in cases]
     require(len(actual) == len(set(actual)) and set(actual) == expected,
             f'sample suite mismatch: missing={expected - set(actual)}, extra={set(actual) - expected}')
@@ -81,12 +83,13 @@ def main():
     parser.add_argument('--input', type=int, choices=[0, 1])
     parser.add_argument('--xml', type=Path)
     parser.add_argument('--log', type=Path)
+    parser.add_argument('--required-dir', type=Path, default=Path(__file__).parent)
     args = parser.parse_args()
     if args.command == 'prepare':
         require(args.unity and args.input is not None, 'prepare requires Unity version and input mode')
         prepare(args.root, args.out, args.unity, args.input)
     else:
-        verify(args.root, args.out, args.xml, args.log)
+        verify(args.root, args.out, args.xml, args.log, args.required_dir)
 
 
 if __name__ == '__main__':

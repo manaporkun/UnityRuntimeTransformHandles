@@ -11,10 +11,6 @@ import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-CASES = {m + '/' + o for m in ('None', 'DisableDomainReload', 'DisableSceneReload',
-         'DisableDomainReload, DisableSceneReload') for o in ('authored', 'factory')}
-PHASES = ['entry-requested', 'entered-and-asserted', 'exit-requested', 'exited-and-asserted']
-
 
 def require(condition, message):
     if not condition:
@@ -23,6 +19,29 @@ def require(condition, message):
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def read_expectations(required_dir):
+    data = json.loads((Path(required_dir) / 'required-unity-evidence.json').read_text())
+    require(isinstance(data, dict) and
+            set(data) == {'schema', 'exceptions', 'session_cases', 'phases'} and
+            type(data['schema']) is int and data['schema'] == 1, 'invalid evidence expectations schema')
+    exceptions = data['exceptions']
+    require(isinstance(exceptions, dict) and set(exceptions) == {'play', 'edit'} and
+            all(isinstance(items, list) and all(isinstance(s, str) and s and '\n' not in s
+                                               for s in items) for items in exceptions.values()),
+            'invalid exception expectations')
+    phases = data['phases']
+    require(isinstance(phases, list) and len(phases) == 4 and
+            all(isinstance(s, str) and s and not re.search(r'[\t\r\n]', s) for s in phases) and
+            len(set(phases)) == 4, 'invalid session phases')
+    cases = data['session_cases']
+    require(isinstance(cases, list) and cases and all(
+            isinstance(c, dict) and set(c) == {'name', 'require_quit_on_exit'} and
+            isinstance(c['name'], str) and c['name'] and not re.search(r'[\t\r\n]', c['name']) and
+            type(c['require_quit_on_exit']) is bool for c in cases), 'invalid session cases')
+    require(len({c['name'] for c in cases}) == len(cases), 'duplicate session cases')
+    return data
 
 
 def package_hash(path):
@@ -96,6 +115,9 @@ def collect(out, paths):
 
 def verify(out, required_dir):
     out, required_dir = Path(out), Path(required_dir)
+    expected = read_expectations(required_dir)
+    session_cases = {c['name']: c['require_quit_on_exit'] for c in expected['session_cases']}
+    phases = expected['phases']
     m = json.loads((out / 'metadata.json').read_text())
     require(m['schema'] == 1, 'metadata schema')
     require(re.fullmatch(r'[0-9a-f]{32}', m['run_id']) is not None, 'run ID')
@@ -134,31 +156,27 @@ def verify(out, required_dir):
         require(not re.search(r'error CS\d+|Scripts have compiler errors|MissingReferenceException|NullReferenceException|Destroying object multiple times', log), 'unexpected error in ' + mode)
         # Deliberate subscriber exceptions are asserted precisely by the passing Unity tests.
         exceptions = [line for line in log.splitlines() if re.match(r'^\w+(?:\.\w+)*Exception:', line)]
-        expected = ['disable end', 'end callback', 'destroyed callback', 'end callback 2', 'destroyed callback 2',
-                    'direct end callback', 'end callback', 'destroyed callback',
-                    'direct destruction CSharp', 'direct destruction CSharp', 'direct destruction UnityEvent',
-                    'direct destruction UnityEvent', 'destruction after remove', 'destruction after manager'] if mode == 'play' else []
-        require(sorted(exceptions) == sorted('InvalidOperationException: ' + e for e in expected), 'exception log mismatch')
+        require(sorted(exceptions) == sorted(expected['exceptions'][mode]), 'exception log mismatch')
     rows = [r.split('\t') for r in Path(f['transitions']['path']).read_text().splitlines()]
-    require(all(len(r) == 5 for r in rows) and len(rows) == 104, 'transition shape')
-    require({r[0] for r in rows} == CASES, 'transition case identities')
-    for case in CASES:
+    require(all(len(r) == 5 for r in rows) and len(rows) == len(session_cases) * 13, 'transition shape')
+    require({r[0] for r in rows} == set(session_cases), 'transition case identities')
+    for case, require_quit in session_cases.items():
         selected = [r for r in rows if r[0] == case]
         require(len(selected) == 13, 'duplicate/missing case rows')
         for i in range(3):
             segment = selected[i * 4:i * 4 + 4]
-            require([r[1] for r in segment] == [str(i)] * 4 and [r[2] for r in segment] == PHASES, 'transition ordering')
+            require([r[1] for r in segment] == [str(i)] * 4 and [r[2] for r in segment] == phases, 'transition ordering')
             require(segment[1][3] == 'quit=False', 'entry quit reset')
             require(segment[2][3:] == ['quit=False', 'ends=1'], 'interaction cancellation')
             require(segment[3][4] == 'ends=2', 'exit interaction completion')
-            if 'DisableDomainReload' in case:
+            if require_quit:
                 require(segment[3][3] == 'quit=True', 'natural quit flag')
-        require(selected[-1][1:3] == ['3', 'teardown-at-exited-and-asserted'], 'teardown checkpoint')
+        require(selected[-1][1:3] == ['3', 'teardown-at-' + phases[-1]], 'teardown checkpoint')
     rows = [r.split('\t') for r in Path(f['settings']['path']).read_text().splitlines()]
-    require(len(rows) == 8 and all(len(r) == 5 for r in rows), 'settings evidence shape')
-    require({r[0] for r in rows} == CASES, 'settings cases')
+    require(len(rows) == len(session_cases) and all(len(r) == 5 for r in rows), 'settings evidence shape')
+    require({r[0] for r in rows} == set(session_cases), 'settings cases')
     require(all(r[1] in ('True', 'False') and r[2] in ('0', '1', '2', '3') and r[1:3] == r[3:5] for r in rows), 'settings restore mismatch')
-    print('PASS: exact test suites, 24 session cycles and observed settings/version')
+    print(f'PASS: exact test suites, {len(session_cases) * 3} session cycles and observed settings/version')
 
 
 def main():

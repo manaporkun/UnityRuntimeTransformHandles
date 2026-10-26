@@ -12,6 +12,19 @@ samples = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(samples)
 
 
+def write_results(folder, required_dir, input_mode):
+    folder.mkdir(parents=True, exist_ok=True)
+    tree = ET.Element('test-run', result='Passed')
+    names = (Path(required_dir) / f'required-samples-input{input_mode}.txt').read_text().splitlines()
+    for name in names:
+        if name and not name.startswith('#'):
+            ET.SubElement(tree, 'test-case', fullname=name, result='Passed')
+    xml, log = folder / 'results.xml', folder / 'results.log'
+    ET.ElementTree(tree).write(xml)
+    log.write_text('Initialize engine version: 6000.3.16f1 (revision)\n')
+    return xml, log
+
+
 class SampleResultsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -103,3 +116,19 @@ class SampleResultsTests(unittest.TestCase):
         os.utime(self.xml, (1, 1))
         with self.assertRaisesRegex(ValueError, 'stale sample results'):
             self.verify()
+
+    def test_required_dir_selects_sample_inventory(self):
+        expected = self.tree[0].get('fullname')
+        self.tree[:] = [self.tree[0]]; self.save()
+        (self.out / 'required-samples-input0.txt').write_text(expected + '\n')
+        samples.verify(self.root, self.out, self.xml, self.log, self.out)
+        with self.assertRaisesRegex(ValueError, 'suite mismatch'):
+            self.verify()
+
+    def test_invalid_sample_inventory_rejected(self):
+        path = self.out / 'required-samples-input0.txt'
+        for text in ('', 'Duplicate\nDuplicate\n'):
+            with self.subTest(text=text):
+                path.write_text(text)
+                with self.assertRaisesRegex(ValueError, 'invalid expected sample names'):
+                    samples.verify(self.root, self.out, self.xml, self.log, self.out)

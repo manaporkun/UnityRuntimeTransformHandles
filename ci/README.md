@@ -21,7 +21,13 @@ batch run. Dirty scenes are still rejected. Do not use this flag in a project wi
 
 Run validator unit tests with `python3 -m unittest discover -s ci -p 'test_*.py'`.
 Expected lists are reviewed source-controlled baselines, not generated from the run being accepted.
-Update them deliberately when adding/removing package tests. XML `engine-version` identifies NUnit,
+Update them deliberately when adding/removing/renaming package tests. Core's expected exception
+messages (including duplicates), session cases and four ordered phase names live in
+`required-unity-evidence.json`. Its `require_quit_on_exit` flag requires a naturally true quit flag
+for no-domain-reload cases; false retains the existing full-reload behavior without adding an exit
+quit assertion. The current verifier enforces three complete cycles per case and rejects empty,
+duplicate or malformed expectations. Update this data deliberately when those observations change.
+XML `engine-version` identifies NUnit,
 not Unity; Unity's startup log supplies the observed Editor version.
 
 Evidence includes expected and observed metadata, XML/logs, transitions.tsv, settings.tsv and run ID.
@@ -103,6 +109,19 @@ prepares both `.tgz` packages before validation. Every licensed Core/Demos job a
 artifacts and verifies that package bytes remain unchanged. The separate compatibility-floor
 workflow remains an additional required review check; it is not a substitute for local minimum-version
 or versioned-artifact consumer tests.
+
+The candidate includes `required/` with the four exact test-name files and
+`required-unity-evidence.json`, copied byte-for-byte from `package_source` and hashed in
+`candidate.json`. That source is HEAD for normal preparation and the interrupted bump commit for
+recovery. Both publish-workflow verifiers use `--required-dir artifacts/candidate/required`, so
+later test additions, removals, renames or changed exception/session expectations cannot invalidate
+an older candidate's inventory. Current freshness, hash, no-skip and observed-settings checks still
+apply. Candidate validation rejects missing, changed or extra inventory files. Keep this directory
+with the candidate archives when validating a local candidate and pass its path with `--required-dir`
+to both `verify-unity-results.py verify` and `verify-sample-results.py verify`. Their default remains
+the current `ci/` directory for ordinary local and compatibility-floor runs. Historical releases
+missing these files stop; see the release preparation document for independently verified manual
+completion. They never fall back to current expectations.
 
 Demos CI imports all five samples, runs only `TransformHandles.Samples.`, and checks the exact
 `required-samples-input0.txt` or `required-samples-input1.txt` list with zero skips. These baselines

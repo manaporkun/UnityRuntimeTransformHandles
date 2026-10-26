@@ -235,7 +235,7 @@ jobs:
         if: always()
         run: |
           python3 ci/verify-unity-results.py collect --out artifacts/evidence --play-xml artifacts/playmode-results.xml --edit-xml artifacts/editmode-results.xml --play-log artifacts/playmode.log --edit-log artifacts/editmode.log
-          python3 ci/verify-unity-results.py verify --out artifacts/evidence
+          python3 ci/verify-unity-results.py verify --out artifacts/evidence --required-dir artifacts/candidate/required
 
       - name: Upload test results
         if: always()
@@ -324,7 +324,7 @@ jobs:
 
       - name: Verify exact sample suite
         if: always()
-        run: python3 ci/verify-sample-results.py verify --out artifacts/sample-evidence --xml artifacts/playmode-results.xml --log artifacts/playmode.log
+        run: python3 ci/verify-sample-results.py verify --out artifacts/sample-evidence --xml artifacts/playmode-results.xml --log artifacts/playmode.log --required-dir artifacts/candidate/required
 
       - name: Upload test results
         if: always()

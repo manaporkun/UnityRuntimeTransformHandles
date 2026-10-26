@@ -84,6 +84,27 @@ The release inspection and independent plan review are complete. The proposed pa
 
 The independent reviewer accepted the version pair and existing distribution pattern with the revision-gap and Demos-validation requirements above. Implementation is now authorized; merge, publication and deployment still require separate owner approval. See [release preparation](RELEASE-PREPARATION.md) for the implementation contract and acceptance matrix. Final independent source review and local QC passed; remote checks and owner acceptance remain separate gates.
 
+## PR review follow-up (2026-10-26)
+
+The owner approved the independently reviewed recovery plan. Release preparation now freezes the
+Core/sample test lists and structured exception/session expectations from `package_source`, with
+their hashes in `candidate.json`. Recovery uses the interrupted release's inventory; normal
+preparation uses committed HEAD. Current verifier logic still enforces freshness, package integrity,
+passing exact suites and complete session evidence. Historical releases missing that inventory stop
+and require the independently verified manual procedure in [release preparation](RELEASE-PREPARATION.md).
+
+The package README and documentation index now agree on compatibility and completed trackpad
+validation. Level Editor documentation describes its actual UI Toolkit layout and assets. Core's
+curated Unreleased notes contain unique standard headings and consumer changes; internal CI records
+and the sample-only UI entry were removed. The Precision authoring command documents its package
+writes and maintainer scope. These changes keep README, API docs, changelogs and migration guidance
+aligned with the existing Core/Demos release scope.
+
+Local Python coverage is now 73 tests, including real temporary Git histories feeding both verifier
+CLIs with synthetic Unity observations for test additions, removals and renames under both input
+modes. This does not replace licensed Unity CI. Confirm the required checks for the final PR commit
+and obtain owner approval before merge or publication.
+
 ## Latest checkpoint: release candidate validation (2026-10-25)
 
 The owner approved Core 4.0.0 / optional Demos 1.0.0 implementation. `ci/release-candidate.py`

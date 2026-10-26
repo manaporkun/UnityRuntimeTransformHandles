@@ -1,12 +1,16 @@
+import contextlib
 import importlib.util
 import io
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
+import test_verify_unity_results as core_tests
+import test_verify_sample_results as sample_tests
 
 spec = importlib.util.spec_from_file_location('candidate', Path(__file__).with_name('release-candidate.py'))
 candidate = importlib.util.module_from_spec(spec)
@@ -32,6 +36,18 @@ class CandidateTests(unittest.TestCase):
                 manifest['dependencies'] = {candidate.CORE: '3.3.1'}
             (folder / 'package.json').write_text(json.dumps(manifest))
             (folder / 'CHANGELOG.md').write_text('# Changelog\n\n## [Unreleased]\n\n### Added\n- Curated entry.\n\n## [3.3.1]\n\n### Fixed\n- Previous entry.\n')
+        ci = self.root / 'ci'; ci.mkdir(exist_ok=True)
+        for name in candidate.REQUIRED_FILES:
+            shutil.copy2(Path(__file__).with_name(name), ci / name)
+        for name in candidate.REQUIRED_FILES[:-1]:
+            (ci / name).write_text(name + '.Shared\n' + name + '.Old\n')
+        demos = self.root / 'Packages' / candidate.DEMOS
+        path = demos / 'package.json'
+        manifest = json.loads(path.read_text())
+        manifest.update(displayName='Fixture Demos', samples=[{'displayName': 'Fixture', 'path': 'Samples~/Fixture'}])
+        path.write_text(json.dumps(manifest))
+        sample = demos / 'Samples~/Fixture'; sample.mkdir(parents=True)
+        (sample / 'fixture.cs').write_text('fixture sample')
         self.commit('chore: bump version to 3.3.1 [skip ci]')
         self.start = self.git('rev-parse', 'HEAD')
 
@@ -174,6 +190,161 @@ class CandidateTests(unittest.TestCase):
                 else:
                     self.assertEqual(candidate.release_exists('fixture/repo', '3.3.1'), exists)
 
+    def test_inventory_uses_committed_bytes_despite_local_edits(self):
+        self.change(candidate.CORE, 'fix: next patch')
+        name = candidate.REQUIRED_FILES[0]
+        original = (self.root / 'ci' / name).read_bytes()
+        (self.root / 'ci' / name).write_bytes(b'uncommitted baseline\n')
+        metadata = candidate.prepare(self.root, self.out)
+        self.assertEqual((self.out / 'required' / name).read_bytes(), original)
+        self.assertEqual(metadata['required'], candidate.hashes(self.out / 'required'))
+
+    def test_changed_inventory_files_rejected(self):
+        self.prepare()
+        for name in candidate.REQUIRED_FILES:
+            with self.subTest(name=name):
+                path = self.out / 'required' / name
+                original = path.read_bytes(); path.write_bytes(original + b'changed')
+                with self.assertRaisesRegex(ValueError, 'required inventory changed'):
+                    candidate.read_candidate(self.out)
+                path.write_bytes(original)
+
+    def test_missing_or_extra_inventory_files_rejected(self):
+        self.prepare()
+        path = self.out / 'required' / candidate.REQUIRED_FILES[0]
+        original = path.read_bytes(); path.unlink()
+        with self.assertRaisesRegex(ValueError, 'inventory files'):
+            candidate.read_candidate(self.out)
+        path.write_bytes(original)
+        (self.out / 'required' / 'extra.txt').write_text('extra')
+        with self.assertRaisesRegex(ValueError, 'inventory files'):
+            candidate.read_candidate(self.out)
+
+    def test_incomplete_inventory_manifest_rejected(self):
+        self.prepare()
+        path = self.out / 'candidate.json'
+        metadata = json.loads(path.read_text())
+        del metadata['required'][candidate.REQUIRED_FILES[0]]
+        path.write_text(json.dumps(metadata))
+        with self.assertRaisesRegex(ValueError, 'invalid candidate inventory'):
+            candidate.read_candidate(self.out)
+
+    def test_historical_recovery_does_not_fall_back_to_current_inventory(self):
+        path = self.root / 'ci/required-unity-evidence.json'
+        original = path.read_bytes(); path.unlink()
+        self.commit('chore: bump version to 3.3.1 [skip ci]')
+        path.write_bytes(original)
+        self.change(candidate.CORE, 'fix: newer change with inventory restored')
+        with patch.object(candidate, 'release_exists', return_value=False):
+            with self.assertRaisesRegex(ValueError, 'cannot read release test inventory'):
+                candidate.prepare(self.root, self.out, 'fixture/repo')
+
+
+class InventoryRecoveryTests(unittest.TestCase):
+    setUp = CandidateTests.setUp
+    git = CandidateTests.git
+    commit = CandidateTests.commit
+    change = CandidateTests.change
+
+    def evidence(self, required_dir, label, input_mode):
+        """Run real prepare/collect/CLI verification around synthetic Unity observations."""
+        settings = self.root / 'ProjectSettings/ProjectSettings.asset'
+        settings.parent.mkdir(exist_ok=True)
+        settings.write_text(f'  activeInputHandler: {input_mode}\n')
+        out = self.root / f'artifacts/{label}-core-{input_mode}'
+        core_tests.v.prepare(self.root, self.root / 'Packages' / candidate.CORE,
+                             out, '6000.3.16f1', input_mode)
+        files = core_tests.write_results(self.root / 'Library/P0E-Evidence', required_dir)
+        core_tests.v.collect(out, {k: v for k, v in files.items() if k.endswith(('_xml', '_log'))})
+        command = ['python3', str(Path(__file__).with_name('verify-unity-results.py').resolve()),
+                   'verify', '--out', str(out), '--required-dir', str(required_dir)]
+        result = subprocess.run(command, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sample_out = self.root / f'artifacts/{label}-samples-{input_mode}'
+        sample_tests.samples.prepare(self.root, sample_out, '6000.3.16f1', input_mode)
+        xml, log = sample_tests.write_results(sample_out, required_dir, input_mode)
+        command = ['python3', str(Path(__file__).with_name('verify-sample-results.py').resolve()),
+                   'verify', '--root', str(self.root), '--out', str(sample_out),
+                   '--xml', str(xml), '--log', str(log), '--required-dir', str(required_dir)]
+        result = subprocess.run(command, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return out, sample_out, xml, log
+
+    def check_recovery(self, operation):
+        for name in candidate.REQUIRED_FILES[:-1]:
+            path = self.root / 'ci' / name
+            names = path.read_text().splitlines()
+            if operation == 'add':
+                names.append(name + '.Added')
+            elif operation == 'remove':
+                names.pop()
+            else:
+                names[-1] = name + '.Renamed'
+            path.write_text('\n'.join(names) + '\n')
+        path = self.root / 'ci/required-unity-evidence.json'
+        data = json.loads(path.read_text())
+        if operation == 'add':
+            data['session_cases'].append({'name': 'New/session', 'require_quit_on_exit': True})
+            data['exceptions']['play'].append(data['exceptions']['play'][0])
+        elif operation == 'remove':
+            data['session_cases'].pop()
+            data['exceptions']['play'].pop()
+        else:
+            data['session_cases'][0]['name'] = 'Renamed/session'
+            data['exceptions']['play'][0] = 'InvalidOperationException: renamed callback'
+        data['phases'] = ['next-' + phase for phase in data['phases']]
+        path.write_text(json.dumps(data))
+        self.change(candidate.CORE, 'fix: evolve tests after interrupted release')
+        head = self.git('rev-parse', 'HEAD')
+        self.out = self.root / 'artifacts/candidate'
+        with patch.object(candidate, 'release_exists', return_value=False):
+            recovery = candidate.prepare(self.root, self.out, 'fixture/repo')
+        self.assertTrue(recovery['recovery'])
+        self.assertEqual(recovery['package_source'], self.start)
+        candidate.apply(self.root, self.out)
+        candidate.import_samples(self.root, ['all'])
+        old = {mode: self.evidence(self.out / 'required', 'recovery', mode) for mode in (0, 1)}
+
+        self.git('restore', '--source=HEAD', '--worktree', '--', 'Packages')
+        normal_out = Path(self.temp.name) / 'normal'
+        with patch.object(candidate, 'release_exists', return_value=True):
+            normal = candidate.prepare(self.root, normal_out, 'fixture/repo')
+        self.assertFalse(normal['recovery'])
+        self.assertEqual(normal['package_source'], head)
+        self.assertEqual(normal['version'], '3.3.2')
+        candidate.apply(self.root, self.out)
+        for mode, (core_out, sample_out, xml, log) in old.items():
+            (self.root / 'ProjectSettings/ProjectSettings.asset').write_text(f'  activeInputHandler: {mode}\n')
+            with self.assertRaisesRegex(ValueError, 'discovery mismatch'):
+                core_tests.v.verify(core_out, normal_out / 'required')
+            with self.assertRaisesRegex(ValueError, 'sample suite mismatch'):
+                sample_tests.samples.verify(self.root, sample_out, xml, log, normal_out / 'required')
+
+        self.git('restore', '--source=HEAD', '--worktree', '--', 'Packages')
+        shutil.rmtree(self.out)
+        shutil.copytree(normal_out, self.out)
+        candidate.apply(self.root, self.out)
+        candidate.import_samples(self.root, ['all'])
+        for mode in (0, 1):
+            self.evidence(self.out / 'required', 'normal', mode)
+
+    def test_added_tests_and_expectations_use_their_package_source(self):
+        self.check_recovery('add')
+
+    def test_removed_tests_and_expectations_use_their_package_source(self):
+        self.check_recovery('remove')
+
+    def test_renamed_tests_and_expectations_use_their_package_source(self):
+        self.check_recovery('rename')
+
+    def test_workflow_selects_frozen_inventory_for_both_verifiers(self):
+        workflow = (Path(__file__).parent.parent / '.github/workflows/publish-upm.yml').read_text()
+        for script in ('verify-unity-results.py', 'verify-sample-results.py'):
+            lines = [line for line in workflow.splitlines() if script + ' verify ' in line]
+            self.assertEqual(len(lines), 1)
+            self.assertIn('--required-dir artifacts/candidate/required', lines[0])
+
+
 class PublicationTests(unittest.TestCase):
     setUp = CandidateTests.setUp
     git = CandidateTests.git
@@ -195,7 +366,7 @@ class PublicationTests(unittest.TestCase):
         path = target / 'candidate.json'
         metadata = json.loads(path.read_text()); metadata['publishable'] = True
         path.write_text(json.dumps(metadata))
-        ci = self.root / 'ci'; ci.mkdir()
+        ci = self.root / 'ci'; ci.mkdir(exist_ok=True)
         shutil.copy2(Path(__file__).with_name('release-candidate.py'), ci)
         output = self.root / 'github-output'
         candidate.apply(self.root, target)
