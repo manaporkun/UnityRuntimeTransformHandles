@@ -6,7 +6,6 @@ import json
 import re
 import shutil
 import subprocess
-import time
 import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -69,7 +68,6 @@ def prepare(project, package, out, unity, input_mode, repository=None):
     if evidence.exists():
         shutil.rmtree(evidence)
     evidence.mkdir(parents=True)
-    started_ns = time.time_ns()
     original = settings(project)
     editor = project / 'ProjectSettings/EditorSettings.asset'
     if editor.exists():
@@ -81,7 +79,11 @@ def prepare(project, package, out, unity, input_mode, repository=None):
             require(count == 1, 'missing or ambiguous reload setting: ' + key)
         editor.write_text(text)
     run_id = uuid.uuid4().hex
-    (evidence / 'run-id.txt').write_text(run_id)
+    marker = evidence / 'run-id.txt'
+    marker.write_text(run_id)
+    # Compare filesystem timestamps with the fresh filesystem marker. Linux inode
+    # timestamps can be coarser than time.time_ns(), even for this just-written file.
+    started_ns = marker.stat().st_mtime_ns
     metadata = {'schema': 1, 'run_id': run_id, 'started_ns': started_ns,
                 'project': str(project), 'package': str(package),
                 'commit': subprocess.check_output(['git', '-C', str(repository or package), 'rev-parse', 'HEAD'], text=True).strip(),

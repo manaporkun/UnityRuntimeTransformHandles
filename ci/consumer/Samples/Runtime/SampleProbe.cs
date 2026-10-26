@@ -23,7 +23,7 @@ namespace ConsumerJourney
             probe.packageSource = config.packageSource;
             owner.AddComponent<SampleProbe>();
             ConsumerProbe.ReadControls = ReadControls;
-            ConsumerProbe.ReadLabels = ReadLabels;
+            ConsumerProbe.ReadLabelRegions = ReadLabelRegions;
             ConsumerProbe.ReadSampleTargets = ReadTargets;
         }
 
@@ -42,27 +42,29 @@ namespace ConsumerJourney
                 .SelectMany(document =>
                 {
                     var root = document.rootVisualElement;
-                    var scaleX = Screen.width / root.resolvedStyle.width;
-                    var scaleY = Screen.height / root.resolvedStyle.height;
                     return root.Query<Button>().ToList().Where(IsVisible).Select((button, index) =>
                     {
-                        var rectangle = button.worldBound;
-                        return new ControlObservation
-                        {
-                            id = string.IsNullOrEmpty(button.name) ? "button-" + index : button.name,
-                            text = string.Join(" ", new[] {button.text}.Concat(button.Query<Label>().ToList().Select(label => label.text)).Where(text => !string.IsNullOrEmpty(text))),
-                            x = rectangle.center.x * scaleX, y = rectangle.center.y * scaleY,
-                            width = rectangle.width * scaleX, height = rectangle.height * scaleY,
-                            enabled = button.enabledInHierarchy
-                        };
+                        var text = string.Join(" ", new[] {button.text}.Concat(button.Query<Label>().ToList().Select(label => label.text)).Where(value => !string.IsNullOrEmpty(value)));
+                        return ObserveRegion(button, root, text, string.IsNullOrEmpty(button.name) ? "button-" + index : button.name);
                     });
                 }).ToArray();
         }
 
-        private static string[] ReadLabels()
+        private static ControlObservation[] ReadLabelRegions()
         {
-            return FindObjectsOfType<UIDocument>().SelectMany(document => document.rootVisualElement.Query<Label>().ToList())
-                .Where(IsVisible).Select(label => label.text).Where(text => !string.IsNullOrEmpty(text)).ToArray();
+            return FindObjectsOfType<UIDocument>().Where(document => document.rootVisualElement.panel != null &&
+                    document.rootVisualElement.resolvedStyle.width > 0 && document.rootVisualElement.resolvedStyle.height > 0)
+                .SelectMany(document => document.rootVisualElement.Query<Label>().ToList().Where(label => IsVisible(label) && !string.IsNullOrEmpty(label.text))
+                    .Select(label => ObserveRegion(label, document.rootVisualElement, label.text, label.name))).ToArray();
+        }
+
+        private static ControlObservation ObserveRegion(VisualElement element, VisualElement root, string text, string identifier)
+        {
+            var rectangle = element.worldBound;
+            var scaleX = Screen.width / root.resolvedStyle.width;
+            var scaleY = Screen.height / root.resolvedStyle.height;
+            return new ControlObservation {id = identifier, text = text, x = rectangle.center.x * scaleX, y = rectangle.center.y * scaleY,
+                width = rectangle.width * scaleX, height = rectangle.height * scaleY, enabled = element.enabledInHierarchy};
         }
 
         private static Transform[] ReadTargets()
@@ -87,7 +89,7 @@ namespace ConsumerJourney
         private void OnDestroy()
         {
             ConsumerProbe.ReadControls = null;
-            ConsumerProbe.ReadLabels = null;
+            ConsumerProbe.ReadLabelRegions = null;
             ConsumerProbe.ReadSampleTargets = null;
         }
     }

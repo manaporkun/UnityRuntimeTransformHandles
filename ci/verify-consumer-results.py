@@ -146,6 +146,24 @@ def verify_rendered_visuals(observation, frame):
     require(found >= required, 'sample frame has no visible target AND applicable handle pixels in observed renderer bounds')
 
 
+def verify_rendered_text(observation, frame, text):
+    labels = [label for label in observation.get('labelRegions', []) if text in label.get('text', '')]
+    require(labels, 'empty gallery label has no observed screen bounds')
+    width, height, channels, pixels = frame
+    for label in labels:
+        require(all(isinstance(label[key], (int, float)) and math.isfinite(label[key]) for key in ('x', 'y', 'width', 'height')), 'invalid label screen bounds')
+        left, right = max(0, math.floor(label['x'] - label['width'] / 2)), min(width - 1, math.ceil(label['x'] + label['width'] / 2))
+        top, bottom = max(0, math.floor(label['y'] - label['height'] / 2)), min(height - 1, math.ceil(label['y'] + label['height'] / 2))
+        require(right - left >= 8 and bottom - top >= 4, 'empty gallery label is outside the rendered viewport')
+        rows = [[sum(pixels[y][x * channels:x * channels + 3]) / 3 for x in range(left, right + 1)] for y in range(top, bottom + 1)]
+        low, high = min(map(min, rows)), max(map(max, rows))
+        if high - low < 40: continue
+        midpoint = (low + high) / 2
+        transitions = max(sum((row[index - 1] > midpoint) != (row[index] > midpoint) for index in range(1, len(row))) for row in rows)
+        if transitions >= 8: return
+    raise ValueError('empty gallery label has no rendered text pixels')
+
+
 def vector_delta(after, before):
     require(set(after) == set(before) == {'x', 'y', 'z'}, 'invalid transform vector')
     result = {key: after[key] - before[key] for key in before}
@@ -415,6 +433,7 @@ def verify_sample_player(out, expected, contract, sample, customized=False):
         if sample == 'DemoBrowser':
             require(observation['scene'] == samples['DemoBrowser']['scene'] and not observation['controls'] and
                     any(ui['emptyGalleryText'] in label for label in observation['labels']), 'Browser-only player did not render its empty gallery')
+            verify_rendered_text(observation, frames[stage], ui['emptyGalleryText'])
             continue
         gallery_stage = sample == 'gallery' and (stage == 'ready' or stage.startswith('return-'))
         if gallery_stage:

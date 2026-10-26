@@ -19,6 +19,10 @@ batch run. Dirty scenes are still rejected. Do not use this flag in a project wi
    input readback, unchanged package and restored reload settings. It also requires all eight
    session cases and their 24 complete cycles. Missing or stale evidence fails.
 
+Freshness compares artifact timestamps with the newly created run-ID file's filesystem
+timestamp, keeping Linux timestamp precision consistent. The run ID must still match;
+artifacts older than that preparation marker fail collection.
+
 Run validator unit tests with `python3 -m unittest discover -s ci -p 'test_*.py'`.
 Expected lists are reviewed source-controlled baselines, not generated from the run being accepted.
 Update them deliberately when adding/removing/renaming package tests. Core's expected exception
@@ -196,7 +200,9 @@ The exact output patterns are frozen in `consumer/contract.json`.
 
 Acceptance checks actual focused-window input, rendered targets and handles, hover
 pixels, numeric snapped transforms, public events and cleanup, effective saved
-settings/prefab/material values, sample UI clicks and gallery transitions. Existing
+settings/prefab/material values, sample UI clicks and gallery transitions.
+Browser-only builds must render the empty-gallery text inside its observed label bounds;
+a label string paired with a blank frame is rejected. Existing
 customized imports must survive another public-import attempt; a deliberate duplicate
 GUID probe must be rejected. PackageCache bytes stay unchanged. Demos removal retains
 explicit UI dependencies and imported Assets. Later removals happen only in controlled

@@ -33,6 +33,7 @@ namespace ConsumerJourney
         public Color[] targetColors;
         public float handleSize;
         public ControlObservation[] controls;
+        public ControlObservation[] labelRegions;
         public string[] labels;
         public VisualObservation[] visuals;
         public string[] errors;
@@ -68,7 +69,7 @@ namespace ConsumerJourney
     {
         public string runId, source, packageSource;
         public static Func<ControlObservation[]> ReadControls;
-        public static Func<string[]> ReadLabels;
+        public static Func<ControlObservation[]> ReadLabelRegions;
         public static Func<Transform[]> ReadSampleTargets;
         private static ConsumerProbe _instance;
         private string _evidence, _session, _lastNonce;
@@ -145,6 +146,7 @@ namespace ConsumerJourney
             var handle = example != null ? example.CurrentHandle : FindObjectsOfType<Handle>().FirstOrDefault();
             var targets = example != null ? example.targets : (ReadSampleTargets?.Invoke() ?? new Transform[0]);
             var camera = Camera.main;
+            var labelRegions = ReadLabelRegions?.Invoke() ?? new ControlObservation[0];
             if (_build.runId != runId || _build.source != source || _build.packageSource != packageSource)
                 throw new InvalidOperationException("Native build and scene identities differ");
             var observation = new PlayerObservation
@@ -181,7 +183,7 @@ namespace ConsumerJourney
                 rotationShortcut = example != null && example.settings != null ? example.settings.RotationKey.ToString() : "none",
                 handleSize = handle != null ? handle.AutoScaleSizeInPixels : 0,
                 controls = ReadControls?.Invoke() ?? new ControlObservation[0],
-                labels = ReadLabels?.Invoke() ?? new string[0],
+                labels = labelRegions.Select(label => label.text).ToArray(), labelRegions = labelRegions,
                 visuals = camera != null ? ReadVisuals(camera, targets) : new VisualObservation[0]
             };
             if (handle != null && camera != null)

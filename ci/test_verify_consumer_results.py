@@ -26,7 +26,7 @@ def vector(x=0, y=0, z=0):
     return dict(x=x, y=y, z=z)
 
 
-def png(hover=False, custom=False, magenta=False, panel=False, blank=False, shade=1):
+def png(hover=False, custom=False, magenta=False, panel=False, blank=False, shade=1, text=False):
     width, height = 320, 240
     data = bytearray(bytes((30, 35, 45)) * width * height)
     def square(x, y, color, radius=20):
@@ -38,6 +38,8 @@ def png(hover=False, custom=False, magenta=False, panel=False, blank=False, shad
         for x in (80, 240): square(x, 120, (255, 0, 255) if magenta else tuple(round(value * shade) for value in (230, 140, 40)))
         square(120, 90, ((0, 255, 255) if custom else (255, 255, 255)) if hover else (255, 20, 20), 5)
     if panel: square(160, 120, (250, 250, 250), 50)
+    if text:
+        for x in range(90, 240, 12): square(x, 120, (220, 220, 220), 2)
     raw = b''.join(b'\0' + data[row * width * 3:(row + 1) * width * 3] for row in range(height))
     def chunk(kind, value):
         return struct.pack('>I', len(value)) + kind + value + struct.pack('>I', zlib.crc32(kind + value))
@@ -407,6 +409,35 @@ class ConsumerEvidenceTests(unittest.TestCase):
         contract['ui']['galleryOrder'].pop()
         with self.assertRaisesRegex(ValueError, 'omit a workspace'):
             verifier.sample_stages('gallery', contract)
+
+    def test_empty_browser_requires_actual_text_pixels_inside_observed_label(self):
+        self.write_sample()
+        observation = json.loads((self.out / 'ready.json').read_text())
+        text = self.contract['ui']['emptyGalleryText']
+        report = json.loads((self.out / 'input.json').read_text())
+        for path in self.out.iterdir():
+            if path.name != 'player.log': path.unlink()
+        observation.update(scene=self.contract['samples']['DemoBrowser']['scene'], cameraPresent=False, positions=[], targetPixels=[], controls=[],
+                           liveHandles=0, labels=[text], labelRegions=[dict(text=text, x=160, y=120, width=200, height=32)])
+        (self.out / 'ready.json').write_text(json.dumps(observation))
+        stage = 'empty-gallery'
+        observation.update(stage=stage, nonce='ui-0', frame=60)
+        stem = stage + '-ui-0'
+        (self.out / (stem + '.json')).write_text(json.dumps(observation))
+        checkpoint = {**report['checkpoints'][0], 'stage': stage, 'json': stem + '.json', 'frame': stem + '.png'}
+        inputs = report['input'][:2]
+        for item in inputs: item['stage'] = stage
+        inputs[0]['argv'][-2:] = ['160', '120']
+        report.update(sample='DemoBrowser', checkpoints=[checkpoint], input=inputs)
+        (self.out / 'input.json').write_text(json.dumps(report))
+        for options in (dict(blank=True, text=True), dict(blank=True), dict(blank=True, panel=True)):
+            for name in ('ready.png', stem + '.png'): (self.out / name).write_bytes(png(**options))
+            self.rehash()
+            if options.get('text'):
+                verifier.verify_sample_player(self.out, self.expected, self.contract, 'DemoBrowser')
+            else:
+                with self.subTest(options=options), self.assertRaisesRegex(ValueError, 'no rendered text'):
+                    verifier.verify_sample_player(self.out, self.expected, self.contract, 'DemoBrowser')
 
 
 class ConsumerTestXmlTests(unittest.TestCase):

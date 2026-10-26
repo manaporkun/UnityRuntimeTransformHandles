@@ -4,8 +4,5 @@
   "references": ["com.orkunmanap.runtime-transform-handles"],
   "includePlatforms": [],
   "autoReferenced": true,
-  "defineConstraints": [],
-  "versionDefines": [
-    {"name": "com.unity.inputsystem", "expression": "1.0.0", "define": "CONSUMER_INPUT_SYSTEM"}
-  ]
+  "defineConstraints": []
 }

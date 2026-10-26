@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -75,7 +76,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_valid_evidence(self): self.check()
 
-    def test_prepare_collect_roundtrip(self):
+    def prepare_collect_roundtrip(self):
         project = self.out / 'project';(project/'ProjectSettings').mkdir(parents=True)
         (project/'ProjectSettings/ProjectSettings.asset').write_text('  activeInputHandler: 0\n')
         (project/'ProjectSettings/EditorSettings.asset').write_text('  m_EnterPlayModeOptions: 3\n  m_EnterPlayModeOptionsEnabled: 0\n')
@@ -90,10 +91,33 @@ class EvidenceTests(unittest.TestCase):
         for key in ('transitions','settings'):
             (project/('Library/P0E-Evidence/'+key+'.tsv')).write_bytes(Path(self.meta['files'][key]['path']).read_bytes())
         prepared=json.loads((output/'metadata.json').read_text())
+        self.assertEqual(prepared['started_ns'], (project/'Library/P0E-Evidence/run-id.txt').stat().st_mtime_ns)
         self.assertNotEqual(prepared['original_settings']['reload'],prepared['before']['reload'])
         self.assertEqual(prepared['before']['reload'], ['  m_EnterPlayModeOptions: 0', '  m_EnterPlayModeOptionsEnabled: 1'])
         v.collect(output, paths)
         with contextlib.redirect_stdout(io.StringIO()):v.verify(output,self.out)
+        return output, paths
+
+    def test_prepare_collect_roundtrip(self):
+        self.prepare_collect_roundtrip()
+
+    def test_fresh_coarse_filesystem_marker_does_not_look_stale(self):
+        from unittest.mock import patch
+        original = Path.write_text
+        def write_with_coarse_timestamp(path, *args, **kwargs):
+            result = original(path, *args, **kwargs)
+            if path.name == 'run-id.txt':
+                timestamp = path.stat().st_mtime_ns
+                rounded = timestamp - timestamp % 1_000_000_000
+                os.utime(path, ns=(rounded, rounded))
+            return result
+        with patch.object(Path, 'write_text', new=write_with_coarse_timestamp):
+            output, paths = self.prepare_collect_roundtrip()
+        prepared = json.loads((output/'metadata.json').read_text())
+        old = prepared['started_ns'] - 1
+        os.utime(paths['play_xml'], ns=(old, old))
+        with self.assertRaisesRegex(ValueError, 'stale evidence: play_xml'):
+            v.collect(output, paths)
 
     def test_missing_case(self):
         self.mutate('play_xml',lambda s:s.replace('play.Case','missing.Case'))
