@@ -55,6 +55,135 @@ namespace TransformHandles.Tests
             return go;
         }
 
+        private TransformGroup UniformGroup(out Transform a, out Transform b)
+        {
+            a = NewObject("a", new Vector3(2, 1, 0)).transform;
+            b = NewObject("b", new Vector3(6, 1, 0)).transform;
+            a.localScale = new Vector3(1, 2, 3);
+            b.localScale = new Vector3(2, 3, 4);
+            b.rotation = Quaternion.Euler(10, 30, 45);
+            _handle.Type = HandleType.Scale;
+            _handle.UniformGroupScale = true;
+            var group = new TransformGroup(NewGhost(new Vector3(4, 1, 0)), _handle);
+            group.AddTransform(a); group.AddTransform(b);
+            group.BeginInteraction();
+            return group;
+        }
+
+        [Test]
+        public void UniformScaleUsesStartSizesAndSharedCenterAcrossFrames()
+        {
+            var group = UniformGroup(out var a, out var b);
+            var rotation = b.rotation;
+            group.GroupGhost.transform.localScale = Vector3.one * 1.5f;
+            group.UpdateScales(Vector3.one * .5f);
+            group.GroupGhost.transform.localScale = Vector3.one * 2;
+            group.UpdateScales(Vector3.one * .5f);
+            Assert.AreEqual(new Vector3(0, 1, 0), a.position);
+            Assert.AreEqual(new Vector3(8, 1, 0), b.position);
+            Assert.AreEqual(new Vector3(2, 4, 6), a.localScale);
+            Assert.AreEqual(new Vector3(4, 6, 8), b.localScale);
+            Assert.AreEqual(rotation, b.rotation);
+            group.GroupGhost.transform.localScale = Vector3.one;
+            group.UpdateScales(-Vector3.one);
+            Assert.AreEqual(new Vector3(2, 1, 0), a.position);
+            Assert.AreEqual(new Vector3(1, 2, 3), a.localScale);
+        }
+
+        [Test]
+        public void UniformScaleRecapturesBaselineOnRepeatedDragsAndStopsAfterEnd()
+        {
+            var group = UniformGroup(out var a, out var b);
+            group.GroupGhost.transform.localScale = Vector3.one * 2;
+            group.UpdateScales(Vector3.one);
+            group.EndInteraction();
+            group.GroupGhost.transform.localScale = Vector3.one * 3;
+            group.UpdateScales(Vector3.one);
+            Assert.AreEqual(new Vector3(2, 4, 6), a.localScale);
+            group.GroupGhost.transform.localScale = Vector3.one * 2;
+            group.BeginInteraction();
+            group.GroupGhost.transform.localScale = Vector3.one * 3;
+            group.UpdateScales(Vector3.one);
+            Assert.AreEqual(new Vector3(3, 6, 9), a.localScale);
+            Assert.AreEqual(new Vector3(-2, 1, 0), a.position);
+        }
+
+        [Test]
+        public void UniformScaleRejectsInvalidNonuniformAndOverflowAtomically()
+        {
+            var group = UniformGroup(out var a, out var b);
+            foreach (var scale in new[] { Vector3.zero, -Vector3.one, Vector3.one * float.NaN,
+                Vector3.one * float.PositiveInfinity, new Vector3(2, 3, 2), Vector3.one * float.MaxValue })
+            {
+                if (float.IsNaN(scale.x) || float.IsInfinity(scale.x))
+                    UnityEngine.TestTools.LogAssert.Expect(LogType.Error,
+                        new System.Text.RegularExpressions.Regex("transform.localScale assign attempt.*not valid"));
+                group.GroupGhost.transform.localScale = scale;
+                group.UpdateScales(Vector3.one);
+                Assert.AreEqual(new Vector3(1, 2, 3), a.localScale);
+                Assert.AreEqual(new Vector3(2, 3, 4), b.localScale);
+                Assert.AreEqual(new Vector3(2, 1, 0), a.position);
+            }
+        }
+
+        [Test]
+        public void UniformScaleDoesNotTouchRemovedMembersOrAllowPartialMasks()
+        {
+            var group = UniformGroup(out var a, out var b);
+            _handle.Axes = HandleAxes.X;
+            group.GroupGhost.transform.localScale = Vector3.one * 2;
+            group.UpdateScales(Vector3.one);
+            Assert.AreEqual(new Vector3(1, 2, 3), a.localScale);
+            _handle.Axes = HandleAxes.XYZ;
+            group.RemoveTransform(b);
+            group.AddTransform(NewObject("replacement").transform);
+            group.UpdateScales(Vector3.one);
+            Assert.AreEqual(new Vector3(1, 2, 3), a.localScale);
+            Assert.AreEqual(new Vector3(2, 3, 4), b.localScale);
+        }
+
+        [Test]
+        public void UniformOptionKeepsCombinedModeLegacyMath()
+        {
+            var group = UniformGroup(out var a, out var b);
+            _handle.Type = HandleType.PositionScale;
+            group.UpdateScales(Vector3.one);
+            Assert.AreEqual(new Vector3(2, 3, 4), a.localScale);
+            Assert.AreEqual(new Vector3(2, 1, 0), a.position);
+        }
+
+        [Test]
+        public void LocalReferenceUsesSelectedMemberOnlyAndWorldStaysIdentity()
+        {
+            var group = UniformGroup(out var a, out var b);
+            _handle.Type = HandleType.Rotation;
+            _handle.LocalSpaceReference = b;
+            _handle.Space = Space.Self;
+            Assert.That(Quaternion.Angle(b.rotation, group.GetAveragePosRotScale().Rotation), Is.LessThan(.01f));
+            _handle.Space = Space.World;
+            Assert.AreEqual(Quaternion.identity, group.GetAveragePosRotScale().Rotation);
+            _handle.Space = Space.Self;
+            group.RemoveTransform(b);
+            Assert.That(Quaternion.Angle(a.rotation, group.GetAveragePosRotScale().Rotation), Is.LessThan(.01f));
+        }
+
+        [Test]
+        public void LocalRotationUsesReferenceAxisAroundSharedCenterAndCanBeReversed()
+        {
+            var group = UniformGroup(out var a, out var b);
+            _handle.Type = HandleType.Rotation; _handle.Space = Space.Self;
+            _handle.LocalSpaceReference = b;
+            var before = a.position; var rotation = b.rotation;
+            var axis = group.GetAveragePosRotScale().Rotation * Vector3.up;
+            var delta = Quaternion.AngleAxis(90, axis);
+            group.UpdateRotations(delta);
+            var center = group.GroupGhost.transform.position;
+            Assert.That(Vector3.Distance(a.position, center + delta * (before - center)), Is.LessThan(.0001f));
+            Assert.That(Quaternion.Angle(b.rotation, delta * rotation), Is.LessThan(.01f));
+            group.UpdateRotations(Quaternion.Inverse(delta));
+            Assert.That(Vector3.Distance(a.position, before), Is.LessThan(.0001f));
+        }
+
         [Test]
         public void AddTransform_accepts_unrelated_targets()
         {

@@ -1,0 +1,685 @@
+import importlib.util
+import copy
+from contextlib import redirect_stdout
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tarfile
+import unittest
+from unittest.mock import patch
+
+import test_release_candidate as release_tests
+import test_verify_consumer_results as player_tests
+
+spec = importlib.util.spec_from_file_location('consumer_project', Path(__file__).with_name('consumer-project.py'))
+consumer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(consumer)
+
+
+class ConsumerProjectTests(unittest.TestCase):
+    setUp = release_tests.CandidateTests.setUp
+    git = release_tests.CandidateTests.git
+    commit = release_tests.CandidateTests.commit
+    change = release_tests.CandidateTests.change
+
+    def prepare(self, profile='2021-legacy', transport='tarball'):
+        self.metadata = consumer.candidate.prepare(self.root, self.out)
+        self.work = Path(self.temp.name) / 'work'
+        self.config = consumer.prepare(self.out, self.work, profile, transport)
+        self.project = self.work / 'projects/core'
+        return self.config
+
+    def observation(self):
+        folder = self.project / 'Library/PackageCache' / (consumer.CORE + '@fixture')
+        consumer.unpack_archive(self.out / (consumer.CORE + '.tgz'), folder, self.metadata['packages'][consumer.CORE]['files'])
+        host = json.loads((self.work / 'candidate/consumer/contract.json').read_text())['profiles'][self.config['profile']]['dependencies']
+        consumer.write_json(self.project / 'Packages/packages-lock.json', {'dependencies': {
+            consumer.CORE: {'source': 'local-tarball', 'depth': 0, 'version': 'file:../.journey/distributions/' + consumer.CORE + '.tgz'}}})
+        return {**{key: self.config[key] for key in ('runId', 'source', 'packageSource', 'unity', 'input')},
+                'schema': 1, 'assemblies': [], 'stage': 'core-resolve', 'packages': [
+                    {'name': consumer.CORE, 'version': self.metadata['version'], 'source': 'LocalTarball',
+                     'resolvedPath': str(folder.resolve()), 'packageId': consumer.CORE + '@file:' + str(self.project.resolve() / '.journey/distributions' / (consumer.CORE + '.tgz'))},
+                    *[{'name': name, 'version': version, 'source': 'Registry', 'resolvedPath': '/registry/' + name,
+                       'packageId': name + '@' + version} for name, version in host.items()]]}
+
+    def test_reviewed_eight_entry_coverage_is_current_policy(self):
+        scopes = [consumer.scope_for(profile, transport) for profile in consumer.PROFILES for transport in ('tarball', 'git')]
+        self.assertEqual(scopes.count('full'), 5)
+        self.assertEqual(scopes.count('probe'), 3)
+        with self.assertRaisesRegex(ValueError, 'matrix'):
+            consumer.scope_for('unknown', 'git')
+
+    def test_fresh_core_only_minimum_project_uses_upm_tarball(self):
+        self.prepare()
+        manifest = json.loads((self.project / 'Packages/manifest.json').read_text())
+        self.assertTrue(manifest['dependencies'][consumer.CORE].startswith('file:../.journey/distributions/'))
+        for name in (consumer.DEMOS, 'com.unity.ugui', 'com.unity.inputsystem', 'com.unity.render-pipelines.universal'):
+            self.assertNotIn(name, manifest['dependencies'])
+        for name in ('Library', 'Packages/packages-lock.json', 'Packages/' + consumer.CORE):
+            self.assertFalse((self.project / name).exists())
+        self.assertEqual((self.project / 'ProjectSettings/ProjectVersion.txt').read_text(), 'm_EditorVersion: 2021.3.0f1\n')
+        self.assertTrue((self.project / 'Assets/ConsumerJourney/Bootstrap/ConsumerBootstrap.cs').is_file())
+        self.assertFalse((self.project / 'Assets/ConsumerJourney/Runtime').exists())
+
+    def test_refuses_existing_project_instead_of_reusing_library(self):
+        self.prepare()
+        with self.assertRaisesRegex(ValueError, 'fresh consumer'):
+            consumer.prepare(self.out, self.work, '2021-legacy', 'tarball')
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            consumer.create_project(self.work, 'core')
+
+    def test_git_distribution_shapes_use_real_committed_matching_bytes(self):
+        self.prepare('6-input', 'git')
+        self.assertIn('?path=/Packages/' + consumer.CORE + '#', self.config['pairCoreUrl'])
+        self.assertEqual(self.config['pairCoreUrl'].split('#')[-1], self.config['pairDemosUrl'].split('#')[-1])
+        root = self.work / 'distribution'
+        self.assertEqual(consumer.candidate.git(root / 'pair', 'rev-parse', 'HEAD'), self.config['pairCommit'])
+        self.assertEqual(consumer.candidate.hashes(root / 'pair/Packages' / consumer.CORE), self.metadata['packages'][consumer.CORE]['files'])
+        self.assertEqual(consumer.candidate.git(root / 'core', 'rev-parse', 'v' + self.metadata['version']), self.config['coreCommit'])
+
+    def test_scope_in_frozen_contract_cannot_downgrade_current_policy(self):
+        self.prepare('6-urp', 'tarball')
+        self.assertEqual(self.config['scope'], 'full')
+
+    def test_same_candidate_core_is_retained_when_installing_demos(self):
+        self.prepare('6-legacy', 'git')
+        consumer.install_dependencies(self.work, self.project, demos=True)
+        dependencies = json.loads((self.project / 'Packages/manifest.json').read_text())['dependencies']
+        self.assertEqual(dependencies[consumer.CORE], self.config['pairCoreUrl'])
+        self.assertEqual(dependencies[consumer.DEMOS], self.config['pairDemosUrl'])
+        self.assertEqual(dependencies['com.unity.ugui'], '2.0.0')
+
+    def test_actual_resolved_package_evidence_passes(self):
+        self.prepare()
+        consumer.verify_resolved(self.work, self.project, self.observation())
+
+    def test_raw_resolution_rejects_conflicting_editor_manifest_and_lock(self):
+        self.prepare()
+        observation = self.observation()
+        installed = consumer.verify_resolved(self.work, self.project, observation)
+        snapshot = dict(observation=observation, manifest=json.loads((self.project / 'Packages/manifest.json').read_text()),
+                        lock=json.loads((self.project / 'Packages/packages-lock.json').read_text()),
+                        files={name: info['files'] for name, info in installed.items()})
+        contract = json.loads((self.work / 'candidate/consumer/contract.json').read_text())
+        def verify(value, stage='core-resolve'):
+            return consumer.verify_resolution_snapshot(self.config, self.metadata, contract, 'core', stage, value)
+        self.assertEqual(verify(snapshot), installed)
+        for field in ('identity', 'cache', 'manifest', 'lock'):
+            bad = copy.deepcopy(snapshot)
+            if field == 'identity': bad['observation']['unity'] = 'wrong'
+            if field == 'cache': bad['observation']['packages'][0]['resolvedPath'] = '/foreign/Library/PackageCache/' + consumer.CORE + '@fixture'
+            if field == 'manifest': bad['manifest']['dependencies'][consumer.CORE] = None; bad['manifest']['dependencies']['com.unity.test-framework'] = 'wrong'
+            if field == 'lock': bad['lock']['dependencies'][consumer.CORE]['source'] = 'embedded'
+            with self.subTest(field=field), self.assertRaises(ValueError): verify(bad)
+        removed = copy.deepcopy(snapshot)
+        removed['observation'].update(stage='uninstall-verify', packages=observation['packages'][1:], assemblies=['TransformHandles.Runtime'])
+        removed['manifest']['dependencies'].pop(consumer.CORE)
+        removed['lock']['dependencies'].pop(consumer.CORE)
+        removed['files'] = {}
+        with self.assertRaisesRegex(ValueError, 'assembly remains'): verify(removed, 'uninstall-verify')
+        removed['observation']['assemblies'] = []
+        self.assertEqual(verify(removed, 'uninstall-verify'), {})
+        removed['lock']['dependencies'][consumer.CORE] = {}
+        with self.assertRaisesRegex(ValueError, 'reference remains'): verify(removed, 'uninstall-verify')
+
+    def test_exact_import_inventory_and_customized_scene_preservation(self):
+        contract = json.loads((Path(__file__).with_name('consumer') / 'contract.json').read_text())
+        for name, sample in contract['samples'].items():
+            folder = self.root / 'Packages' / consumer.DEMOS / 'Samples~' / name
+            folder.mkdir()
+            (folder / (sample['scene'] + '.unity')).write_text('original scene')
+            (folder / (name + '.asmdef')).write_text(json.dumps({'name': 'TransformHandles.Samples.' + name}))
+        self.commit('test: add reviewed import fixture')
+        self.prepare()
+        samples = []
+        for name, sample in contract['samples'].items():
+            relative = 'Assets/Samples/Fixture/' + name
+            shutil.copytree(self.work / 'distribution/Packages' / consumer.DEMOS / 'Samples~' / name, self.project / relative)
+            samples.append(dict(name=name, path=relative, scene=relative + '/' + sample['scene'] + '.unity', assembly='TransformHandles.Samples.' + name))
+        path = self.project / '.journey/imports.json'
+        original = dict(runId=self.config['runId'], stage='gallery-import', samples=samples)
+        consumer.write_json(path, original)
+        self.assertEqual(len(consumer.verify_imports(self.work, self.project)), 5)
+        for inventory in ([], samples[:-1], samples + [samples[0]], samples[:-1] + [{**samples[-1], 'name': 'unknown'}]):
+            consumer.write_json(path, {**original, 'samples': inventory})
+            with self.assertRaisesRegex(ValueError, 'inventory'): consumer.verify_imports(self.work, self.project)
+        consumer.write_json(path, original)
+        showcase = samples[0]
+        scene = self.project / showcase['scene']
+        scene.write_text('consumer customization')
+        state = json.loads((self.work / 'run.json').read_text())
+        state['customImports'] = {s['path']: consumer.hashes(self.project / s['path']) for s in samples}
+        consumer.write_json(self.work / 'run.json', state)
+        consumer.verify_imports(self.work, self.project, customized=True)
+        scene.write_text('original scene')
+        with self.assertRaisesRegex(ValueError, 'overwritten'): consumer.verify_imports(self.work, self.project, customized=True)
+
+    def test_stale_missing_identity_source_and_embedded_install_fail(self):
+        self.prepare()
+        observation = self.observation()
+        for key, wrong in (('runId', 'old'), ('source', 'f' * 40), ('unity', '2021.3.45f1'), ('input', 1)):
+            with self.subTest(key=key):
+                bad = {**observation, key: wrong}
+                with self.assertRaisesRegex(ValueError, 'mismatch'):
+                    consumer.verify_resolved(self.work, self.project, bad)
+        for key, value in (('source', 'Embedded'), ('resolvedPath', str(self.root / 'Packages' / consumer.CORE))):
+            with self.subTest(package_key=key):
+                bad = {**observation, 'packages': [{**observation['packages'][0], key: value}]}
+                with self.assertRaises(ValueError):
+                    consumer.verify_resolved(self.work, self.project, bad)
+
+    def test_changed_package_files_and_unexpected_optional_package_fail(self):
+        self.prepare()
+        observation = self.observation()
+        path = Path(observation['packages'][0]['resolvedPath']) / 'CHANGELOG.md'
+        path.write_text('changed bytes')
+        with self.assertRaisesRegex(ValueError, 'package bytes differ'):
+            consumer.verify_resolved(self.work, self.project, observation)
+
+    def test_only_generated_unity6_fingerprint_may_change(self):
+        self.prepare('6-legacy')
+        observation = self.observation()
+        path = Path(observation['packages'][0]['resolvedPath']) / 'package.json'
+        manifest = json.loads(path.read_text())
+        manifest['_fingerprint'] = 'generated-by-unity'
+        path.write_text(json.dumps(manifest))
+        consumer.verify_resolved(self.work, self.project, observation)
+        manifest['version'] = '999.0.0'
+        path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError, 'version'):
+            consumer.verify_resolved(self.work, self.project, observation)
+
+    def test_duplicate_package_observations_fail(self):
+        self.prepare()
+        observation = self.observation()
+        observation['packages'] *= 2
+        with self.assertRaisesRegex(ValueError, 'duplicate'):
+            consumer.verify_resolved(self.work, self.project, observation)
+
+    def test_foreign_project_cache_and_symlink_escape_fail(self):
+        self.prepare()
+        observation = self.observation()
+        folder = Path(observation['packages'][0]['resolvedPath'])
+        bad = json.loads(json.dumps(observation))
+        bad['packages'][0]['resolvedPath'] = '/unrelated/checkout/Library/PackageCache/' + folder.name
+        with self.assertRaisesRegex(ValueError, 'outside this project'):
+            consumer.verify_resolved(self.work, self.project, bad)
+        moved = self.work / 'foreign-cache'
+        folder.rename(moved)
+        folder.symlink_to(moved, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            consumer.verify_resolved(self.work, self.project, observation)
+
+    def test_baseline_archive_content_is_verified_before_project_generation(self):
+        self.prepare()
+        baseline = self.work / 'distribution/baseline'
+        self.assertEqual(consumer.hashes(baseline), self.metadata['baseline']['files'])
+        with tarfile.open(self.work / 'candidate/baseline-core.tgz') as archive:
+            self.assertEqual(json.load(archive.extractfile('package/package.json'))['version'], '3.3.1')
+
+    def test_sample_standalone_browser_filter_has_exact_three_reviewed_cases(self):
+        contract = json.loads((Path(__file__).with_name('consumer') / 'contract.json').read_text())
+        filters = contract['samples']['DemoBrowser']['filter'].split(';')
+        self.assertEqual(len(filters), 3)
+        for mode in (0, 1):
+            path = Path(__file__).with_name('consumer') / 'required' / f'DemoBrowser-input{mode}.txt'
+            names = [line for line in path.read_text().splitlines() if line and not line.startswith('#')]
+            self.assertEqual(set(names), set(filters))
+
+    def test_full_policy_requires_every_independent_sample_and_destructive_stage(self):
+        stages = consumer.required_stages('6-input', 'tarball')
+        self.assertEqual(len(stages), 37)
+        for sample in ('Demo', 'LevelEditor', 'ModularBuilding', 'ProductConfigurator', 'DemoBrowser'):
+            for phase in ('import', 'build', 'tests'):
+                self.assertIn('sample-' + sample + '-' + phase, stages)
+        for stage in ('customize', 'custom-gallery-build', 'retained-core-build', 'retained-gallery-build',
+                      'remove-imports-build', 'uninstall-core', 'uninstall-verify', 'upgrade-baseline',
+                      'upgrade-resolve', 'upgrade-setup', 'upgrade-import', 'upgrade-tests', 'upgrade-build'):
+            self.assertIn(stage, stages)
+        self.assertEqual(consumer.required_stages('2021-legacy', 'git'), ['core-resolve', 'core-setup', 'core-build', 'pair-build'])
+
+    def test_workflow_sequence_cannot_skip_to_a_build(self):
+        self.prepare()
+        with self.assertRaisesRegex(ValueError, 'reviewed order'):
+            consumer.before_stage(self.work, 'core-build')
+        result = consumer.before_stage(self.work, 'core-resolve')
+        self.assertEqual(result['method'], 'ConsumerJourney.ConsumerBootstrap.Run')
+        with self.assertRaisesRegex(ValueError, 'not complete'):
+            consumer.before_stage(self.work, 'core-resolve')
+
+    def test_gameci_completion_marker_cannot_replace_real_editor_observations(self):
+        self.prepare()
+        consumer.before_stage(self.work, 'core-resolve')
+        folder = self.project / '.journey/editor'
+        folder.mkdir()
+        state = self.config
+        (folder / 'core-resolve.log').write_text('CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' core-resolve\n' +
+            'CONSUMER_PID 123\nCONSUMER_INVOCATION ' + state['runId'] + ' core-resolve\nBuild succeeded!\n')
+        with self.assertRaises(FileNotFoundError):
+            consumer.after_stage(self.work, 'core-resolve')
+
+    def dialog_log(self, state, stage, evidence):
+        log = 'CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' ' + stage + '\nCONSUMER_PID 123\n'
+        log += 'Log: CONSUMER_INVOCATION ' + state['runId'] + ' ' + stage + '\n'
+        for message in evidence['layerSetupAssertions'][state['unity']]:
+            log += 'Assert: ' + message + '\nUnityEditor.EditorUtility:DisplayDialog (string,string,string)\n'
+            log += 'TransformHandles.Editor.TransformHandleLayerSetup:SetupLayer ()\nConsumerJourney.ConsumerProject:CheckLayerSetup ()\n\n'
+        return log + 'Log: Build succeeded!\n'
+
+    def test_exact_public_setup_dialog_diagnostics_pass_in_both_editors(self):
+        self.prepare()
+        evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
+        path = self.work / 'dialog.log'
+        for unity in ('2021.3.0f1', '6000.3.16f1'):
+            state = {**self.config, 'unity': unity}
+            for stage in ('core-setup', 'upgrade-setup', 'sample-Demo-import'):
+                path.write_text(self.dialog_log(state, stage, evidence))
+                consumer.verify_editor_log(path, state, stage, editor_evidence=evidence)
+
+    def test_setup_diagnostics_cannot_hide_other_assertions_or_errors(self):
+        self.prepare()
+        evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
+        path = self.work / 'dialog.log'
+        original = self.dialog_log(self.config, 'core-setup', evidence)
+        changes = [original.replace('has been created successfully.', 'Failed to create layer.'),
+                   original.replace('ConsumerJourney.ConsumerProject:CheckLayerSetup ()', 'Other:Method ()'),
+                   original.replace('TransformHandles.Editor.TransformHandleLayerSetup:SetupLayer ()\nConsumerJourney.ConsumerProject:CheckLayerSetup ()',
+                                    'ConsumerJourney.ConsumerProject:CheckLayerSetup ()\nTransformHandles.Editor.TransformHandleLayerSetup:SetupLayer ()'),
+                   original + 'Assert: unexpected package assertion\n', original + 'Error: package failed\n',
+                   original + 'Exception: package failed\n', original[:original.index('Assert:')],
+                   original.replace('core-setup', 'core-build')]
+        # An omitted diagnostic and an extra complete expected diagnostic both fail.
+        first, rest = original.split('Assert:', 1)
+        one, tail = rest.split('\n\nAssert:', 1)
+        changes += [first + 'Assert:' + tail, first + 'Assert:' + one + '\n\nAssert:' + rest]
+        for log in changes:
+            with self.subTest(log=log[-80:]):
+                path.write_text(log)
+                stage = 'core-build' if 'core-build' in log else 'core-setup'
+                with self.assertRaises(ValueError):
+                    consumer.verify_editor_log(path, self.config, stage, editor_evidence=evidence)
+        bad = copy.deepcopy(evidence)
+        bad['layerSetupAssertions'][self.config['unity']] = []
+        path.write_text(original)
+        with self.assertRaises(ValueError): consumer.verify_editor_log(path, self.config, 'core-setup', editor_evidence=bad)
+
+    def test_test_phase_cannot_hide_late_editor_errors(self):
+        self.prepare()
+        path = self.work / 'test-editor.log'
+        header = 'CONSUMER_ENGINE ' + self.config['unity'] + ' ' + self.config['runId'] + ' core-tests\n'
+        header += 'Log: CONSUMER_INVOCATION ' + self.config['runId'] + ' core-tests\n'
+        for kind in ('Error', 'Exception', 'Assert'):
+            path.write_text(header + kind + ': late shutdown failure\n')
+            with self.assertRaises(ValueError): consumer.verify_editor_log(path, self.config, 'core-tests')
+
+    def test_license_receipt_requires_real_return_success_and_native_exit(self):
+        self.prepare()
+        helper = self.licensing_fixture(self.work)
+        path = self.work / 'license.json'
+        for output, code, accepted in [
+                ('Successfully returned the entitlement license', 0, True),
+                ('Successfully returned ULF license', 23, False),
+                ('activation succeeded', 0, False),
+                ('::warning::Failed to return the Unity license', 0, False),
+                ('Successfully returned the entitlement license\n::warning::Could not return the Unity license', 0, False),
+                ('Successfully returned the entitlement license\n[Licensing::Client] Error: Seat id does not belong to this user', 0, False),
+                ("Successfully returned ULF license\nSeat id doesn't belong to user", 0, False),
+                ("Machine bindings don't match\nSuccessfully returned the entitlement license", 0, False),
+                ('Machine binding 1 mismatch: invalid\nSuccessfully returned the entitlement license', 0, False),
+                ('Successfully returned the entitlement license\nMachine binding 2 mismatch: invalid', 0, False),
+                ('Successfully returned the entitlement license\nFailed to return entitlement license', 0, False)]:
+            with redirect_stdout(io.StringIO()):
+                result = consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + '); raise SystemExit(' + str(code) + ')'])
+            consumer.write_json(path, {'runId': self.config['runId'], 'stage': 'core-resolve', 'helper': helper, **result})
+            if accepted:
+                consumer.verify_minimum_license(path, self.config, 'core-resolve')
+                with self.assertRaises(ValueError): consumer.verify_minimum_license(path, self.config, 'core-build')
+            else:
+                with self.assertRaises(ValueError): consumer.verify_minimum_license(path, self.config, 'core-resolve')
+
+    def test_licensing_console_never_prints_generated_tokens_or_credentials(self):
+        token = 'newly-issued-session-' + 'b' * 120
+        output = 'Requesting activation password=private-password\naccessToken=' + token
+        output += '\nSuccessfully returned the entitlement license account@example.invalid ' + token
+        console = io.StringIO()
+        with redirect_stdout(console):
+            result = consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + ')'])
+        self.assertTrue(result['returnSucceeded'])
+        self.assertNotIn(token, console.getvalue())
+        self.assertNotIn('private-password', console.getvalue())
+        self.assertNotIn('account@example.invalid', console.getvalue())
+        self.assertIn('CONSUMER_LICENSE license return confirmed', console.getvalue())
+
+    def licensing_fixture(self, work):
+        folder = work / 'licensing/Client'
+        folder.mkdir(parents=True)
+        binary = folder / 'Unity.Licensing.Client'
+        binary.write_text('synthetic client used only by host guard tests')
+        binary.chmod(0o755)
+        (folder / 'runtime.dll').write_bytes(b'checked runtime bytes')
+        files = consumer.hashes(folder)
+        tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        policy = patch.object(consumer, 'LICENSING_HELPER_TREE_SHA256', tree)
+        policy.start(); self.addCleanup(policy.stop)
+        return consumer.verify_licensing_helper(work)
+
+    def test_licensing_helper_rejects_changed_extra_missing_and_linked_bytes(self):
+        self.prepare()
+        original = self.licensing_fixture(self.work)
+        folder = self.work / 'licensing/Client'
+        path = folder / 'runtime.dll'
+        for change in ('changed', 'missing', 'extra', 'linked'):
+            with self.subTest(change=change):
+                path.write_bytes(b'checked runtime bytes')
+                extra = folder / 'extra.dll'
+                if extra.exists(): extra.unlink()
+                if change == 'changed': path.write_bytes(b'other runtime')
+                elif change == 'missing': path.unlink()
+                elif change == 'extra': extra.write_bytes(b'new file')
+                elif change == 'linked':
+                    path.unlink(); path.symlink_to(folder / 'Unity.Licensing.Client')
+                with self.assertRaises(ValueError): consumer.verify_licensing_helper(self.work)
+                if path.is_symlink(): path.unlink()
+        changed = copy.deepcopy(original)
+        changed['image'] = 'unreviewed image'
+        with self.assertRaises(ValueError): consumer.verify_helper_identity(changed)
+
+    def test_minimum_cli_keeps_personal_account_secrets_in_environment_and_uses_full_commands(self):
+        self.prepare()
+        consumer.before_stage(self.work, 'core-resolve')
+        image = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
+        with patch.dict(os.environ, {'UNITY_SERIAL': '', 'UNITY_EMAIL': 'account@example.invalid', 'UNITY_PASSWORD': 'private-password'}):
+            command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
+        self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
+        self.assertIn('--unityLicensingMethod=personal', command)
+        self.assertIn('--licenseRetryMaxAttempts=2', command)
+        self.assertIn('--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + self.config['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client', command)
+        self.assertIn('--engineVersion=2021.3.0f1', command)
+        self.assertNotIn('--skipActivation', command)
+        self.assertFalse(any('private-password' in item or 'account@example.invalid' in item for item in command))
+        state = json.loads((self.work / 'run.json').read_text())
+        state['pending'].update(testMode='playmode', testFilter='Sample.One;Sample.Two')
+        consumer.write_json(self.work / 'run.json', state)
+        command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
+        self.assertEqual(command[1], 'test')
+        self.assertIn('--docker', command)
+        self.assertIn('--testPlatforms=playmode', command)
+        self.assertIn('--customParameters=-testFilter Sample.One;Sample.Two', command)
+        self.assertIn('--coverageEnabled=false', command)
+        with self.assertRaises(ValueError):
+            consumer.minimum_cli_command(self.work, 'different-stage', Path('/verified/game-ci'), image)
+
+    def test_minimum_cli_rejects_unverified_binary_before_execution(self):
+        self.prepare()
+        binary = self.work / 'wrong-cli'
+        binary.write_text('not the pinned CLI')
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            consumer.run_minimum_cli(self.work, 'core-resolve', binary, 'unused')
+
+    def test_incomplete_or_self_downgraded_journey_cannot_pass(self):
+        self.prepare()
+        verifier = consumer.load_verifier()
+        with self.assertRaisesRegex(ValueError, 'lifecycle stage missing'):
+            verifier.verify_journey(self.work, self.out, '2021-legacy', 'tarball')
+        path = self.work / 'run.json'
+        state = json.loads(path.read_text()); state['scope'] = 'probe'
+        path.write_text(json.dumps(state))
+        with self.assertRaisesRegex(ValueError, 'workflow-selected scope'):
+            verifier.verify_journey(self.work, self.out, '2021-legacy', 'tarball')
+
+    def test_controlled_removal_backs_up_only_named_dependent_assets(self):
+        self.prepare()
+        owned = self.project / 'Assets/UserConsumer'
+        owned.mkdir(); (owned / 'Settings.asset').write_text('Core-dependent settings')
+        (self.project / 'Assets/UserConsumer.meta').write_text('fileFormatVersion: 2\nguid: ' + 'a' * 32 + '\n')
+        note = (self.project / 'Assets/UserNotes.txt').read_bytes()
+        result = consumer.backup_remove(self.work, self.project, 'Assets/UserConsumer', 'explicit-core-backup')
+        self.assertFalse(owned.exists())
+        backup = self.work / result['backup']
+        self.assertEqual(consumer.hashes(backup), result['files'])
+        self.assertEqual(consumer.digest(backup.with_suffix('.meta')), result['meta_sha256'])
+        self.assertEqual((self.project / 'Assets/UserNotes.txt').read_bytes(), note)
+        with self.assertRaisesRegex(ValueError, 'unsafe removal'):
+            consumer.backup_remove(self.work, self.project, '../UserNotes.txt', 'escape')
+
+    def test_wrong_host_dependency_and_git_lock_revision_fail(self):
+        self.prepare('6-input', 'git')
+        observation = self.observation()
+        observation['packages'][0].update(source='Git', packageId=consumer.CORE + '@' + self.config['coreUrl'])
+        lock = {'dependencies': {consumer.CORE: {'source': 'git', 'version': self.config['coreUrl'], 'hash': self.config['coreCommit']}}}
+        consumer.write_json(self.project / 'Packages/packages-lock.json', lock)
+        consumer.verify_resolved(self.work, self.project, observation)
+        lock['dependencies'][consumer.CORE]['hash'] = '0' * 40
+        consumer.write_json(self.project / 'Packages/packages-lock.json', lock)
+        with self.assertRaisesRegex(ValueError, 'lock revision'):
+            consumer.verify_resolved(self.work, self.project, observation)
+
+    def test_core_only_git_install_cannot_substitute_the_pair_route(self):
+        self.prepare('6-input', 'git')
+        observation = self.observation()
+        observation['packages'][0].update(source='Git', packageId=consumer.CORE + '@' + self.config['pairCoreUrl'])
+        manifest = json.loads((self.project / 'Packages/manifest.json').read_text())
+        manifest['dependencies'][consumer.CORE] = self.config['pairCoreUrl']
+        consumer.write_json(self.project / 'Packages/manifest.json', manifest)
+        consumer.write_json(self.project / 'Packages/packages-lock.json', {'dependencies': {consumer.CORE: {
+            'source': 'git', 'version': self.config['pairCoreUrl'], 'hash': self.config['pairCommit']}}})
+        with self.assertRaisesRegex(ValueError, 'stage-selected distribution route'):
+            consumer.verify_resolved(self.work, self.project, observation)
+
+    def permission_fixture(self):
+        folder = self.root / 'artifacts/consumer-work'
+        (folder / 'candidate').mkdir(parents=True)
+        (folder / 'run.json').write_text('{}')
+        (folder / 'candidate/candidate.json').write_text('{}')
+        binaries = self.root / 'permission-bin'
+        binaries.mkdir()
+        sudo = binaries / 'sudo'
+        sudo.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$PERMISSION_TRACE"\n')
+        sudo.chmod(0o755)
+        self.permission_trace = self.root / 'permission-arguments.txt'
+        self.permission_env = {**os.environ, 'GITHUB_WORKSPACE': str(self.root),
+                               'PATH': str(binaries) + os.pathsep + os.environ['PATH'], 'PERMISSION_TRACE': str(self.permission_trace)}
+        return folder
+
+    def permissions(self, folder, owner):
+        return subprocess.run(['bash', str(Path(__file__).with_name('consumer-permissions.sh')), str(folder), owner],
+                              env=self.permission_env, text=True, capture_output=True)
+
+    def test_container_and_runner_ownership_stay_in_the_generated_tree_without_following_links(self):
+        folder = self.permission_fixture()
+        for owner, identity in (('container', '0:0'), ('runner', str(os.getuid()) + ':' + str(os.getgid()))):
+            result = self.permissions(folder, owner)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(self.permission_trace.read_text().splitlines(),
+                             ['chown', '-R', '-P', '--no-dereference', identity, '--', str(folder.resolve())])
+
+    def test_minimum_cli_returns_workspace_before_receipt_write_and_on_spawn_failure(self):
+        folder = self.permission_fixture()
+        self.licensing_fixture(folder)
+        consumer.write_json(folder / 'run.json', {'runId': 'one-assigned-seat-attempt'})
+        binary = folder / 'verified-cli'
+        binary.write_text('checked test binary')
+        original_write = consumer.write_json
+
+        def runner_write(path, data):
+            self.assertTrue(self.permission_trace.exists(), 'host receipt written before ownership handoff')
+            original_write(path, data)
+
+        with patch.dict(os.environ, self.permission_env), patch.object(consumer, 'CLI_LINUX_SHA256', consumer.digest(binary)):
+            command = [sys.executable, '-c', "print('Successfully returned the entitlement license')"]
+            with patch.object(consumer, 'minimum_cli_command', return_value=command), patch.object(consumer, 'write_json', side_effect=runner_write), redirect_stdout(io.StringIO()):
+                consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
+            self.assertTrue((folder / 'evidence/core-resolve/license.json').is_file())
+            self.permission_trace.unlink()
+            with patch.object(consumer, 'minimum_cli_command', return_value=[str(folder / 'missing-command')]):
+                with self.assertRaises(FileNotFoundError): consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
+            self.assertTrue(self.permission_trace.exists(), 'spawn failure skipped ownership recovery')
+            (folder / 'evidence/core-resolve/license.json').unlink()
+            command = [sys.executable, '-c', 'from pathlib import Path; Path(' + repr(str(folder / 'licensing/Client/runtime.dll')) +
+                       ").write_text('modified'); print('Successfully returned the entitlement license')"]
+            with patch.object(consumer, 'minimum_cli_command', return_value=command), redirect_stdout(io.StringIO()):
+                with self.assertRaises(ValueError): consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
+            self.assertFalse((folder / 'evidence/core-resolve/license.json').exists(), 'changed helper produced a valid receipt')
+
+    def licensing_script_fixture(self):
+        folder = self.permission_fixture()
+        consumer.write_json(folder / 'run.json', {'profile': '2021-legacy', 'unity': '2021.3.0f1', 'buildTarget': 'StandaloneLinux64'})
+        source = self.root / 'public-client'
+        source.mkdir()
+        (source / 'Unity.Licensing.Client').write_text('public fixture bytes')
+        scripts = self.root / 'fixture-ci'
+        scripts.mkdir()
+        shutil.copy2(Path(__file__).with_name('consumer-licensing.sh'), scripts / 'consumer-licensing.sh')
+        (scripts / 'consumer-project.py').write_text(
+            "import sys\nfrom pathlib import Path\nassert sys.argv[1:3] == ['verify-licensing', '--work']\n"
+            "assert (Path(sys.argv[3])/'licensing/Client/Unity.Licensing.Client').read_text() == 'public fixture bytes'\n")
+        binaries = self.root / 'permission-bin'
+        timeout = binaries / 'timeout'
+        timeout.write_text('#!/bin/sh\nshift\nexec "$@"\n')
+        timeout.chmod(0o755)
+        docker = binaries / 'docker'
+        docker.write_text("""#!/usr/bin/env python3
+import json, os, shutil, sys
+from pathlib import Path
+a = sys.argv[1:]
+with open(os.environ['TEST_DOCKER_TRACE'], 'a') as f: f.write(json.dumps(a) + '\\n')
+if a[:2] == ['image', 'inspect']: raise SystemExit(1)
+if a[0] == 'create': print('created-owned-container')
+if a[0] == 'cp':
+    if os.environ.get('TEST_DOCKER_FAIL_COPY'): raise SystemExit(19)
+    shutil.copytree(os.environ['TEST_HELPER_SOURCE'], a[2])
+""")
+        docker.chmod(0o755)
+        self.docker_trace = self.root / 'docker-trace.jsonl'
+        env = {**self.permission_env, 'TEST_DOCKER_TRACE': str(self.docker_trace), 'TEST_HELPER_SOURCE': str(source)}
+        return folder, scripts / 'consumer-licensing.sh', env
+
+    def test_licensing_export_is_guarded_cached_and_never_starts_a_container(self):
+        folder, script, env = self.licensing_script_fixture()
+        result = subprocess.run(['bash', str(script), str(folder)], env=env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [json.loads(line) for line in self.docker_trace.read_text().splitlines()]
+        create = next(call for call in calls if call[0] == 'create')
+        name = create[create.index('--name') + 1]
+        self.assertEqual(create[-1], consumer.LICENSING_HELPER_IMAGE)
+        self.assertEqual(create[create.index('--network') + 1], 'none')
+        self.assertEqual(create[create.index('--entrypoint') + 1], '/bin/bash')
+        self.assertFalse(any(call[0] in ('run', 'start', 'exec') for call in calls))
+        self.assertIn(['rm', name], calls)
+        self.assertIn(['image', 'rm', consumer.LICENSING_HELPER_IMAGE], calls)
+        before = self.docker_trace.read_text()
+        self.assertEqual(subprocess.run(['bash', str(script), str(folder)], env=env, capture_output=True).returncode, 0)
+        self.assertEqual(self.docker_trace.read_text(), before)
+        outside = self.root / 'outside'
+        shutil.copytree(folder, outside)
+        self.assertNotEqual(subprocess.run(['bash', str(script), str(outside)], env=env, capture_output=True).returncode, 0)
+        self.assertEqual(self.docker_trace.read_text(), before)
+
+    def test_licensing_export_failure_cleans_only_its_owned_container_and_image(self):
+        folder, script, env = self.licensing_script_fixture()
+        result = subprocess.run(['bash', str(script), str(folder)], env={**env, 'TEST_DOCKER_FAIL_COPY': '1'}, capture_output=True)
+        self.assertEqual(result.returncode, 19, result.stderr)
+        calls = [json.loads(line) for line in self.docker_trace.read_text().splitlines()]
+        create = next(call for call in calls if call[0] == 'create')
+        name = create[create.index('--name') + 1]
+        self.assertIn(['rm', name], calls)
+        self.assertIn(['image', 'rm', consumer.LICENSING_HELPER_IMAGE], calls)
+        self.assertFalse(any('prune' in call or '--force' in call for call in calls))
+
+    def test_ownership_rejects_checkout_outside_paths_and_symlink_escapes(self):
+        folder = self.permission_fixture()
+        outside = self.root / 'user-owned'
+        shutil.copytree(folder, outside)
+        escape = self.root / 'artifacts/escape'
+        escape.symlink_to(outside, target_is_directory=True)
+        for path in (self.root, outside, escape):
+            with self.subTest(path=path):
+                self.assertNotEqual(self.permissions(path, 'container').returncode, 0)
+                self.assertFalse(self.permission_trace.exists())
+        (folder / 'candidate/candidate.json').unlink()
+        self.assertNotEqual(self.permissions(folder, 'container').returncode, 0)
+        self.assertFalse(self.permission_trace.exists())
+
+    def test_aggregate_probe_rejects_raw_editor_conflicts_and_reused_players(self):
+        self.prepare('6-legacy', 'git')
+        verifier = consumer.load_verifier()
+        state = json.loads((self.work / 'run.json').read_text())
+        stages = consumer.required_stages('6-legacy', 'git')
+        state['completed'] = stages
+        consumer.write_json(self.work / 'run.json', state)
+        manifest = json.loads((self.project / 'Packages/manifest.json').read_text())
+        contract = json.loads((self.work / 'candidate/consumer/contract.json').read_text())
+        writer = player_tests.ConsumerEvidenceTests()
+        writer.setUp()
+        self.addCleanup(writer.doCleanups)
+        for index, stage in enumerate(stages):
+            out = self.work / 'evidence' / stage
+            out.mkdir(parents=True)
+            phase_manifest = copy.deepcopy(manifest)
+            if stage == 'pair-build': phase_manifest['dependencies'].update({consumer.CORE: state['pairCoreUrl'], consumer.DEMOS: state['pairDemosUrl']})
+            packages, locked, files = [], {}, {}
+            for name, url in phase_manifest['dependencies'].items():
+                if name in (consumer.CORE, consumer.DEMOS):
+                    packages.append(dict(name=name, version=self.metadata['version'] if name == consumer.CORE else self.metadata['demos_version'], source='Git',
+                                         resolvedPath=str(self.project.resolve() / 'Library/PackageCache' / (name + '@fixture')), packageId=name + '@' + url))
+                    locked[name] = dict(source='git', version=url, hash=state['coreCommit'] if url == state['coreUrl'] else state['pairCommit'])
+                    files[name] = self.metadata['packages'][name]['files']
+                else: packages.append(dict(name=name, version=url, source='Registry'))
+            observation = {key: state[key] for key in ('runId', 'source', 'packageSource', 'unity', 'input')}
+            observation.update(schema=1, stage=stage, packages=packages, assemblies=[])
+            resolution = dict(observation=observation, manifest=phase_manifest, lock=dict(dependencies=locked), files=files)
+            record = dict(schema=1, runId=state['runId'], source=state['source'], packageSource=state['packageSource'], project='core', stage=stage,
+                          started=index * 10, editorFinished=index * 10 + 1, finished=index * 10 + 2, editorPids=[str(index + 100)], builds=[], players=[], tests=None)
+            record['installed'] = consumer.verify_resolution_snapshot(state, self.metadata, contract, 'core', stage, resolution)
+            if stage.endswith('-build'):
+                build_files = {'Consumer.x86_64': 'd' * 64}
+                build_sha = hashlib.sha256(json.dumps(build_files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+                identity = dict(runId=state['runId'], lifecycleStage=stage, buildId=str(index) * 32, buildSha256=build_sha, files=build_files)
+                observation.update(buildId=identity['buildId'], buildPath='.journey/build/' + stage + '/Consumer.x86_64', scenes=['Assets/Default.unity'])
+                record['builds'] = [dict(path=observation['buildPath'], scenes=observation['scenes'], files=build_files, buildId=identity['buildId'], buildSha256=build_sha)]
+                consumer.write_json(out / 'build.json', identity)
+                for negative in ([False, True] if stage == 'core-build' else [False]):
+                    destination = 'negative' if negative else 'player'
+                    writer.out = out / destination
+                    writer.out.mkdir()
+                    writer.expected = {**state, **identity}
+                    writer.write(withheld=negative, session=stage + '-' + destination)
+                    record['players'].append(dict(path=destination, sample=None, customized=False, negative=negative))
+            consumer.write_json(out / 'resolution.json', resolution)
+            consumer.write_json(out / 'editor.json', observation)
+            if stage == 'core-setup':
+                evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
+                log = self.dialog_log(state, stage, evidence)
+            else:
+                log = 'CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' ' + stage + '\nCONSUMER_PID ' + str(index + 100) + '\nCONSUMER_INVOCATION ' + state['runId'] + ' ' + stage + '\n'
+            (out / 'editor.log').write_text(log)
+            record['files'] = consumer.hashes(out)
+            consumer.write_json(out / 'record.json', record)
+        summary = verifier.verify_journey(self.work, self.out, '6-legacy', 'git')
+        self.assertEqual((summary['editorInvocations'], summary['nativeBuilds'], summary['playerRuns']), (4, 2, 3))
+        out = self.work / 'evidence/pair-build'
+        raw = json.loads((out / 'editor.json').read_text())
+        consumer.write_json(out / 'editor.json', {**raw, 'unity': 'wrong', 'packages': []})
+        def rehash():
+            path = out / 'record.json'
+            record = json.loads(path.read_text())
+            record['files'] = {name: value for name, value in consumer.hashes(out).items() if name != 'record.json'}
+            consumer.write_json(path, record)
+        rehash()
+        with self.assertRaisesRegex(ValueError, 'raw Editor observation differs'):
+            verifier.verify_journey(self.work, self.out, '6-legacy', 'git')
+        consumer.write_json(out / 'editor.json', raw)
+        shutil.rmtree(out / 'player')
+        shutil.copytree(self.work / 'evidence/core-build/player', out / 'player')
+        rehash()
+        with self.assertRaisesRegex(ValueError, 'another lifecycle build'):
+            verifier.verify_journey(self.work, self.out, '6-legacy', 'git')
+
+
+if __name__ == '__main__':
+    unittest.main()

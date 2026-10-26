@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -46,6 +47,103 @@ namespace TransformHandles.Tests
             var go = new GameObject(name) { transform = { position = position } };
             _spawned.Add(go);
             return go;
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void HoverEmphasisPreservesHueAndRestoresAllComponentTypes(int kind)
+        {
+            var settings = TransformHandleSettings.CreateDefault();
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            typeof(TransformHandleSettings).GetField("emphasizeHandleColorOnHover", flags).SetValue(settings, true);
+            typeof(TransformHandleSettings).GetField("preserveHandleColorOnHover", flags).SetValue(settings, true);
+            _manager.Settings = settings;
+            try
+            {
+                var handle = _manager.CreateHandle(NewObject("target").transform);
+                TransformHandleManager.ChangeHandleType(handle, kind < 2 ? HandleType.Position : kind == 2 ? HandleType.Rotation : HandleType.Scale);
+                HandleBase component;
+                switch (kind)
+                {
+                    case 0: component = handle.GetComponentInChildren<PositionAxis>(true); break;
+                    case 1: component = handle.GetComponentInChildren<PositionPlane>(true); break;
+                    case 2: component = handle.GetComponentInChildren<RotationAxis>(true); break;
+                    case 3: component = handle.GetComponentInChildren<ScaleAxis>(true); break;
+                    default: component = handle.GetComponentInChildren<ScaleGlobal>(true); break;
+                }
+                var material = component.GetComponentInChildren<MeshRenderer>(true).sharedMaterial;
+                var original = material.color;
+                var hover = typeof(TransformHandleManager).GetMethod("HandleOverEffect", flags);
+                hover.Invoke(_manager, new object[] { component });
+                var highlighted = material.color;
+                Assert.AreNotEqual(original, highlighted, "Emphasis takes priority over exact preservation.");
+                Color.RGBToHSV(original, out var h, out var sat, out var val);
+                Color.RGBToHSV(highlighted, out var hh, out var hs, out var hv);
+                Assert.That(hh, Is.EqualTo(h).Within(.0001f));
+                Assert.That(hs, Is.EqualTo(sat).Within(.0001f));
+                Assert.Less(hv, val);
+                if (kind == 1) Assert.Greater(highlighted.a, original.a);
+                hover.Invoke(_manager, new object[] { component });
+                Assert.AreEqual(highlighted, material.color, "Repeated hover cannot accumulate tint.");
+                hover.Invoke(_manager, new object[] { null });
+                Assert.AreEqual(original, material.color);
+                hover.Invoke(_manager, new object[] { component });
+                Assert.IsTrue(_manager.BeginInteraction(component, handle.transform.position));
+                _manager.enabled = false;
+                Assert.AreEqual(original, material.color);
+            }
+            finally { _manager.Settings = null; Object.DestroyImmediate(settings); }
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void HoverPreservesComponentColorOnlyWhenEnabled(bool preserve, bool plane)
+        {
+            var settings = TransformHandleSettings.CreateDefault();
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            typeof(TransformHandleSettings).GetField("preserveHandleColorOnHover", flags).SetValue(settings, preserve);
+            _manager.Settings = settings;
+            try
+            {
+                var handle = _manager.CreateHandle(NewObject("target").transform);
+                HandleBase component = plane ? (HandleBase)handle.GetComponentInChildren<PositionHandle>(true).XPlane :
+                    handle.GetComponentInChildren<PositionAxis>(true);
+                var renderer = component.GetComponentInChildren<MeshRenderer>(true);
+                var original = renderer.sharedMaterial.color;
+                var hover = typeof(TransformHandleManager).GetMethod("HandleOverEffect", flags);
+                hover.Invoke(_manager, new object[] { component });
+                Assert.AreEqual(preserve ? original : settings.HighlightColor, renderer.sharedMaterial.color);
+                hover.Invoke(_manager, new object[] { null });
+                Assert.AreEqual(original, renderer.sharedMaterial.color, "Hover exit restores exact RGBA.");
+                hover.Invoke(_manager, new object[] { component });
+                Assert.IsTrue(_manager.BeginInteraction(component, handle.transform.position));
+                _manager.enabled = false;
+                Assert.AreEqual(original, renderer.sharedMaterial.color, "Cancellation restores exact RGBA.");
+            }
+            finally
+            {
+                _manager.Settings = null;
+                Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void HoverWithoutSettingsRetainsLegacyHighlight()
+        {
+            var handle = _manager.CreateHandle(NewObject("target").transform);
+            var axis = handle.GetComponentInChildren<PositionAxis>(true);
+            var renderer = axis.GetComponentInChildren<MeshRenderer>(true);
+            var original = renderer.sharedMaterial.color;
+            var hover = typeof(TransformHandleManager).GetMethod("HandleOverEffect", BindingFlags.Instance | BindingFlags.NonPublic);
+            hover.Invoke(_manager, new object[] { axis });
+            Assert.AreEqual(Color.white, renderer.sharedMaterial.color);
+            hover.Invoke(_manager, new object[] { null });
+            Assert.AreEqual(original, renderer.sharedMaterial.color);
         }
 
         [Test]

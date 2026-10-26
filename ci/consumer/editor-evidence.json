@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "layerSetupAssertions": {
+    "2021.3.0f1": [
+      "Cancelling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' has been created successfully.\n\nMake sure the TransformHandleManager's Layer Mask includes this layer.\nThis should not be called in batch mode.",
+      "Cancelling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' already exists.\nThis should not be called in batch mode.",
+      "Cancelling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' has been created successfully.\n\nMake sure the TransformHandleManager's Layer Mask includes this layer.\nThis should not be called in batch mode.",
+      "Cancelling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' already exists.\nThis should not be called in batch mode."
+    ],
+    "6000.3.16f1": [
+      "Canceling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' has been created successfully.\n\nMake sure the TransformHandleManager's Layer Mask includes this layer.\nThis should not be called in batch mode.",
+      "Canceling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' already exists.\nThis should not be called in batch mode.",
+      "Canceling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' has been created successfully.\n\nMake sure the TransformHandleManager's Layer Mask includes this layer.\nThis should not be called in batch mode.",
+      "Canceling DisplayDialog: Transform Handle Layer Layer 'TransformHandle' already exists.\nThis should not be called in batch mode."
+    ]
+  }
+}

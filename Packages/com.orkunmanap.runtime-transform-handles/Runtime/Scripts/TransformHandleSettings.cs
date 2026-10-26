@@ -32,6 +32,12 @@ namespace TransformHandles
         [SerializeField] private KeyCode pivotToggleKey = KeyCode.Z;
 
         [Header("Visual Settings")]
+        [Tooltip("Emphasize each component's own color on hover. Takes priority over exact color preservation.")]
+        [SerializeField] private bool emphasizeHandleColorOnHover;
+
+        [Tooltip("Keep each handle component’s original color and opacity while hovering.")]
+        [SerializeField] private bool preserveHandleColorOnHover;
+
         [Tooltip("Color used when hovering over a handle")]
         [SerializeField] private Color highlightColor = Color.white;
 
@@ -78,6 +84,12 @@ namespace TransformHandles
         public KeyCode SpaceToggleKey => spaceToggleKey;
         /// <summary>Key to toggle between Pivot and Center origin.</summary>
         public KeyCode PivotToggleKey => pivotToggleKey;
+
+        /// <summary>Whether hover emphasizes the component's own hue instead of replacing it.</summary>
+        public bool EmphasizeHandleColorOnHover => emphasizeHandleColorOnHover;
+
+        /// <summary>Whether hover preserves each component's original color and opacity.</summary>
+        public bool PreserveHandleColorOnHover => preserveHandleColorOnHover;
 
         /// <summary>Color used when hovering over a handle.</summary>
         public Color HighlightColor => highlightColor;

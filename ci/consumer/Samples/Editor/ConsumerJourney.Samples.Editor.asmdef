@@ -1,0 +1,7 @@
+{
+  "name": "ConsumerJourney.Samples.Editor",
+  "rootNamespace": "ConsumerJourney",
+  "references": ["ConsumerJourney.Bootstrap", "ConsumerJourney.Editor", "ConsumerJourney.Samples"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

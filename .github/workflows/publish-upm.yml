@@ -12,7 +12,7 @@ permissions: {}
 
 # Serialize per ref so two main pushes can't run the publish/bump/tag steps concurrently
 # (which previously raced on the version-bump commit and tag). Stale PR runs are cancelled;
-# main runs queue (never cancelled mid-release) so an in-flight release always completes.
+# main runs queue. A stale run fails closed rather than publishing a newer untested main.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -48,6 +48,8 @@ jobs:
               - 'Packages/**'
               - 'Assets/**'
               - 'ProjectSettings/**'
+              - 'ci/**'
+              - '.github/actions/**'
               - '.github/workflows/publish-upm.yml'
 
       - name: Check Unity credentials
@@ -64,10 +66,42 @@ jobs:
             echo "::notice::Unity credentials unavailable (Dependabot/fork run?); the licensed test job will be skipped."
           fi
 
+  candidate:
+    name: Freeze release candidate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Prepare fixed candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" != pull_request ] && [ "$REF" = refs/heads/main ]; then
+            python3 ci/release-candidate.py prepare --repository "$REPOSITORY"
+          else
+            python3 ci/release-candidate.py prepare
+          fi
+
+      - name: Upload candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+          if-no-files-found: error
+
   # UPM-spec gate: manifest + required files + asmdef sanity. No Unity license needed,
   # so it runs fast on every PR and enforces the package floor going forward.
   validate:
     name: Validate package
+    needs: candidate
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,56 +109,62 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - name: Validate manifest & structure
+      - name: Download fixed candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Apply candidate artifacts
+        run: python3 ci/release-candidate.py apply
+
+      - name: Validate package boundaries
+        run: |
+          python3 -m unittest discover -s ci -p 'test_*.py'
+          python3 ci/verify-package-boundaries.py
+
+      - name: Validate manifests and structure
         run: |
           set -uo pipefail
-          PKG="Packages/com.orkunmanap.runtime-transform-handles"
-          MANIFEST="$PKG/package.json"
           fail=0
           err(){ echo "::error::$1"; fail=1; }
-
-          if [ ! -f "$MANIFEST" ]; then echo "::error::package.json missing"; exit 1; fi
-          jq empty "$MANIFEST" 2>/dev/null || err "package.json is not valid JSON"
-
-          for k in name version displayName description unity; do
-            v=$(jq -r --arg k "$k" '.[$k] // empty' "$MANIFEST")
-            [ -n "$v" ] || err "package.json missing '$k'"
+          for PKG in Packages/com.orkunmanap.runtime-transform-handles Packages/com.orkunmanap.runtime-transform-handles.demos; do
+            MANIFEST="$PKG/package.json"
+            if ! jq empty "$MANIFEST" 2>/dev/null; then err "invalid or missing $MANIFEST"; continue; fi
+            for k in name version displayName description unity; do
+              v=$(jq -r --arg k "$k" '.[$k] // empty' "$MANIFEST")
+              [ -n "$v" ] || err "$MANIFEST missing '$k'"
+            done
+            NAME=$(jq -r '.name // ""' "$MANIFEST")
+            echo "$NAME" | grep -qE '^[a-z0-9]+(\.[a-z0-9-]+)+$' || err "invalid package name '$NAME'"
+            VER=$(jq -r '.version // ""' "$MANIFEST")
+            echo "$VER" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+].+)?$' || err "version '$VER' not semver"
+            UNITY=$(jq -r '.unity // ""' "$MANIFEST")
+            echo "$UNITY" | grep -qE '^[0-9]{4}\.[0-9]+$' || err "unity '$UNITY' not in YYYY.N form"
+            for f in README.md LICENSE.md CHANGELOG.md "Third Party Notices.md"; do
+              [ -f "$PKG/$f" ] || err "missing in-package file: $PKG/$f"
+            done
+            while IFS= read -r sample; do
+              [ -z "$sample" ] || [ -d "$PKG/$sample" ] || err "sample path not found: $sample"
+            done < <(jq -r '.samples[]?.path' "$MANIFEST")
+            while IFS= read -r -d '' assembly; do
+              jq -e '.name' "$assembly" >/dev/null 2>&1 || err "asmdef invalid or unnamed: $assembly"
+            done < <(find "$PKG" -name '*.asmdef' -print0)
           done
-
-          NAME=$(jq -r '.name // ""' "$MANIFEST")
-          echo "$NAME" | grep -qE '^[a-z0-9]+(\.[a-z0-9-]+)+$' || err "invalid package name '$NAME'"
-
-          VER=$(jq -r '.version // ""' "$MANIFEST")
-          echo "$VER" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([-+].+)?$' || err "version '$VER' not semver"
-
-          UNITY=$(jq -r '.unity // ""' "$MANIFEST")
-          echo "$UNITY" | grep -qE '^[0-9]{4}\.[0-9]+$' || err "unity '$UNITY' not in YYYY.N form"
-
-          for f in README.md LICENSE.md CHANGELOG.md "Third Party Notices.md"; do
-            [ -f "$PKG/$f" ] || err "missing in-package file: $f"
-          done
-
-          # Every registered sample path must exist.
-          while IFS= read -r p; do
-            [ -z "$p" ] && continue
-            [ -d "$PKG/$p" ] || err "samples[] path not found: $p"
-          done < <(jq -r '.samples[]?.path' "$MANIFEST")
-
-          # Every asmdef (incl. hidden samples) must be valid JSON with a name.
-          while IFS= read -r -d '' a; do
-            jq -e '.name' "$a" >/dev/null 2>&1 || err "asmdef invalid or unnamed: $a"
-          done < <(find "$PKG" -name '*.asmdef' -print0)
-
-          if [ "$fail" -ne 0 ]; then echo "Package validation FAILED"; exit 1; fi
-          echo "Package validation passed."
+          [ "$fail" -eq 0 ] || exit 1
+          echo "Both package manifests validated."
 
   # Gate: the package must compile and its EditMode + PlayMode tests must pass
   # before anything is published. Runs on pull_request too so breakage is caught
   # before it reaches main. Skips neutrally (not red) when Unity credentials are
   # unavailable (Dependabot/forks) and on docs-only PRs; pushes to main always test.
   test:
-    name: Tests (EditMode + PlayMode)
-    needs: preflight
+    name: Tests (input ${{ matrix.input }})
+    strategy:
+      fail-fast: false
+      matrix:
+        input: [0, 1]
+    needs: [preflight, candidate]
     if: >-
       needs.preflight.outputs.has-unity-secrets == 'true' &&
       (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
@@ -141,13 +181,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
+      - name: Download fixed candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Apply candidate artifacts
+        run: python3 ci/release-candidate.py apply
+
       - name: Cache Library
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: Library
-          key: Library-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
+          key: Library-input${{ matrix.input }}-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-
+            Library-input${{ matrix.input }}-
+
+      - name: Select input backend
+        env:
+          INPUT_MODE: ${{ matrix.input }}
+        run: |
+          python3 - <<'PYINPUT'
+          import os, re
+          from pathlib import Path
+          p = Path('ProjectSettings/ProjectSettings.asset')
+          content, count = re.subn(r'(?m)^  activeInputHandler: [01]$', '  activeInputHandler: ' + os.environ['INPUT_MODE'], p.read_text())
+          assert count == 1, 'expected exactly one input setting'
+          p.write_text(content)
+          PYINPUT
+
+      - name: Prepare fresh test evidence
+        run: |
+          python3 -m unittest discover -s ci -p 'test_*.py'
+          python3 ci/verify-unity-results.py prepare --project . --package Packages/com.orkunmanap.runtime-transform-handles --out artifacts/evidence --unity 6000.3.16f1 --input ${{ matrix.input }}
 
       - name: Run tests
         uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4
@@ -158,28 +225,641 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
         with:
+          cliVersion: v0.1.72
           unityVersion: 6000.3.16f1
           testMode: all
+          customParameters: -transformHandlesIsolatedTests -testFilter TransformHandles.Tests.
           githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Unity 6 input ${{ matrix.input }} results
+
+      - name: Collect and verify test evidence
+        if: always()
+        run: |
+          python3 ci/verify-unity-results.py collect --out artifacts/evidence --play-xml artifacts/playmode-results.xml --edit-xml artifacts/editmode-results.xml --play-log artifacts/playmode.log --edit-log artifacts/editmode.log
+          python3 ci/verify-unity-results.py verify --out artifacts/evidence --required-dir artifacts/candidate/required
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: test-results
+          name: test-results-input${{ matrix.input }}
           path: artifacts
           if-no-files-found: ignore
+
+      - name: Verify candidate unchanged
+        run: python3 ci/release-candidate.py verify
+
+  demos-test:
+    name: Demos (input ${{ matrix.input }})
+    strategy:
+      fail-fast: false
+      matrix:
+        input: [0, 1]
+    needs: [preflight, candidate]
+    if: >-
+      needs.preflight.outputs.has-unity-secrets == 'true' &&
+      (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force 2>/dev/null || true
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Download fixed candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Apply candidate artifacts
+        run: python3 ci/release-candidate.py apply
+
+      - name: Cache Library
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: Library
+          key: Library-demos-input${{ matrix.input }}-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-demos-input${{ matrix.input }}-
+
+      - name: Select input backend
+        env:
+          INPUT_MODE: ${{ matrix.input }}
+        run: |
+          python3 - <<'PYINPUT'
+          import os, re
+          from pathlib import Path
+          p = Path('ProjectSettings/ProjectSettings.asset')
+          content, count = re.subn(r'(?m)^  activeInputHandler: [01]$', '  activeInputHandler: ' + os.environ['INPUT_MODE'], p.read_text())
+          assert count == 1, 'expected exactly one input setting'
+          p.write_text(content)
+          PYINPUT
+
+      - name: Import optional samples and record evidence
+        run: |
+          python3 ci/release-candidate.py import-samples
+          python3 ci/verify-sample-results.py prepare --out artifacts/sample-evidence --unity 6000.3.16f1 --input ${{ matrix.input }}
+
+      - name: Run tests
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+        with:
+          cliVersion: v0.1.72
+          unityVersion: 6000.3.16f1
+          testMode: playmode
+          customParameters: -testFilter TransformHandles.Samples.
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Demos Unity 6 input ${{ matrix.input }} results
+
+      - name: Verify exact sample suite
+        if: always()
+        run: python3 ci/verify-sample-results.py verify --out artifacts/sample-evidence --xml artifacts/playmode-results.xml --log artifacts/playmode.log --required-dir artifacts/candidate/required
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: demos-results-input${{ matrix.input }}
+          path: artifacts
+          if-no-files-found: ignore
+
+      - name: Verify candidate unchanged
+        run: python3 ci/release-candidate.py verify
+
+  consumer-activation:
+    name: Minimum consumer activation and return
+    needs: [preflight, candidate, test, demos-test]
+    if: >-
+      !cancelled() && needs.test.result == 'success' && needs.demos-test.result == 'success' &&
+      needs.preflight.outputs.has-unity-secrets == 'true' &&
+      (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      UNITY_LICENSE: ''
+      UNITY_LICENSING_SERVER: ''
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Download fixed candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Generate a fresh minimum consumer
+        run: python3 ci/consumer-project.py prepare --candidate artifacts/candidate --work artifacts/consumer-work --profile 2021-legacy --transport tarball --mount-root /github/workspace/artifacts/consumer-work
+
+      # One bounded lifecycle must prove real UPM bootstrap and an explicit license
+      # return before any matrix row can repeatedly acquire the same account seat.
+      - name: Resolve Core and return the account license
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: core-resolve
+          image: unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6
+          github-token: ${{ github.token }}
+
+      - name: Upload minimum activation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: consumer-minimum-activation
+          include-hidden-files: true
+          path: |
+            artifacts/consumer-work/run.json
+            artifacts/consumer-work/evidence
+            artifacts/consumer-work/projects/*/.journey/editor
+          if-no-files-found: error
+
+  consumer:
+    name: Consumer (${{ matrix.profile }}, ${{ matrix.transport }}, ${{ matrix.scope }})
+    # Wait for the existing licensed suites so the new max-parallel budget does not
+    # add two concurrent seats on top of the Core/Demos matrices.
+    needs: [preflight, candidate, test, demos-test, consumer-activation]
+    if: >-
+      !cancelled() && needs.test.result == 'success' && needs.demos-test.result == 'success' &&
+      needs.consumer-activation.result == 'success' &&
+      needs.preflight.outputs.has-unity-secrets == 'true' &&
+      (github.event_name != 'pull_request' || needs.preflight.outputs.code-changed == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      checks: write
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      # The old 2021.3.0f1 client misreports a mismatched ULF as activated,
+      # preventing the CLI's account fallback. Select account activation directly.
+      UNITY_LICENSE: ${{ matrix.profile != '2021-legacy' && secrets.UNITY_LICENSE || '' }}
+      UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - profile: 2021-legacy
+            transport: tarball
+            scope: full
+            image: unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6
+          - profile: 2021-legacy
+            transport: git
+            scope: probe
+            image: unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6
+          - profile: 6-legacy
+            transport: tarball
+            scope: full
+            image: unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913
+          - profile: 6-legacy
+            transport: git
+            scope: probe
+            image: unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913
+          - profile: 6-input
+            transport: tarball
+            scope: full
+            image: unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913
+          - profile: 6-input
+            transport: git
+            scope: full
+            image: unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913
+          - profile: 6-urp
+            transport: tarball
+            scope: full
+            image: unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913
+          - profile: 6-urp
+            transport: git
+            scope: probe
+            image: unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Download fixed candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Install Linux display and input tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb xdotool libgl1-mesa-dri libglx-mesa0 libxcursor1 libxrandr2 libxinerama1 libxi6 libpulse0
+
+      - name: Generate a fresh UPM consumer
+        env:
+          CONSUMER_PROFILE: ${{ matrix.profile }}
+          CONSUMER_TRANSPORT: ${{ matrix.transport }}
+        run: |
+          python3 - <<'PYIDENTITY'
+          import json, subprocess
+          from pathlib import Path
+          metadata = json.loads(Path('artifacts/candidate/candidate.json').read_text())
+          assert metadata['source'] == subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          PYIDENTITY
+          python3 ci/consumer-project.py prepare --candidate artifacts/candidate --work artifacts/consumer-work --profile "$CONSUMER_PROFILE" --transport "$CONSUMER_TRANSPORT" --mount-root /github/workspace/artifacts/consumer-work
+
+      - name: Consumer core-resolve
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: core-resolve
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer core-setup
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: core-setup
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer core-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: core-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer core-build
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: core-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer pair-build probe
+        if: matrix.scope == 'probe'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: pair-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-Demo-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-Demo-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-Demo-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-Demo-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-Demo-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-Demo-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-LevelEditor-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-LevelEditor-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-LevelEditor-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-LevelEditor-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-LevelEditor-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-LevelEditor-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-ModularBuilding-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-ModularBuilding-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-ModularBuilding-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-ModularBuilding-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-ModularBuilding-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-ModularBuilding-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-ProductConfigurator-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-ProductConfigurator-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-ProductConfigurator-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-ProductConfigurator-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-ProductConfigurator-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-ProductConfigurator-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-DemoBrowser-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-DemoBrowser-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-DemoBrowser-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-DemoBrowser-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer sample-DemoBrowser-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: sample-DemoBrowser-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer gallery-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: gallery-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer gallery-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: gallery-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer gallery-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: gallery-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer customize
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: customize
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer custom-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: custom-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer custom-gallery-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: custom-gallery-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer remove-demos
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: remove-demos
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer retained-core-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: retained-core-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer retained-gallery-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: retained-gallery-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer remove-imports-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: remove-imports-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer uninstall-core
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: uninstall-core
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer uninstall-verify
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: uninstall-verify
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer upgrade-baseline
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: upgrade-baseline
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer upgrade-resolve
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: upgrade-resolve
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer upgrade-setup
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: upgrade-setup
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer upgrade-import
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: upgrade-import
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer upgrade-tests
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: upgrade-tests
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Consumer upgrade-build
+        if: matrix.scope == 'full'
+        timeout-minutes: 20
+        uses: ./.github/actions/consumer-editor
+        with:
+          stage: upgrade-build
+          image: ${{ matrix.image }}
+          github-token: ${{ github.token }}
+
+      - name: Audit the complete workflow-selected journey
+        env:
+          CONSUMER_PROFILE: ${{ matrix.profile }}
+          CONSUMER_TRANSPORT: ${{ matrix.transport }}
+        run: python3 ci/verify-consumer-results.py --work artifacts/consumer-work --candidate artifacts/candidate --profile "$CONSUMER_PROFILE" --transport "$CONSUMER_TRANSPORT"
+
+      - name: Upload consumer evidence and measurements
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: consumer-results-${{ matrix.profile }}-${{ matrix.transport }}
+          include-hidden-files: true
+          path: |
+            artifacts/consumer-work/evidence
+            artifacts/consumer-work/backups
+            artifacts/consumer-work/run.json
+            artifacts/consumer-work/projects/*/.journey/editor
+            artifacts/consumer-work/projects/*/.journey/config.json
+          if-no-files-found: warn
 
   publish:
     # Only publish on a real push to main (or manual dispatch), and only after validate + tests
     # SUCCEEDED. `needs.test.result == 'success'` (with !cancelled()) is load-bearing: the test
     # job can be SKIPPED when Unity credentials are missing, and a skipped gate must never
     # let untested code publish.
-    needs: [validate, test]
+    needs: [validate, test, demos-test, consumer]
     if: >-
       !cancelled() &&
       needs.validate.result == 'success' &&
       needs.test.result == 'success' &&
+      needs.demos-test.result == 'success' &&
+      needs.consumer.result == 'success' &&
+      github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
@@ -197,260 +877,56 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Prepare release and push
+      - name: Download tested candidate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-candidate
+          path: artifacts/candidate
+
+      - name: Commit only the tested candidate
         id: release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # actions/checkout pins this job to the triggering commit (github.sha). The job is serialized
-        # by the concurrency group, but while it waited on the ~5-min test job (or queued behind another
-        # release) main can advance, and it can advance again between computing the bump and pushing it.
-        # So compute version + notes against the CURRENT origin/main and commit + push as one unit; if
-        # the push is rejected, RECOMPUTE against the now-latest main and retry. Recomputing (rather than
-        # rebasing a pre-built commit) keeps the release correct whatever landed in the window:
-        #   - a non-bump commit that slipped in is folded into this release's notes and bump type;
-        #   - a competing release bump makes the range empty -> bump=none -> this run skips cleanly,
-        #     so there is no duplicate version and no colliding (non-force) tag push.
         run: |
-          PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
-          MANIFEST="$PACKAGE_PATH/package.json"
-          CHANGELOG="$PACKAGE_PATH/CHANGELOG.md"
+          python3 ci/release-candidate.py apply
+          python3 ci/release-candidate.py verify
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          from pathlib import Path
+          m = json.loads(Path('artifacts/candidate/candidate.json').read_text())
+          assert m['publishable'], 'local previews cannot publish'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('skip=' + str(m['skip']).lower() + '\n')
+              output.write('version=' + m['version'] + '\n')
+              output.write('bump=' + m['bump'] + '\n')
+          if m['skip']:
+              raise SystemExit(0)
+          subprocess.run(['git', 'fetch', 'origin', 'main'], check=True)
+          current = subprocess.check_output(['git', 'rev-parse', 'origin/main'], text=True).strip()
+          assert current == m['source'], 'main advanced; rerun validation for the new candidate'
+          if m['recovery']:
+              release_ref = m['package_source']
+              # The recovered files were verified above; discard only this job's overlay before checkout.
+              subprocess.run(['git', 'restore', '--source=HEAD', '--staged', '--worktree', '--', 'Packages'], check=True)
+          else:
+              subprocess.run(['git', 'add', 'Packages'], check=True)
+              subprocess.run(['git', 'commit', '-m', 'chore: bump version to ' + m['version'] + ' [skip ci]'], check=True)
+              release_ref = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+              # A concurrent main push rejects this update. Never rebase or recompute after tests.
+              subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/main'], check=True)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('release_ref=' + release_ref + '\n')
+          PYTHON
+          cp artifacts/candidate/release-notes.md /tmp/release_entries.md
 
-          # Robust "is this version already released?" check. Distinguishes a real 404 (no release) from
-          # a transient auth/rate-limit/network error: only a 404 means "not released", anything else
-          # fails the job loudly so a flaky API call can never trigger a false recovery.
-          release_exists() {
-            local tag="$1" err
-            if err=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$tag" 2>&1 >/dev/null); then
-              return 0
-            fi
-            if printf '%s' "$err" | grep -qE "HTTP 404|Not Found"; then
-              return 1
-            fi
-            echo "::error::release lookup for $tag failed (not a 404): $err"
-            exit 1
-          }
-
-          # Recompute everything from the latest origin/main, edit the files, and commit the bump.
-          # Sets NEW_VERSION / BUMP / SKIP / RECOVER and (re)writes /tmp/release_entries.md for later steps.
-          prepare() {
-            git fetch origin main
-            git checkout -B main origin/main
-
-            RECOVER="false"
-            CURRENT=$(jq -r '.version' "$MANIFEST")
-            echo "Current version: $CURRENT"
-
-            # Release boundary = the last automated version-bump commit on main (tag-independent: tags
-            # live on the orphan `upm` branch, unreachable from main, so `git describe` is wrong here).
-            RANGE_START=$(git log --grep='^chore: bump version to' --format=%H -n 1 HEAD || true)
-            if [ -n "$RANGE_START" ]; then
-              RANGE="$RANGE_START..HEAD"
-              echo "Previous release commit: $RANGE_START"
-            else
-              RANGE="HEAD"
-              echo "No previous bump commit found; treating all history as the first release."
-            fi
-            echo "Commit range: $RANGE"
-
-            # Recovery takes priority over a new bump: if the last automated bump's version was never
-            # released (an earlier publish run pushed the bump commit, then died before tag/release),
-            # finish THAT release first — even if newer commits have since landed. Publish runs are
-            # serialized, so an unreleased bump means its run already terminated; there is no concurrent
-            # release to collide with. The newer commits keep their place in the range and ship next run.
-            if [ -n "$RANGE_START" ] && ! release_exists "v$CURRENT"; then
-              echo "v$CURRENT was bumped on main but has no release; completing it before any new bump."
-              SKIP="false"
-              RECOVER="true"
-              BUMP="none"
-              NEW_VERSION="$CURRENT"
-              # Package the bump commit's tree, NOT HEAD — commits that landed after the interrupted
-              # publish must not ship under this recovered tag (they release on a later run).
-              RELEASE_REF="$RANGE_START"
-              # Recover this version's notes from the CHANGELOG at the bump commit (the same ref we
-              # package from), so the GitHub release notes match the shipped in-package changelog even
-              # if main's CHANGELOG changed after the bump. Capture the FULL section body ("### "
-              # group headings included), not just dash lines - curated sections are grouped.
-              git show "$RANGE_START:$CHANGELOG" \
-                | awk -v h="## [$CURRENT]" '
-                    index($0, h) == 1 { grab = 1; next }
-                    grab && /^## \[/ { exit }
-                    grab { print }
-                  ' > /tmp/release_entries.md
-              return 0
-            fi
-
-            # Full messages (%B) so `BREAKING CHANGE:` footers are seen, not just subjects.
-            COMMITS=$(git log $RANGE --format=%B)
-
-            # Release notes: prefer the curated [Unreleased] section of the CHANGELOG. If it has
-            # real content it becomes the release entries verbatim (and is consumed below when the
-            # new version section is written). Otherwise fall back to commit subjects in the range,
-            # grouped Keep-a-Changelog style by Conventional Commit type - never the old raw
-            # "git log --pretty='- %s'" dump that put merge commits into released sections.
-            UNRELEASED_BODY=""
-            if [ -f "$CHANGELOG" ] && grep -q '^## \[Unreleased\]' "$CHANGELOG"; then
-              UNRELEASED_BODY=$(awk '
-                /^## \[Unreleased\]/ { grab = 1; next }
-                grab && /^## \[/ { exit }
-                grab { print }
-              ' "$CHANGELOG")
-            fi
-
-            if printf '%s\n' "$UNRELEASED_BODY" | grep -qE '^(### |- )'; then
-              # sed '/./,$!d' strips the leading blank lines left by the heading separator.
-              printf '%s\n' "$UNRELEASED_BODY" | sed '/./,$!d' > /tmp/release_entries.md
-            else
-              git log $RANGE --no-merges --pretty=tformat:"%s" \
-                | grep -vE '^chore: bump version to' > /tmp/subjects.txt || true
-              awk '
-                {
-                  rest = $0; type = ""
-                  if (match($0, /^[A-Za-z]+(\([^)]*\))?!?: /)) {
-                    type = substr($0, 1, RLENGTH)
-                    rest = substr($0, RLENGTH + 1)
-                    sub(/\(.*/, "", type); sub(/!?: ?$/, "", type)
-                    type = tolower(type)
-                  }
-                  if (type == "feat")                                   group = "Added"
-                  else if (type == "fix")                               group = "Fixed"
-                  else if (type == "perf" || type == "refactor")        group = "Changed"
-                  else if (type == "docs")                              group = "Documentation"
-                  else if (type ~ /^(ci|build|chore|test|style)$/)      group = "Maintenance"
-                  else                                                  { group = "Changed"; rest = $0 }
-                  lines[group] = lines[group] "- " rest "\n"
-                }
-                END {
-                  n = split("Added Changed Fixed Documentation Maintenance", order, " ")
-                  first = 1
-                  for (i = 1; i <= n; i++) {
-                    g = order[i]
-                    if (lines[g] != "") {
-                      if (!first) printf "\n"
-                      printf "### %s\n%s", g, lines[g]
-                      first = 0
-                    }
-                  }
-                }
-              ' /tmp/subjects.txt > /tmp/release_entries.md
-            fi
-
-            # Strict Conventional Commits only — no bare aliases, no "any change -> patch" fallback.
-            BUMP="none"
-            if echo "$COMMITS" | grep -qE "^BREAKING CHANGE:" \
-               || echo "$COMMITS" | grep -qiE "^[a-z]+(\(.+\))?!:"; then
-              BUMP="major"
-            elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:"; then
-              BUMP="minor"
-            elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor)(\(.+\))?:"; then
-              BUMP="patch"
-            elif echo "$COMMITS" | grep -qiE "^(docs|style|chore|ci|test|build)(\(.+\))?:"; then
-              # Housekeeping types bump only when SHIPPING code/manifest changed (not Tests/ or Samples~/),
-              # otherwise adding a test would cut a pointless release.
-              if git log $RANGE --name-only --pretty=format: | sort -u \
-                   | grep -vE "/Tests/|/Samples~/" \
-                   | grep -qE "\.cs$|package\.json$"; then
-                BUMP="patch"
-              fi
-            fi
-            echo "Bump type: $BUMP"
-
-            # No new release-worthy commits and the current version is already released (recovery above
-            # handled the not-yet-released case): nothing to do.
-            if [ "$BUMP" = "none" ]; then
-              SKIP="true"
-              NEW_VERSION="$CURRENT"
-              return 0
-            fi
-            SKIP="false"
-
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-            case "$BUMP" in
-              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-              patch) PATCH=$((PATCH + 1)) ;;
-            esac
-            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-            echo "New version: $NEW_VERSION"
-
-            jq ".version = \"$NEW_VERSION\"" "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
-
-            DATE=$(date +%Y-%m-%d)
-            {
-              echo "## [$NEW_VERSION] - $DATE"
-              echo ""
-              cat /tmp/release_entries.md
-              echo ""
-            } > /tmp/new_entry.md
-            if [ -f "$CHANGELOG" ]; then
-              if grep -q '^## \[Unreleased\]' "$CHANGELOG"; then
-                # Consume the [Unreleased] body (it became this release's notes) and insert the
-                # new version section right below the now-empty [Unreleased] heading.
-                awk '
-                  /^## \[Unreleased\]/ { print; print ""; skip = 1; ins = 1; next }
-                  skip && /^## \[/ { skip = 0 }
-                  skip { next }
-                  ins && /^## \[/ { while ((getline line < "/tmp/new_entry.md") > 0) print line; ins = 0 }
-                  { print }
-                  END { if (ins) { while ((getline line < "/tmp/new_entry.md") > 0) print line } }
-                ' "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
-              else
-                # Legacy layout without an [Unreleased] heading: insert before the first version heading.
-                awk 'BEGIN{ins=0}
-                     /^## \[/ && ins==0 {while((getline line < "/tmp/new_entry.md")>0) print line; ins=1}
-                     {print}
-                     END{if(ins==0){while((getline line < "/tmp/new_entry.md")>0) print line}}' \
-                    "$CHANGELOG" > /tmp/changelog.md && mv /tmp/changelog.md "$CHANGELOG"
-              fi
-            else
-              cp /tmp/new_entry.md "$CHANGELOG"
-            fi
-
-            git add "$MANIFEST" "$CHANGELOG"
-            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            # Package exactly this bump commit, so later steps are immune to main advancing again.
-            RELEASE_REF="$(git rev-parse HEAD)"
-          }
-
-          # Each iteration recomputes against the latest main, so the loop self-corrects when main moves:
-          # the next attempt's range/version/notes reflect whatever just landed. No rebase of a stale
-          # commit, so nothing gets orphaned and a competing bump is detected as nothing-to-do.
-          pushed=0
-          for attempt in 1 2 3 4 5; do
-            prepare
-            if [ "$SKIP" = "true" ]; then
-              echo "Nothing to release (already published, or no bump in range); skipping."
-              break
-            fi
-            if [ "$RECOVER" = "true" ]; then
-              echo "Completing an incomplete publish of v$NEW_VERSION (nothing to push)."
-              pushed=1
-              break
-            fi
-            if git push origin main; then pushed=1; break; fi
-            echo "push rejected (attempt $attempt); main advanced — recomputing against latest origin/main"
-            if [ "$attempt" -lt 5 ]; then sleep $((attempt * 3)); fi
-          done
-
-          if [ "$SKIP" = "true" ]; then
-            {
-              echo "skip=true"
-              echo "version=$NEW_VERSION"
-              echo "bump=none"
-            } >> $GITHUB_OUTPUT
-            exit 0
+      - name: Verify existing tag before updating distribution
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          VERSION="v${{ steps.release.outputs.version }}"
+          EXPECTED_TREE="$(git rev-parse "${{ steps.release.outputs.release_ref }}:Packages/com.orkunmanap.runtime-transform-handles")"
+          git ls-remote --tags origin "refs/tags/$VERSION" > /tmp/existing-release-tag
+          if [ -s /tmp/existing-release-tag ]; then
+            git fetch origin "refs/tags/$VERSION:refs/tags/$VERSION"
+            test "$(git rev-parse "$VERSION^{tree}")" = "$EXPECTED_TREE"
           fi
-
-          if [ "$pushed" -ne 1 ]; then
-            echo "::error::Failed to push the version bump after $attempt attempt(s)."
-            exit 1
-          fi
-
-          {
-            echo "skip=false"
-            echo "version=$NEW_VERSION"
-            echo "bump=$BUMP"
-            echo "release_ref=$RELEASE_REF"
-          } >> $GITHUB_OUTPUT
 
       - name: Create/Update UPM branch
         if: steps.release.outputs.skip != 'true'
@@ -469,7 +945,7 @@ jobs:
             find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
 
             git checkout "$RELEASE_REF" -- "$PACKAGE_PATH"
-            mv "$PACKAGE_PATH"/* .
+            cp -a "$PACKAGE_PATH"/. .
             rm -rf Packages
           else
             echo "Creating new UPM branch..."
@@ -479,7 +955,7 @@ jobs:
             git clean -fd
 
             git checkout "$RELEASE_REF" -- "$PACKAGE_PATH"
-            mv "$PACKAGE_PATH"/* .
+            cp -a "$PACKAGE_PATH"/. .
             rm -rf Packages
           fi
 
@@ -489,6 +965,7 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Release v${{ steps.release.outputs.version }}"
+            test "$(git rev-parse HEAD^{tree})" = "$(git rev-parse "$RELEASE_REF:$PACKAGE_PATH")"
             # force-with-lease: the remote-tracking ref is fresh from the pull above, so this
             # behaves like --force unless someone moved upm mid-run - then it fails loudly
             # instead of silently rewriting the branch consumers track.
@@ -502,12 +979,16 @@ jobs:
           VERSION="v${{ steps.release.outputs.version }}"
 
           git checkout upm
+          EXPECTED_TREE="$(git rev-parse "${{ steps.release.outputs.release_ref }}:Packages/com.orkunmanap.runtime-transform-handles")"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
 
           # Idempotent: a recovery run (completing an earlier interrupted publish) may reach here with
           # the tag already pushed. Only create + push it when it is missing, so the non-force tag push
           # never fails the job on an existing tag.
           if git ls-remote --tags origin "refs/tags/$VERSION" | grep -q "refs/tags/$VERSION"; then
-            echo "Tag $VERSION already exists on origin; leaving it."
+            git fetch origin "refs/tags/$VERSION:refs/tags/$VERSION"
+            test "$(git rev-parse "$VERSION^{tree}")" = "$EXPECTED_TREE"
+            echo "Tag $VERSION already matches the tested package."
           else
             git tag -a "$VERSION" -m "Release $VERSION"
             git push origin "$VERSION"
@@ -541,6 +1022,13 @@ jobs:
             "com.orkunmanap.runtime-transform-handles": "https://github.com/${{ github.repository }}.git#v${{ steps.release.outputs.version }}"
             ```
 
+            Optional Demos uses two explicit project dependencies
+            pinned to the same release source commit (the Core-only tag has no Demos path):
+            ```json
+            "com.orkunmanap.runtime-transform-handles": "https://github.com/${{ github.repository }}.git?path=/Packages/com.orkunmanap.runtime-transform-handles#${{ steps.release.outputs.release_ref }}",
+            "com.orkunmanap.runtime-transform-handles.demos": "https://github.com/${{ github.repository }}.git?path=/Packages/com.orkunmanap.runtime-transform-handles.demos#${{ steps.release.outputs.release_ref }}"
+            ```
+
             Or use the latest:
             ```json
             "com.orkunmanap.runtime-transform-handles": "https://github.com/${{ github.repository }}.git#upm"
@@ -552,7 +1040,7 @@ jobs:
         run: |
           if [ "${{ steps.release.outputs.skip }}" = "true" ]; then
             echo "## No Release Needed" >> $GITHUB_STEP_SUMMARY
-            echo "No version bump was triggered by the commits." >> $GITHUB_STEP_SUMMARY
+            echo "No Core release was triggered. Demos-only changes are validated source distributions; they do not create a Core tag." >> $GITHUB_STEP_SUMMARY
           else
             echo "## UPM Package Released 🎉" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY

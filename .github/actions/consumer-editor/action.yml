@@ -1,0 +1,103 @@
+name: Consumer Editor phase
+description: Run one bounded licensed Editor process, then verify its consumer evidence.
+inputs:
+  stage:
+    description: Reviewed lifecycle phase selected by the workflow.
+    required: true
+  image:
+    description: Immutable Unity editor image digest.
+    required: true
+  work:
+    description: Fresh generated consumer workspace under artifacts/, relative to checkout.
+    default: artifacts/consumer-work
+  github-token:
+    description: Token used by the existing test runner check integration.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Prepare consumer phase
+      id: prepare
+      shell: bash
+      env:
+        CONSUMER_STAGE: ${{ inputs.stage }}
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: python3 ci/consumer-project.py before --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE" --github-output "$GITHUB_OUTPUT"
+
+    - name: Install the pinned CLI for minimum Editor account activation
+      if: steps.prepare.outputs.unity == '2021.3.0f1' && env.CONSUMER_GAMECI_CLI == ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        consumer_cli_dir="$RUNNER_TEMP/consumer-gameci-v0.1.72"
+        mkdir -p "$consumer_cli_dir"
+        gh release download v0.1.72 --repo game-ci/cli --pattern game-ci-linux-x64 --dir "$consumer_cli_dir" --clobber
+        consumer_cli_bin="$consumer_cli_dir/game-ci-linux-x64"
+        printf '%s  %s\n' 'a14afcb203920e3bf457b1a8d231c6795e4cda2f3be2dce6a1f32800c7b1bc66' "$consumer_cli_bin" | sha256sum --check
+        chmod 700 "$consumer_cli_bin"
+        printf 'CONSUMER_GAMECI_CLI=%s\n' "$consumer_cli_bin" >> "$GITHUB_ENV"
+
+    - name: Prepare the separate Personal-capable licensing client
+      if: steps.prepare.outputs.unity == '2021.3.0f1'
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: bash ci/consumer-licensing.sh "$CONSUMER_WORK"
+
+    - name: Give the container its generated workspace
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: bash ci/consumer-permissions.sh "$CONSUMER_WORK" container
+
+    - name: Run Editor phase
+      if: steps.prepare.outputs.unity != '2021.3.0f1' && steps.prepare.outputs.testMode == ''
+      uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v5
+      with:
+        cliVersion: v0.1.72
+        customImage: ${{ inputs.image }}
+        projectPath: ${{ steps.prepare.outputs.project }}
+        targetPlatform: StandaloneLinux64
+        buildMethod: ${{ steps.prepare.outputs.method }}
+        versioning: None
+        allowDirtyBuild: true
+        customParameters: -consumerConfig .journey/config.json
+
+    - name: Run narrow consumer or sample tests
+      if: steps.prepare.outputs.unity != '2021.3.0f1' && steps.prepare.outputs.testMode != ''
+      uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4
+      with:
+        cliVersion: v0.1.72
+        customImage: ${{ inputs.image }}
+        projectPath: ${{ steps.prepare.outputs.project }}
+        testMode: ${{ steps.prepare.outputs.testMode }}
+        customParameters: -testFilter ${{ steps.prepare.outputs.testFilter }}
+        artifactsPath: ${{ steps.prepare.outputs.artifacts }}
+        coverageEnabled: false
+        githubToken: ${{ inputs.github-token }}
+        checkName: Consumer ${{ inputs.stage }}
+
+    - name: Run minimum Editor with Personal-capable account activation
+      if: steps.prepare.outputs.unity == '2021.3.0f1'
+      shell: bash
+      env:
+        CONSUMER_STAGE: ${{ inputs.stage }}
+        CONSUMER_WORK: ${{ inputs.work }}
+        CONSUMER_IMAGE: ${{ inputs.image }}
+      run: python3 ci/consumer-project.py run-cli --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE" --image "$CONSUMER_IMAGE" --cli "$CONSUMER_GAMECI_CLI"
+
+    - name: Return generated files to the runner
+      if: always() && steps.prepare.outcome == 'success'
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: bash ci/consumer-permissions.sh "$CONSUMER_WORK" runner
+
+    - name: Verify phase and drive built player
+      if: always() && steps.prepare.outcome == 'success'
+      shell: bash
+      env:
+        CONSUMER_STAGE: ${{ inputs.stage }}
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: python3 ci/consumer-project.py after --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE"

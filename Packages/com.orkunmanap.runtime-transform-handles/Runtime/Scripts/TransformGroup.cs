@@ -52,6 +52,90 @@ namespace TransformHandles
             BoundsMap = new Dictionary<Transform, Bounds>();
         }
 
+        private readonly Dictionary<Transform, PosRotScale> _scaleStart = new Dictionary<Transform, PosRotScale>();
+        private Vector3 _scaleCenter, _ghostStartScale;
+
+        internal void BeginInteraction()
+        {
+            EndInteraction();
+            if (!GroupHandle.UniformGroupScale || GroupHandle.Type != HandleType.Scale ||
+                GroupHandle.Axes != HandleAxes.XYZ || Transforms.Count < 2 || GroupGhost == null) return;
+            _scaleCenter = GroupGhost.transform.position;
+            _ghostStartScale = GroupGhost.transform.localScale;
+            foreach (var target in Transforms)
+                if (target != null) _scaleStart.Add(target, new PosRotScale
+                { Position = target.position, Rotation = target.rotation, Scale = target.localScale });
+        }
+
+        internal void EndInteraction() => _scaleStart.Clear();
+
+        private static bool Finite(Vector3 value) =>
+            !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+            !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+            !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+
+        private void UpdateUniformScale()
+        {
+            if (_scaleStart.Count != Transforms.Count || _scaleStart.Count < 2 || GroupGhost == null) return;
+            var current = GroupGhost.transform.localScale;
+            if (!Finite(current) || !Finite(_ghostStartScale) ||
+                _ghostStartScale.x <= 0 || _ghostStartScale.y <= 0 || _ghostStartScale.z <= 0) return;
+            var factor = current.x / _ghostStartScale.x;
+            if (!(factor > 0) || float.IsInfinity(factor) ||
+                !Mathf.Approximately(factor, current.y / _ghostStartScale.y) ||
+                !Mathf.Approximately(factor, current.z / _ghostStartScale.z)) return;
+            // Validate the entire result before mutating any member.
+            foreach (var pair in _scaleStart)
+            {
+                if (pair.Key == null || !Transforms.Contains(pair.Key) ||
+                    !Finite(pair.Value.Scale * factor) ||
+                    !Finite(_scaleCenter + (pair.Value.Position - _scaleCenter) * factor)) return;
+            }
+            foreach (var pair in _scaleStart)
+            {
+                pair.Key.localScale = pair.Value.Scale * factor;
+                pair.Key.position = _scaleCenter + (pair.Value.Position - _scaleCenter) * factor;
+            }
+        }
+
+        internal bool HasDestroyedTargets()
+        {
+            foreach (var target in Transforms)
+            {
+                if (target == null) return true;
+            }
+
+            return false;
+        }
+
+        internal bool HasLiveTargets()
+        {
+            foreach (var target in Transforms)
+            {
+                if (target != null) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Removes independently destroyed targets from all group maps.
+        /// The caller owns the optional buffer; when null a local list is used.
+        /// </summary>
+        internal int PruneDestroyedTargets(List<Transform> removed = null)
+        {
+            var targetsToRemove = removed ?? new List<Transform>();
+            targetsToRemove.Clear();
+
+            foreach (var target in Transforms)
+            {
+                if (target == null) targetsToRemove.Add(target);
+            }
+
+            foreach (var target in targetsToRemove) RemoveTransform(target);
+            return targetsToRemove.Count;
+        }
+
         /// <summary>
         /// Adds a transform to the group if it's not null and not already relative to selected transforms.
         /// </summary>
@@ -59,12 +143,34 @@ namespace TransformHandles
         /// <returns>True if the transform was added successfully, false if target is null or relative to existing transforms.</returns>
         public bool AddTransform(Transform target)
         {
-            if (target == null)
+            return AddTransform(target, null);
+        }
+
+        /// <summary>
+        /// Internal overload used by the manager so descendant replacements can be removed from the
+        /// manager's ownership index. The supplied buffer is cleared by this method.
+        /// </summary>
+        internal bool AddTransform(Transform target, List<Transform> replaced)
+        {
+            replaced?.Clear();
+
+            if (ReferenceEquals(target, null))
             {
                 Debug.LogWarning("Cannot add null transform to group.");
                 return false;
             }
-            if (IsTargetRelativeToSelectedOnes(target)) return false;
+
+            if (target == null)
+            {
+                Debug.LogWarning("Cannot add a destroyed transform to group.");
+                return false;
+            }
+
+            // A public TransformGroup may outlive an independently destroyed member; clear those
+            // before any hierarchy checks so IsDeepParentOf never dereferences a destroyed receiver.
+            PruneDestroyedTargets();
+
+            if (IsTargetRelativeToSelectedOnes(target, replaced)) return false;
 
             var meshRenderer = target.GetComponent<MeshRenderer>();
 
@@ -96,6 +202,8 @@ namespace TransformHandles
         {
             foreach (var (target, meshRenderer) in RenderersMap)
             {
+                if (target == null) continue;
+
                 var bounds = meshRenderer ? meshRenderer.bounds : target.GetBounds();
                 BoundsMap[target] = bounds;
             }
@@ -109,6 +217,7 @@ namespace TransformHandles
         {
             foreach (var target in RenderersMap.Keys)
             {
+                if (target == null) continue;
                 target.position += positionChange;
             }
         }
@@ -125,6 +234,7 @@ namespace TransformHandles
             {
                 foreach (var target in RenderersMap.Keys)
                 {
+                    if (target == null) continue;
                     target.position = rotationChange * (target.position - ghostPosition) + ghostPosition;
                     target.rotation = rotationChange * target.rotation;
                 }
@@ -143,6 +253,7 @@ namespace TransformHandles
 
                 foreach (var target in RenderersMap.Keys)
                 {
+                    if (target == null) continue;
                     target.RotateAround(ghostPosition, rotationAxis, angleInDegrees);
                 }
             }
@@ -154,8 +265,15 @@ namespace TransformHandles
         /// <param name="scaleChange">The scale change to apply.</param>
         internal void UpdateScales(Vector3 scaleChange)
         {
+            if (GroupHandle.UniformGroupScale && GroupHandle.Type == HandleType.Scale && Transforms.Count > 1)
+            {
+                if (GroupHandle.Axes == HandleAxes.XYZ) UpdateUniformScale();
+                return;
+            }
             foreach (var (target, meshRenderer) in RenderersMap)
             {
+                if (target == null) continue;
+
                 if (IsOriginOnCenter && meshRenderer != null)
                 {
                     var oldCenter = meshRenderer.bounds.center;
@@ -189,9 +307,22 @@ namespace TransformHandles
         {
             var space = GroupHandle.Space;
             var averagePosRotScale = new PosRotScale();
+            var liveCount = 0;
+            var sumQuaternion = Quaternion.identity;
+            var averagePosition = Vector3.zero;
 
-            var transformsCount = Transforms.Count;
-            if (transformsCount == 0)
+            foreach (var target in Transforms)
+            {
+                if (target == null) continue;
+
+                liveCount++;
+                averagePosition += GetCenterPoint(target);
+
+                if (space == Space.World) continue;
+                sumQuaternion *= target.rotation;
+            }
+
+            if (liveCount == 0)
             {
                 averagePosRotScale.Position = Vector3.zero;
                 averagePosRotScale.Rotation = Quaternion.identity;
@@ -199,21 +330,12 @@ namespace TransformHandles
                 return averagePosRotScale;
             }
 
-            var sumQuaternion = Quaternion.identity;
-            var averagePosition = Vector3.zero;
-
-            foreach (var target in Transforms)
-            {
-                averagePosition += GetCenterPoint(target);
-
-                if (space == Space.World) continue;
-                sumQuaternion *= target.rotation;
-            }
-
-            averagePosition /= transformsCount;
+            averagePosition /= liveCount;
 
             averagePosRotScale.Position = averagePosition;
-            averagePosRotScale.Rotation = sumQuaternion;
+            var reference = GroupHandle.LocalSpaceReference;
+            averagePosRotScale.Rotation = space == Space.Self && reference != null && Transforms.Contains(reference)
+                ? reference.rotation : sumQuaternion;
             averagePosRotScale.Scale = Vector3.one;
 
             return averagePosRotScale;
@@ -221,18 +343,22 @@ namespace TransformHandles
 
         /// <summary>
         /// Checks if the new target is a parent or child of any existing transform in the group.
+        /// A new parent replaces all contained descendants.
         /// </summary>
-        private bool IsTargetRelativeToSelectedOnes(Transform newTarget)
+        private bool IsTargetRelativeToSelectedOnes(Transform newTarget, List<Transform> replaced)
         {
+            var descendants = replaced ?? new List<Transform>();
+
             foreach (var transformInHash in Transforms)
             {
+                if (transformInHash == null) continue;
+
                 if (transformInHash.IsDeepParentOf(newTarget)) return true;
 
-                if (!newTarget.IsDeepParentOf(transformInHash)) continue;
-                RemoveTransform(transformInHash);
-                return false;
+                if (newTarget.IsDeepParentOf(transformInHash)) descendants.Add(transformInHash);
             }
 
+            foreach (var descendant in descendants) RemoveTransform(descendant);
             return false;
         }
     }

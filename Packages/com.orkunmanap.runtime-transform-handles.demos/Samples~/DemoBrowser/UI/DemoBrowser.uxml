@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="DemoBrowser.uss" />
+    <ui:VisualElement name="gallery" class="gallery demo-gallery">
+        <ui:ScrollView class="gallery-scroll">
+            <ui:VisualElement class="content">
+                <ui:Label text="RUNTIME TRANSFORM HANDLES" class="eyebrow" />
+                <ui:Label text="A place to try things." class="heading" />
+                <ui:Label text="Pick a workspace and make it your own." class="intro" />
+                <ui:VisualElement name="cards" class="cards" />
+                <ui:Label name="status" class="status" />
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>
