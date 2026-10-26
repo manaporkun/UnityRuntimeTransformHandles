@@ -2,8 +2,10 @@ import importlib.util
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
 import tarfile
 import unittest
 
@@ -295,6 +297,47 @@ class ConsumerProjectTests(unittest.TestCase):
             'source': 'git', 'version': self.config['pairCoreUrl'], 'hash': self.config['pairCommit']}}})
         with self.assertRaisesRegex(ValueError, 'stage-selected distribution route'):
             consumer.verify_resolved(self.work, self.project, observation)
+
+    def permission_fixture(self):
+        folder = self.root / 'artifacts/consumer-work'
+        (folder / 'candidate').mkdir(parents=True)
+        (folder / 'run.json').write_text('{}')
+        (folder / 'candidate/candidate.json').write_text('{}')
+        binaries = self.root / 'permission-bin'
+        binaries.mkdir()
+        sudo = binaries / 'sudo'
+        sudo.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$PERMISSION_TRACE"\n')
+        sudo.chmod(0o755)
+        self.permission_trace = self.root / 'permission-arguments.txt'
+        self.permission_env = {**os.environ, 'GITHUB_WORKSPACE': str(self.root),
+                               'PATH': str(binaries) + os.pathsep + os.environ['PATH'], 'PERMISSION_TRACE': str(self.permission_trace)}
+        return folder
+
+    def permissions(self, folder, owner):
+        return subprocess.run(['bash', str(Path(__file__).with_name('consumer-permissions.sh')), str(folder), owner],
+                              env=self.permission_env, text=True, capture_output=True)
+
+    def test_container_and_runner_ownership_stay_in_the_generated_tree_without_following_links(self):
+        folder = self.permission_fixture()
+        for owner, identity in (('container', '0:0'), ('runner', str(os.getuid()) + ':' + str(os.getgid()))):
+            result = self.permissions(folder, owner)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(self.permission_trace.read_text().splitlines(),
+                             ['chown', '-R', '-P', '--no-dereference', identity, '--', str(folder.resolve())])
+
+    def test_ownership_rejects_checkout_outside_paths_and_symlink_escapes(self):
+        folder = self.permission_fixture()
+        outside = self.root / 'user-owned'
+        shutil.copytree(folder, outside)
+        escape = self.root / 'artifacts/escape'
+        escape.symlink_to(outside, target_is_directory=True)
+        for path in (self.root, outside, escape):
+            with self.subTest(path=path):
+                self.assertNotEqual(self.permissions(path, 'container').returncode, 0)
+                self.assertFalse(self.permission_trace.exists())
+        (folder / 'candidate/candidate.json').unlink()
+        self.assertNotEqual(self.permissions(folder, 'container').returncode, 0)
+        self.assertFalse(self.permission_trace.exists())
 
     def test_aggregate_probe_rejects_raw_editor_conflicts_and_reused_players(self):
         self.prepare('6-legacy', 'git')

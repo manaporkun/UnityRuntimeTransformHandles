@@ -175,6 +175,12 @@ allowing the next phase. `required_stages()` in `consumer-project.py` owns order
 scope; a report cannot choose a smaller journey. Use the workflow's sequence rather
 than skipping to a build. No Library or lock is restored into a fresh consumer.
 
+The pinned image's license setup needs the default container user. The composite
+transfers only the generated workspace under `artifacts/` to that user before each
+invocation and returns ownership to the runner afterward, including failed phases.
+This also keeps temporary Git repository ownership consistent with UPM. The guarded
+helper never follows symlinks or changes ownership of the checkout or outside paths.
+
 The local `run-editor` command accepts `--unity`, `--project`, `--method` and
 `--timeout` for individual Editor smoke checks. `prepare --build-target StandaloneOSX`
 can produce a local macOS counterpart. Full acceptance uses native Linux Mono

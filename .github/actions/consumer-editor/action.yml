@@ -8,7 +8,7 @@ inputs:
     description: Immutable Unity editor image digest.
     required: true
   work:
-    description: Fresh generated consumer workspace, relative to checkout.
+    description: Fresh generated consumer workspace under artifacts/, relative to checkout.
     default: artifacts/consumer-work
   github-token:
     description: Token used by the existing test runner check integration.
@@ -24,6 +24,12 @@ runs:
         CONSUMER_WORK: ${{ inputs.work }}
       run: python3 ci/consumer-project.py before --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE" --github-output "$GITHUB_OUTPUT"
 
+    - name: Give the container its generated workspace
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: bash ci/consumer-permissions.sh "$CONSUMER_WORK" container
+
     - name: Run Editor phase
       if: steps.prepare.outputs.testMode == ''
       uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v5
@@ -35,7 +41,6 @@ runs:
         buildMethod: ${{ steps.prepare.outputs.method }}
         versioning: None
         allowDirtyBuild: true
-        runAsHostUser: true
         customParameters: -consumerConfig .journey/config.json
 
     - name: Run narrow consumer or sample tests
@@ -49,9 +54,15 @@ runs:
         customParameters: -testFilter ${{ steps.prepare.outputs.testFilter }}
         artifactsPath: ${{ steps.prepare.outputs.artifacts }}
         coverageEnabled: false
-        runAsHostUser: true
         githubToken: ${{ inputs.github-token }}
         checkName: Consumer ${{ inputs.stage }}
+
+    - name: Return generated files to the runner
+      if: always() && steps.prepare.outcome == 'success'
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: bash ci/consumer-permissions.sh "$CONSUMER_WORK" runner
 
     - name: Verify phase and drive built player
       if: always() && steps.prepare.outcome == 'success'
