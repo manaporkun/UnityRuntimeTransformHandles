@@ -11,8 +11,6 @@ CORE = 'com.orkunmanap.runtime-transform-handles'
 DEMOS = CORE + '.demos'
 # Optional Unity assembly references already used by the showcase/Core asmdefs.
 UNITY_ASSEMBLIES = {'2bafac87e7f4b9b418d9448d219b01ab', '75469ad4d38634e559750d17036d5f7c'}
-# The unchanged legacy showcase retains its documented URP camera component.
-LEGACY_URP = {'a79441f348de89743a2939f4d699eac1'}
 GUID = re.compile(r'(?:guid:\s*|GUID:)([0-9a-f]{32})')
 
 
@@ -88,8 +86,6 @@ def validate(root):
         require(folder.is_relative_to((demos / 'Samples~').resolve()) and folder.is_dir(), 'invalid sample path')
         local_guids = {guid for guid, path in all_guids.items() if path.resolve().is_relative_to(folder)}
         allowed = core_guids | local_guids | UNITY_ASSEMBLIES
-        if sample['path'] == 'Samples~/Demo':
-            allowed |= LEGACY_URP
         require(any(folder.glob('*.unity')) and any(folder.glob('*.asmdef')), 'sample scene/assembly missing')
         for path in folder.rglob('*'):
             if path.suffix not in ('.unity', '.prefab', '.asset', '.mat', '.asmdef', '.asmref', '.shader', '.anim', '.controller', '.inputactions', '.renderTexture', '.uxml', '.uss', '.tss'):

@@ -45,6 +45,13 @@ class PackageBoundaryTests(unittest.TestCase):
         scene.write_text(scene.read_text() + '\nreference: {guid: 123456789012345678901234567890ab}\n')
         with self.assertRaisesRegex(ValueError, 'escapes'): boundary.validate(self.root)
 
+    def test_optional_urp_camera_is_not_allowed_in_generic_showcase(self):
+        scene = self.demos / 'Samples~/Demo/RuntimeTransformHandlesDemo.unity'
+        self.assertNotIn('UniversalAdditionalCameraData', scene.read_text())
+        scene.write_text(scene.read_text() + '\nm_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}\n')
+        with self.assertRaisesRegex(ValueError, 'escapes'):
+            boundary.validate(self.root)
+
     def test_compiled_demo_assembly_outside_samples_rejected(self):
         (self.demos / 'Leaked.cs').write_text('class Leaked {}')
         with self.assertRaisesRegex(ValueError, 'always-compiled'): boundary.validate(self.root)

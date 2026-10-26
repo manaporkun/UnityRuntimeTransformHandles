@@ -20,5 +20,6 @@
 - Responsive white editor UI, handle size popover, left-drag orbit, right-drag pan and fractional WebGL wheel zoom.
 
 ### Fixed
+- The generic showcase no longer serializes an optional URP camera component, avoiding a missing script when imported into a Built-in project without URP.
 - Modular Building typography and spacing are defined together in the sample stylesheet; no TMP package or Essential Resources setup is required.
 - WebGL builds now reject newly imported sample assemblies until Unity reloads them, preventing missing-script players. Modular Building has a separate CLI preparation command; Pages prepares the original showcase before starting Unity.
