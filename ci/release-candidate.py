@@ -39,6 +39,83 @@ def hashes(folder):
             if p.is_file() and p.name != '.DS_Store'}
 
 
+def export_tree(root, revision, prefix, destination):
+    """Read committed regular files only; never trust paths from a source archive."""
+    command = ['git', '-C', str(root), 'archive', revision]
+    raw = subprocess.check_output(command + (['--', prefix] if prefix else []))
+    with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+        for member in archive.getmembers():
+            path = PurePosixPath(member.name)
+            require(not path.is_absolute() and '..' not in path.parts and
+                    (member.isdir() or member.isfile()), 'unsafe source archive entry')
+            if member.isfile():
+                relative = path.relative_to(prefix) if prefix else path
+                target = destination / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(archive.extractfile(member).read())
+                target.chmod(member.mode & 0o777)
+
+
+def archive_tree(archive_path):
+    """Reconstruct the Git tree identity from actual baseline archive bytes and modes."""
+    root, seen = {}, set()
+    with tarfile.open(archive_path) as archive:
+        for entry in archive.getmembers():
+            path = PurePosixPath(entry.name)
+            require(not path.is_absolute() and len(path.parts) > 1 and path.parts[0] == 'package' and
+                    '..' not in path.parts and entry.isfile() and path not in seen, 'invalid baseline archive entry')
+            seen.add(path)
+            node = root
+            for part in path.parts[1:-1]:
+                require(part not in node or isinstance(node[part], dict), 'baseline file/directory conflict')
+                node = node.setdefault(part, {})
+            require(path.name not in node, 'duplicate baseline tree entry')
+            payload = archive.extractfile(entry).read()
+            blob = hashlib.sha1(b'blob ' + str(len(payload)).encode() + b'\0' + payload).digest()
+            node[path.name] = (b'100755' if entry.mode & 0o111 else b'100644', blob)
+    def tree(node):
+        records = []
+        for name, value in node.items():
+            directory = isinstance(value, dict)
+            mode, identifier = (b'40000', tree(value)) if directory else value
+            records.append(((name + ('/' if directory else '')).encode(), mode + b' ' + name.encode() + b'\0' + identifier))
+        payload = b''.join(value for _, value in sorted(records))
+        return hashlib.sha1(b'tree ' + str(len(payload)).encode() + b'\0' + payload).digest()
+    return tree(root).hex()
+
+
+def freeze_consumer(root, package_source, out):
+    fixture = out / 'consumer'
+    try:
+        export_tree(root, package_source, 'ci/consumer', fixture)
+    except subprocess.CalledProcessError as error:
+        raise ValueError('cannot read consumer fixture at ' + package_source +
+                         '; see docs/RELEASE-PREPARATION.md for historical recovery') from error
+    require((fixture / 'contract.json').is_file(), 'missing consumer contract; historical recovery unsupported')
+    contract = json.loads((fixture / 'contract.json').read_text())
+    require(contract.get('schema') == 1, 'unsupported consumer contract')
+    baseline = contract['baseline']
+    require(re.fullmatch(r'[0-9a-f]{40}', baseline['commit']) and
+            re.fullmatch(r'[0-9a-f]{40}', baseline['tree']), 'invalid baseline identity')
+    require(git(root, 'rev-parse', baseline['commit'] + '^{tree}') == baseline['tree'],
+            'upgrade baseline tree mismatch')
+    require(git(root, 'rev-parse', baseline['ref'] + '^{commit}') == baseline['commit'],
+            'upgrade baseline ref/commit mismatch')
+    # Tags may move; the reviewed commit and tree, not a remote lookup, select these bytes.
+    with tempfile.TemporaryDirectory() as temp:
+        staging = Path(temp)
+        export_tree(root, baseline['commit'], '', staging)
+        manifest = json.loads((staging / 'package.json').read_text())
+        require(manifest['name'] == CORE and manifest['version'] == baseline['version'],
+                'upgrade baseline package mismatch')
+        archive_path = out / 'baseline-core.tgz'
+        with tarfile.open(archive_path, 'w:gz') as archive:
+            for relative in hashes(staging):
+                archive.add(staging / relative, arcname='package/' + relative, recursive=False)
+        return {'files': hashes(fixture)}, {
+            **baseline, 'sha256': digest(archive_path), 'files': hashes(staging)}
+
+
 def release_exists(repository, version):
     result = subprocess.run(['gh', 'api', '--include', f'repos/{repository}/releases/tags/v{version}'],
                             text=True, capture_output=True)
@@ -101,6 +178,7 @@ def prepare(root, out, repository=None):
                 f'cannot read release test inventory {name} at {package_source}; '
                 'see docs/RELEASE-PREPARATION.md for historical recovery')
         (required / name).write_bytes(result.stdout)
+    consumer, baseline = freeze_consumer(root, package_source, out)
     # git archive excludes consumer imports, caches, untracked files and OS metadata.
     with tempfile.TemporaryDirectory() as temp:
         staging = Path(temp)
@@ -144,7 +222,8 @@ def prepare(root, out, repository=None):
                     'publishable': bool(repository), 'recovery': recovery,
                     'skip': not recovery and bump == 'none', 'version': version, 'bump': bump,
                     'demos_version': json.loads((demos / 'package.json').read_text())['version'],
-                    'required': hashes(required), 'packages': {}}
+                    'required': hashes(required), 'consumer': consumer,
+                    'baseline': baseline, 'packages': {}}
         for name, folder in zip(PACKAGES, (core, demos)):
             target = out / (name + '.tgz')
             with tarfile.open(target, 'w:gz') as archive:
@@ -165,6 +244,17 @@ def read_candidate(out):
     require(required.is_dir() and {p.name for p in required.iterdir()} == set(REQUIRED_FILES),
             'invalid candidate inventory files')
     require(hashes(required) == metadata['required'], 'required inventory changed')
+    fixture = out / 'consumer'
+    require(fixture.is_dir() and hashes(fixture) == metadata.get('consumer', {}).get('files'),
+            'consumer fixture changed or missing; historical recovery unsupported')
+    contract = json.loads((fixture / 'contract.json').read_text())
+    require(contract.get('schema') == 1, 'unsupported consumer contract')
+    baseline = metadata.get('baseline', {})
+    require(all(baseline.get(key) == value for key, value in contract['baseline'].items()),
+            'baseline identity differs from consumer contract')
+    require((out / 'baseline-core.tgz').is_file() and
+            digest(out / 'baseline-core.tgz') == baseline.get('sha256'), 'baseline archive changed or missing')
+    require(archive_tree(out / 'baseline-core.tgz') == baseline.get('tree'), 'baseline archive differs from pinned Git tree')
     require(digest(out / 'release-notes.md') == metadata['notes_sha256'], 'release notes changed')
     for name, info in metadata['packages'].items():
         require(digest(out / (name + '.tgz')) == info['sha256'], 'archive changed: ' + name)

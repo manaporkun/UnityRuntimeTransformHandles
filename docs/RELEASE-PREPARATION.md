@@ -53,6 +53,12 @@ that verified tag. Do not move an existing tag, publish newer main files under t
 invent a historical inventory from current code. If the original evidence is unavailable, leave
 the recovery unresolved until it can be established.
 
+Consumer validation also requires the original `consumer/` fixture, its complete per-file
+inventory, and `baseline-core.tgz`. Candidate metadata binds the fixture to `package_source`
+and the baseline to the reviewed v3.3.1 commit and Git tree in `consumer/contract.json`.
+Missing, extra or modified files fail recovery. Current orchestration and verifiers run
+against those frozen inputs; current fixture code never substitutes for an older candidate.
+
 Future stable Demos dependency changes require an explicit new Demos version in the source manifest
 and matching changelog. The script rejects silently changing an existing stable Demos version when
 Core advances. Demos-only changes do not manufacture a Core release: CI still validates them and
@@ -60,6 +66,23 @@ their source distribution, but the Core publisher reports that no Core release w
 Demos-only release must explicitly update its own version/changelog and use its validated source SHA.
 
 ## Clean consumer acceptance
+
+The publish workflow automates the journey below using five full journeys and three Git
+installation/build/player probes. Tarball installation runs the full lifecycle in all four
+profiles: Unity 2021.3.0f1 Legacy/Built-in, Unity 6000.3.16f1 Legacy/Built-in, Input System/Built-in,
+and Input System/active URP 17.3.0. Git runs the full lifecycle in Unity 6 Input System/Built-in
+and probes in the other three profiles. Git URLs use a temporary local Core root/tag and
+same-commit Core/Demos subpaths, resolved by UPM. This validates transport shapes without
+publishing a candidate. See [the exact commands and evidence contract](../ci/README.md#clean-consumer-journeys).
+
+Each full journey includes save/reopen customization, independent sample tests/players,
+gallery navigation, removal with retained imports, controlled backup/removal of imports and
+Core-dependent consumer assets, and an upgrade from the pinned previous stable Core. Players
+run under Xvfb with real pointer/key input. Actual Unity version, input backend, active pipeline,
+rendered targets/handles, transforms and public events are checked. A no-input control must
+fail interaction acceptance. Each player report is bound to its own lifecycle build and bytes.
+All eight consumer jobs are required publish dependencies; skipped or unavailable licensed
+jobs cannot authorize publication. Existing Core/Demos suites and the separate floor stay in place.
 
 Install the candidate Core `.tgz` in a new disposable Unity project through Package Manager's
 **Add package from tarball**. The project must not reference this repository's development folders.

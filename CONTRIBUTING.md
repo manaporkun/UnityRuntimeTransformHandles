@@ -14,6 +14,9 @@ is organized, how releases work, and what a pull request needs to pass.
 - **`ci/floor-2021/`** is a minimal Unity 2021.3 project used only by CI to verify the declared
   minimum Unity version, the legacy Input Manager path, and URP-free installs. Don't open it
   with a newer editor.
+- **`ci/consumer/`** contains consumer-owned scripts and reviewed journey data. These files
+  are frozen into release candidates; they are not distributed in Core or Demos. See
+  [the consumer CI guide](ci/README.md#clean-consumer-journeys) before changing the contract.
 - **`.local/`** is gitignored scratch space for planning, review and assistant output. Keep
   notes there, not in the repository root.
 
@@ -75,7 +78,10 @@ always better.
 On every push to `main`, the publish workflow:
 
 1. Validates the package manifest and structure (no Unity license needed).
-2. Runs EditMode + PlayMode tests on the current Unity version, under both input settings. The 2021.3 floor workflow runs separately and is not a publish dependency.
+2. Tests the frozen Core/Demos candidate under both current-Unity input settings, then runs
+   eight fresh consumer jobs covering real UPM installation and native Linux players. All
+   consumer jobs must succeed before publication. The separate 2021.3 floor workflow
+   remains a required review check.
 3. Computes the version bump from Core-affecting commits since the last release, updates `package.json`
    and `CHANGELOG.md`, and pushes a `chore: bump version to X.Y.Z [skip ci]` commit.
 4. Splits the package directory onto the `upm` branch, tags `vX.Y.Z`, and creates a GitHub
@@ -100,7 +106,7 @@ There is nothing to do manually — merging to `main` releases.
 
 | Workflow | What it gates |
 |---|---|
-| `publish-upm.yml` | manifest validation, EditMode+PlayMode tests on current Unity, release automation |
+| `publish-upm.yml` | frozen candidate, Core/Demos suites, eight fresh consumer journeys/probes, release automation |
 | `compat-floor.yml` | package tests on Unity 2021.3 without Input System or URP |
 | `min-api-lint.yml` | static scan for unguarded post-2021.3 APIs, `.meta` BOM check |
 | `webgl-pages.yml` | WebGL demo build + GitHub Pages deploy |

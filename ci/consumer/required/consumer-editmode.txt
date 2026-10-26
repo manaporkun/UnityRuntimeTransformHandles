@@ -1,0 +1,5 @@
+# Reviewed consumer contract tests; never generated from accepted XML.
+ConsumerJourney.Tests.ConsumerProjectTests.SavedScenesKeepConsumerOwnedReferences
+ConsumerJourney.Tests.ConsumerProjectTests.PublicSetupPreservesOccupiedUserLayers
+ConsumerJourney.Tests.ConsumerProjectTests.ManagerUsesConsumerPrefabAndSettingsCopies
+ConsumerJourney.Tests.ConsumerProjectTests.AssetGuidsAreUniqueAfterImportsAndUpgrade

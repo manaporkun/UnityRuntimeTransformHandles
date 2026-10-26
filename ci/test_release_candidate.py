@@ -41,6 +41,18 @@ class CandidateTests(unittest.TestCase):
             shutil.copy2(Path(__file__).with_name(name), ci / name)
         for name in candidate.REQUIRED_FILES[:-1]:
             (ci / name).write_text(name + '.Shared\n' + name + '.Old\n')
+        # A real immutable Core-only Git commit models the reviewed older release.
+        self.git('add', 'Packages/' + candidate.CORE)
+        tree = self.git('write-tree')
+        core_tree = self.git('rev-parse', tree + ':Packages/' + candidate.CORE)
+        baseline = self.git('commit-tree', core_tree, '-m', 'Baseline Core package')
+        self.git('tag', 'v3.3.1', baseline)
+        fixture = ci / 'consumer'
+        shutil.copytree(Path(__file__).with_name('consumer'), fixture)
+        contract_path = fixture / 'contract.json'
+        contract = json.loads(contract_path.read_text())
+        contract['baseline'].update(commit=baseline, tree=core_tree)
+        contract_path.write_text(json.dumps(contract))
         demos = self.root / 'Packages' / candidate.DEMOS
         path = demos / 'package.json'
         manifest = json.loads(path.read_text())
@@ -228,6 +240,72 @@ class CandidateTests(unittest.TestCase):
         path.write_text(json.dumps(metadata))
         with self.assertRaisesRegex(ValueError, 'invalid candidate inventory'):
             candidate.read_candidate(self.out)
+
+    def test_fixture_and_baseline_are_committed_immutable_bytes(self):
+        path = self.root / 'ci/consumer/contract.json'
+        committed = path.read_bytes()
+        path.write_bytes(b'local invalid contract')
+        metadata = candidate.prepare(self.root, self.out)
+        self.assertEqual((self.out / 'consumer/contract.json').read_bytes(), committed)
+        self.assertEqual(metadata['consumer']['files'], candidate.hashes(self.out / 'consumer'))
+        with tarfile.open(self.out / 'baseline-core.tgz') as archive:
+            self.assertEqual(json.load(archive.extractfile('package/package.json'))['version'], '3.3.1')
+        candidate.read_candidate(self.out)
+
+    def test_changed_missing_extra_fixture_and_baseline_rejected(self):
+        self.prepare()
+        path = self.out / 'consumer/contract.json'
+        original = path.read_bytes()
+        for action in ('change', 'remove', 'extra'):
+            with self.subTest(action=action):
+                extra = self.out / 'consumer/unexpected.txt'
+                if action == 'change': path.write_bytes(original + b' ')
+                elif action == 'remove': path.unlink()
+                else: extra.write_text('unreviewed')
+                with self.assertRaisesRegex(ValueError, 'consumer fixture'):
+                    candidate.read_candidate(self.out)
+                path.write_bytes(original)
+                extra.unlink(missing_ok=True)
+        archive = self.out / 'baseline-core.tgz'
+        archive.write_bytes(archive.read_bytes() + b'changed')
+        with self.assertRaisesRegex(ValueError, 'baseline archive'):
+            candidate.read_candidate(self.out)
+
+    def test_recovery_freezes_fixture_and_baseline_from_package_source(self):
+        old_contract = (self.root / 'ci/consumer/contract.json').read_bytes()
+        path = self.root / 'ci/consumer/contract.json'
+        data = json.loads(path.read_text())
+        data['scenarios'].append('future-scenario')
+        path.write_text(json.dumps(data))
+        self.change(candidate.CORE, 'fix: evolve consumer fixture')
+        with patch.object(candidate, 'release_exists', return_value=False):
+            recovery = candidate.prepare(self.root, self.out, 'fixture/repo')
+        self.assertEqual((self.out / 'consumer/contract.json').read_bytes(), old_contract)
+        normal_out = Path(self.temp.name) / 'normal'
+        normal = candidate.prepare(self.root, normal_out)
+        self.assertEqual((normal_out / 'consumer/contract.json').read_bytes(), path.read_bytes())
+        self.assertNotEqual(recovery['consumer'], normal['consumer'])
+        self.assertEqual(recovery['baseline']['files'], normal['baseline']['files'])
+
+    def test_historical_recovery_does_not_use_head_fixture(self):
+        fixture = self.root / 'ci/consumer'
+        backup = Path(self.temp.name) / 'fixture'
+        shutil.move(fixture, backup)
+        self.commit('chore: bump version to 3.3.1 [skip ci]')
+        shutil.copytree(backup, fixture)
+        self.change(candidate.CORE, 'fix: restore fixture on newer source')
+        with patch.object(candidate, 'release_exists', return_value=False):
+            with self.assertRaisesRegex(ValueError, 'cannot read consumer fixture'):
+                candidate.prepare(self.root, self.out, 'fixture/repo')
+
+    def test_wrong_baseline_tree_rejected(self):
+        path = self.root / 'ci/consumer/contract.json'
+        contract = json.loads(path.read_text())
+        contract['baseline']['tree'] = '0' * 40
+        path.write_text(json.dumps(contract))
+        self.commit('test: incorrect baseline')
+        with self.assertRaisesRegex(ValueError, 'baseline tree mismatch'):
+            candidate.prepare(self.root, self.out)
 
     def test_historical_recovery_does_not_fall_back_to_current_inventory(self):
         path = self.root / 'ci/required-unity-evidence.json'

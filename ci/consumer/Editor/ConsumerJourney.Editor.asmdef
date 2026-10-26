@@ -1,0 +1,7 @@
+{
+  "name": "ConsumerJourney.Editor",
+  "rootNamespace": "ConsumerJourney",
+  "references": ["ConsumerJourney.Bootstrap", "ConsumerJourney.Runtime", "com.orkunmanap.runtime-transform-handles", "TransformHandles.Editor"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

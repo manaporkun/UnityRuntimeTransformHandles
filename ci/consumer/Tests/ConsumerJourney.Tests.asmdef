@@ -1,0 +1,10 @@
+{
+  "name": "ConsumerJourney.Tests",
+  "rootNamespace": "ConsumerJourney.Tests",
+  "references": ["ConsumerJourney.Bootstrap", "ConsumerJourney.Runtime", "com.orkunmanap.runtime-transform-handles", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

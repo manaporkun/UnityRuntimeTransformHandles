@@ -136,3 +136,87 @@ runner. The upstream downloader's latest-release lookup can hit GitHub's unauthe
 rate limit before Unity starts. Both Core/Demos jobs use the same pinned action revision and CLI;
 Unity editor versions remain explicit in test jobs and match each project's ProjectVersion.txt;
 Pages uses auto detection. Test startup logs independently verify the observed editor version. CLI pinning does not relax any suite, artifact or publication gate.
+
+## Clean consumer journeys
+
+`publish-upm.yml` runs eight fresh consumer jobs after the existing Core/Demos suites.
+Tarball jobs run the full lifecycle in 2021.3.0f1 Legacy/Built-in and 6000.3.16f1
+Legacy/Built-in, Input System/Built-in and Input System/URP 17.3.0. Git runs a full
+journey in Unity 6 Input System/Built-in and installation/build/player probes in the
+other three profiles. Every full lifecycle stage therefore runs in each profile;
+this does not claim a full lifecycle in every transport/profile combination.
+
+The fixture and exact standalone test inventories live in `ci/consumer/` and are
+frozen from `package_source` into each candidate. The older Core-only v3.3.1 baseline
+is frozen separately, with its ref, full commit, Git tree and archive/file hashes.
+Never replace missing historical fixture/baseline bytes with current files. To
+change the baseline or inventories, review and commit the contract/data deliberately.
+Browser-only discovery is exactly three applicable cases; gallery-dependent cases
+belong to the co-import run. Unexpected skips always fail.
+
+For a local candidate, begin with a fresh output and work directory:
+
+```sh
+python3 ci/release-candidate.py prepare --root . --out artifacts/candidate
+python3 ci/consumer-project.py prepare --candidate artifacts/candidate \
+  --work artifacts/consumer-work --profile 2021-legacy --transport tarball
+python3 ci/consumer-project.py before --work artifacts/consumer-work --stage core-resolve
+```
+
+`before` selects the reviewed project, Editor method or test filter and records the
+pending phase. The composite action in `.github/actions/consumer-editor/action.yml`
+runs that invocation with the pinned GameCI CLI/image, then calls `after`. `after`
+verifies actual UPM/cache bytes, test discovery and real player evidence before
+allowing the next phase. `required_stages()` in `consumer-project.py` owns order and
+scope; a report cannot choose a smaller journey. Use the workflow's sequence rather
+than skipping to a build. No Library or lock is restored into a fresh consumer.
+
+The local `run-editor` command accepts `--unity`, `--project`, `--method` and
+`--timeout` for individual Editor smoke checks. `prepare --build-target StandaloneOSX`
+can produce a local macOS counterpart. Full acceptance uses native Linux Mono
+players on Ubuntu with Xvfb, xdotool and Mesa; macOS compilation or a player process
+exit is not Linux interaction evidence.
+
+After all phases, run the current aggregate verifier:
+
+```sh
+python3 ci/verify-consumer-results.py --work artifacts/consumer-work \
+  --candidate artifacts/candidate --profile 2021-legacy --transport tarball
+```
+
+Each phase's evidence directory contains `record.json`, `editor.log` and
+`resolution.json` with the raw observed package/assembly list and manifest/lock
+snapshots. Non-test phases add `editor.json`; tests add their mode's XML/log. Import
+phases retain the public Sample API inventory. Builds add `build.json` and a `player/`
+directory containing native startup log, `input.json`, `ready.json`/PNG and every
+stage/nonce JSON/PNG pair. The first Core build also retains `negative/` from the
+same binary with interaction input withheld. A fresh build identity embedded in a
+Resource and the complete player-file digest prevent evidence reuse across builds.
+The exact output patterns are frozen in `consumer/contract.json`.
+
+Acceptance checks actual focused-window input, rendered targets and handles, hover
+pixels, numeric snapped transforms, public events and cleanup, effective saved
+settings/prefab/material values, sample UI clicks and gallery transitions. Existing
+customized imports must survive another public-import attempt; a deliberate duplicate
+GUID probe must be rejected. PackageCache bytes stay unchanged. Demos removal retains
+explicit UI dependencies and imported Assets. Later removals happen only in controlled
+copies with named dependency-bearing assets backed up outside Assets. Unrelated user
+content and GUIDs must survive. Final uninstall checks raw manifest, lock, package
+list and loaded assemblies after reopening.
+
+The workflow permits two consumer jobs at once and gives each job 180 minutes, with
+20-minute phase deadlines and shorter player/checkpoint deadlines. The current full
+sequence uses 37 Editor phases and 13 native builds; a probe uses four and two. Narrow
+UTF tests and distinct retained Core/gallery players account for these counts. Evidence
+and external backups are always uploaded, including partial failures. After each
+independent sample its Library/build output is removed only after hashed evidence is
+exported. `summary.json` records observed Editor process/build/player counts and elapsed
+time. Artifact upload alone never means acceptance; all eight jobs must succeed before
+the publisher can run. Keep the PR draft until final-revision CI and independent review
+are complete.
+
+Run `python3 -m unittest discover -s ci -p 'test_*.py'` for stdlib regression tests.
+These test evidence rejection and orchestration policy; they do not replace licensed
+Editor/player results. The generic showcase now omits the optional URP camera
+component, preserving its base Camera and GUIDs. Both Built-in and active URP must
+render its actual target/handle pixels with zero missing scripts.

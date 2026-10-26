@@ -1,0 +1,62 @@
+name: Consumer Editor phase
+description: Run one bounded licensed Editor process, then verify its consumer evidence.
+inputs:
+  stage:
+    description: Reviewed lifecycle phase selected by the workflow.
+    required: true
+  image:
+    description: Immutable Unity editor image digest.
+    required: true
+  work:
+    description: Fresh generated consumer workspace, relative to checkout.
+    default: artifacts/consumer-work
+  github-token:
+    description: Token used by the existing test runner check integration.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Prepare consumer phase
+      id: prepare
+      shell: bash
+      env:
+        CONSUMER_STAGE: ${{ inputs.stage }}
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: python3 ci/consumer-project.py before --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE" --github-output "$GITHUB_OUTPUT"
+
+    - name: Run Editor phase
+      if: steps.prepare.outputs.testMode == ''
+      uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v5
+      with:
+        cliVersion: v0.1.72
+        customImage: ${{ inputs.image }}
+        projectPath: ${{ steps.prepare.outputs.project }}
+        targetPlatform: StandaloneLinux64
+        buildMethod: ${{ steps.prepare.outputs.method }}
+        versioning: None
+        allowDirtyBuild: true
+        runAsHostUser: true
+        customParameters: -consumerConfig .journey/config.json
+
+    - name: Run narrow consumer or sample tests
+      if: steps.prepare.outputs.testMode != ''
+      uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4
+      with:
+        cliVersion: v0.1.72
+        customImage: ${{ inputs.image }}
+        projectPath: ${{ steps.prepare.outputs.project }}
+        testMode: ${{ steps.prepare.outputs.testMode }}
+        customParameters: -testFilter ${{ steps.prepare.outputs.testFilter }}
+        artifactsPath: ${{ steps.prepare.outputs.artifacts }}
+        coverageEnabled: false
+        runAsHostUser: true
+        githubToken: ${{ inputs.github-token }}
+        checkName: Consumer ${{ inputs.stage }}
+
+    - name: Verify phase and drive built player
+      if: always() && steps.prepare.outcome == 'success'
+      shell: bash
+      env:
+        CONSUMER_STAGE: ${{ inputs.stage }}
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: python3 ci/consumer-project.py after --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE"

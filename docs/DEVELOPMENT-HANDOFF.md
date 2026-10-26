@@ -236,7 +236,7 @@ Navigation claims its press before Core updates and keeps it through release. Th
 
 `BuildScript.PrepareDemoBrowserWebGL` imports all four samples; run `BuildScript.BuildDemoBrowserWebGL` after compilation in a separate CLI invocation. Existing imports are preserved. Individual build methods and the public Pages workflow are unchanged. See the [Browser README](../Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/DemoBrowser/README.md) for consumer and build instructions.
 
-Validation: the complete imported sample suite passes 86 tests on Unity 2021.3.0f1 Legacy, 86 on Unity 6000.3.16f1 Legacy, and 88 on Unity 6000.3.16f1 Input System. This includes transitions while selected/dragging, returning repeatedly, borrowed manager restoration, EventSystem recovery, duplicate-load rejection, and same-frame navigation input with stale EventSystem hover. A clean Browser-only 2021 consumer without other sample imports passes its three applicable gallery/resolution tests. All 29 Python CI tests, package boundaries, minimum-API/meta checks and wheel bridge checks pass. The Built-in 2021 host retains the original showcase's known missing optional URP camera-script warning; it does not affect the Browser-only import.
+Validation: the complete imported sample suite passes 86 tests on Unity 2021.3.0f1 Legacy, 86 on Unity 6000.3.16f1 Legacy, and 88 on Unity 6000.3.16f1 Input System. This includes transitions while selected/dragging, returning repeatedly, borrowed manager restoration, EventSystem recovery, duplicate-load rejection, and same-frame navigation input with stale EventSystem hover. A clean Browser-only 2021 consumer without other sample imports passes its three applicable gallery/resolution tests. All 29 Python CI tests, package boundaries, minimum-API/meta checks and wheel bridge checks pass. The Built-in 2021 host retained the original showcase's known missing optional URP camera-script warning at this checkpoint. The clean-consumer CI change below removes that optional component from the canonical current showcase; the warning is resolved for the candidate and remains observable only in the pinned old upgrade baseline.
 
 The combined WebGL build passes Chromium checks at 1440×900 and Retina 960×640: gallery layout, all three workspaces, selected-target exits, Modular Building plane dragging, and returns to the gallery. The showcase target colors render correctly. With the showcase UI guard off, dragging from navigation with middle mouse and scrolling over navigation leave the scene pixels unchanged. Browser error/page-error/request-failure arrays are empty. The same three inherited URP hidden-shader diagnostics remain at log level; no physical Mac trackpad check was performed.
 
@@ -249,6 +249,28 @@ The combined WebGL build passes Chromium checks at 1440×900 and Retina 960×640
 - Left drag orbits, right drag pans, scroll zooms. UI and handle gestures consume selection/camera input. All three demos expose size controls in their UI Toolkit inspectors. They support 64–512 rendering pixels, default 192; Retina pixel ratio is not silently folded into that value.
 - Precision handles keep axis-colored hover and picking volumes. Native remains available. Handle creation synchronizes visuals immediately to avoid an origin-to-target flash.
 - Ownership, target destruction, disable/re-enable, callback reentrancy and Editor session restoration have regression coverage. Re-enabling a GameObject inside its OnDisable callback is unsupported by Unity; defer activation until the next frame. Component.enabled reactivation is separately covered.
+
+## Clean-consumer CI checkpoint (2026-10-26)
+
+The release workflow now includes eight disposable UPM consumers: five full lifecycles
+and three Git probes. The full tarball journey covers minimum 2021 Legacy/Built-in
+and Unity 6 Legacy, Input System and active URP; Git repeats the full lifecycle in
+Unity 6 Input System/Built-in. Frozen fixture/baseline inputs, real native Linux
+pointer/key evidence, save/reopen customization, independent/co-imported samples,
+upgrade and controlled removal are required publish gates. See
+[the CI guide](../ci/README.md#clean-consumer-journeys) for scope, artifacts and commands.
+
+The generic showcase's optional URP camera component has been removed from its canonical
+scene, preserving the base Camera and existing GUIDs. Its script metadata now includes
+the standard MonoImporter fields so a normal public sample import need not rewrite it.
+The old v3.3.1 baseline is unchanged and records its known optional-camera reference
+before explicit external backup and old-import cleanup. Current candidate scenes must
+have zero missing scripts and visible target/handle pixels in Built-in and active URP.
+
+Local Editor smoke checks and verifier regression tests are separate from final-revision
+Linux CI acceptance. A draft PR, uploaded artifact or earlier candidate's passing result
+does not establish that acceptance. No merge, publication or deployment is authorized
+by this checkpoint.
 
 ## Start a consumer or demo
 

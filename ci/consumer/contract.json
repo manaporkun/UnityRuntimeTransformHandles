@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "baseline": {
+    "ref": "v3.3.1",
+    "version": "3.3.1",
+    "commit": "32d9920d52635431f7d83ce20bd738258f3c6584",
+    "tree": "e91a2454388de4ac9e0b3ff1f2b1def8cb1884ae"
+  },
+  "profiles": {
+    "2021-legacy": {"unity": "2021.3.0f1", "input": 0, "urp": false, "dependencies": {"com.unity.test-framework": "1.1.33"}},
+    "6-legacy": {"unity": "6000.3.16f1", "input": 0, "urp": false, "dependencies": {"com.unity.test-framework": "1.6.0"}},
+    "6-input": {"unity": "6000.3.16f1", "input": 1, "urp": false, "dependencies": {"com.unity.test-framework": "1.6.0", "com.unity.inputsystem": "1.19.0"}},
+    "6-urp": {"unity": "6000.3.16f1", "input": 1, "urp": true, "dependencies": {"com.unity.test-framework": "1.6.0", "com.unity.inputsystem": "1.19.0", "com.unity.render-pipelines.universal": "17.3.0"}}
+  },
+  "samples": {
+    "Demo": {"scene": "RuntimeTransformHandlesDemo", "cardTitle": "Handle showcase", "filter": "TransformHandles.Samples.Demo.Tests."},
+    "LevelEditor": {"scene": "LevelEditor", "cardTitle": "Prop workshop", "filter": "TransformHandles.Samples.LevelEditor.Tests."},
+    "ModularBuilding": {"scene": "ModularBuilding", "cardTitle": "Modular workshop", "filter": "TransformHandles.Samples.ModularBuilding.Tests."},
+    "ProductConfigurator": {"scene": "ProductConfigurator", "cardTitle": "Lamp assembly", "filter": "TransformHandles.Samples.ProductConfigurator.Tests."},
+    "DemoBrowser": {"scene": "DemoBrowser", "filter": "TransformHandles.Samples.DemoBrowser.Tests.DemoBrowserTests.ResolvesFullPathAndOmitsMissingScenes;TransformHandles.Samples.DemoBrowser.Tests.DemoBrowserTests.RejectsAmbiguousSceneNames;TransformHandles.Samples.DemoBrowser.Tests.DemoBrowserTests.GalleryListsOnlyScenesIncludedInBuild"}
+  },
+  "ui": {"help": "help-toggle", "closeHelp": "help-close", "gallery": "demo-gallery", "firstCard": "button-0", "emptyGalleryText": "No demo scenes in this build.", "galleryOrder": ["ModularBuilding", "LevelEditor", "Demo", "ProductConfigurator"]},
+  "scenarios": ["selection", "move", "rotate", "scale", "world-local", "snap", "group", "disable-cleanup", "scene-cleanup", "hover", "custom-shortcut"],
+  "outputs": {
+    "phase": ["editor.log", "resolution.json", "record.json"],
+    "editor": ["editor.json"],
+    "tests": ["{mode}-results.xml", "{mode}.log"],
+    "imports": ["imports.json"],
+    "build": ["build.json", "player/input.json", "player/player.log", "player/ready.json", "player/ready.png"],
+    "checkpoint": ["{stage}-{nonce}.json", "{stage}-{nonce}.png"],
+    "journey": ["summary.json"]
+  }
+}
