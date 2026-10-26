@@ -223,6 +223,10 @@ namespace ConsumerJourney
             Require(!File.Exists(path), "Refusing to overwrite Editor evidence");
             File.WriteAllText(path, JsonUtility.ToJson(observation, true));
             Debug.Log("CONSUMER_EDITOR " + config.runId + " " + config.stage);
+            // The pinned GameCI builder requires this completion marker for every
+            // custom executeMethod. It acknowledges this persisted Editor phase;
+            // only BuildScenes reports a native build, after BuildResult.Succeeded.
+            Debug.Log("Build succeeded!");
         }
 
         public static void Require(bool condition, string message)

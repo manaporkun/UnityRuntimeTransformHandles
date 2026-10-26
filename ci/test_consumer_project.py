@@ -248,6 +248,17 @@ class ConsumerProjectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'not complete'):
             consumer.before_stage(self.work, 'core-resolve')
 
+    def test_gameci_completion_marker_cannot_replace_real_editor_observations(self):
+        self.prepare()
+        consumer.before_stage(self.work, 'core-resolve')
+        folder = self.project / '.journey/editor'
+        folder.mkdir()
+        state = self.config
+        (folder / 'core-resolve.log').write_text('CONSUMER_ENGINE ' + state['unity'] + ' ' + state['runId'] + ' core-resolve\n' +
+            'CONSUMER_PID 123\nCONSUMER_INVOCATION ' + state['runId'] + ' core-resolve\nBuild succeeded!\n')
+        with self.assertRaises(FileNotFoundError):
+            consumer.after_stage(self.work, 'core-resolve')
+
     def test_incomplete_or_self_downgraded_journey_cannot_pass(self):
         self.prepare()
         verifier = consumer.load_verifier()

@@ -180,6 +180,16 @@ transfers only the generated workspace under `artifacts/` to that user before ea
 invocation and returns ownership to the runner afterward, including failed phases.
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
+The 2021.3.0f1 profile selects the existing Unity account credentials directly: its
+older client reports mismatched manual ULF files differently from later versions,
+so the pinned CLI does not reach its normal account fallback. Other profiles retain
+the existing credential selection. No editor substitution or new credential is used.
+The pinned builder also requires its standard completion marker for custom Editor
+methods. The bootstrap emits it after persisting the phase observation. It is an
+adapter acknowledgement, not native build evidence: the host verifier still requires
+the raw reports, and native stages require a successful BuildReport, executable,
+unique build identity and driven player results. Native build counts come from those
+records. Process failures and managed exceptions still fail the phase.
 
 The local `run-editor` command accepts `--unity`, `--project`, `--method` and
 `--timeout` for individual Editor smoke checks. `prepare --build-target StandaloneOSX`
