@@ -186,22 +186,35 @@ transfers only the generated workspace under `artifacts/` to that user before ea
 invocation and returns ownership to the runner afterward, including failed phases.
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
-The 2021.3.0f1 profile uses the same checksum-pinned CLI directly so it can explicitly
-select assigned named-user activation with `-serial` and no key, using the existing
-account credentials. The older automatic Personal route reaches a legacy endpoint
-that timed out in CI; a Mac-bound ULF also fails on the runner. Activation, the phase
-and license return remain in one CLI/container lifecycle. Other profiles retain the
-pinned action wrappers. The minimum Editor and all acceptance gates stay the same.
-This minimum-version activation still requires a real successful seat grant and
-return; a selected command or activation banner alone is insufficient evidence.
+The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with Personal
+account activation. `consumer-licensing.sh` exports only Licensing/Client from the
+pinned Unity 6 image into a separate generated folder outside Assets. The complete
+245-file client tree is checked against the reviewed SHA-256 policy before and
+after use. The supported `UNITY_LICENSING_CLIENT_PATH` Docker environment override
+selects client 1.18.1; the exact minimum image, original Editor and bundled client
+are unchanged. Its older 1.9 client lacks the Personal option and reached a legacy
+activation endpoint that timed out in CI. No Mac-bound license is copied.
+
+Activation, the consumer phase and return stay in one CLI/container lifecycle with
+the existing account credentials. Other profiles retain the pinned action wrappers.
+The retry budget is two for both activation and return: when no ULF exists, the
+second return iteration permits the original Editor's entitlement-return fallback.
+This permits up to two activation attempts too. A partially acquired license before
+a nonzero activation exit can precede upstream's cleanup trap; uncertain cleanup
+stops acceptance and may require returning that CI activation through Unity ID.
+
 The `Minimum consumer activation and return` prerequisite runs one fresh Core
-resolution before the eight matrix rows. It permits one activation attempt and
-requires the real bootstrap, UPM observation and explicit successful license return.
-Missing or failed return confirmation stops the matrix. Each minimum-Editor phase
-also records a sanitized `license.json` receipt bound to its run and stage; raw
-authentication output is not uploaded. This prerequisite adds one Editor phase
-outside the full/probe journey counts. Test phases also reject late Editor errors,
-exceptions and assertions, including failures after XML results have been written.
+resolution before the eight matrix rows. It requires real old-Editor bootstrap,
+UPM observation and explicit successful return; missing or contradictory return
+confirmation stops the matrix. Success automatically releases the normal required
+matrix. Each minimum phase records a sanitized `license.json` bound to its run,
+stage and complete helper identity. The aggregate rechecks it against current policy.
+Raw activation/return output is parsed privately; only fixed nonsensitive status
+categories reach the Actions console. Wrong-user, binding-mismatch or failed-return
+messages cannot be overridden by a success marker. Managed consumer Editor diagnostics
+remain separate. This prerequisite adds one consumer Editor phase outside the
+full/probe counts. Test phases also reject late Editor errors, exceptions and
+assertions after XML results have been written.
 The pinned builder also requires its standard completion marker for custom Editor
 methods. The bootstrap emits it after persisting the phase observation. It is an
 adapter acknowledgement, not native build evidence: the host verifier still requires

@@ -373,9 +373,9 @@ jobs:
       - name: Generate a fresh minimum consumer
         run: python3 ci/consumer-project.py prepare --candidate artifacts/candidate --work artifacts/consumer-work --profile 2021-legacy --transport tarball --mount-root /github/workspace/artifacts/consumer-work
 
-      # One bounded attempt must prove real UPM bootstrap and an explicit license
+      # One bounded lifecycle must prove real UPM bootstrap and an explicit license
       # return before any matrix row can repeatedly acquire the same account seat.
-      - name: Resolve Core and return the assigned seat
+      - name: Resolve Core and return the account license
         timeout-minutes: 20
         uses: ./.github/actions/consumer-editor
         with:
@@ -388,6 +388,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: consumer-minimum-activation
+          include-hidden-files: true
           path: |
             artifacts/consumer-work/run.json
             artifacts/consumer-work/evidence

@@ -26,6 +26,9 @@ PROFILE_POLICY = {
     '6-urp': ('6000.3.16f1', 1, True)
 }
 CLI_LINUX_SHA256 = 'a14afcb203920e3bf457b1a8d231c6795e4cda2f3be2dce6a1f32800c7b1bc66'
+LICENSING_HELPER_IMAGE = 'unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913'
+LICENSING_HELPER_VERSION = '1.18.1+9fbee8e'
+LICENSING_HELPER_TREE_SHA256 = '613bc1f9f3986a6570196298277a0ba163cbd4e7a255195baf2d822525df6e87'
 OUTPUT_POLICY = {
     'phase': ['editor.log', 'resolution.json', 'record.json'],
     'editor': ['editor.json'],
@@ -672,21 +675,42 @@ def after_stage(work, stage):
     return record
 
 
+def verify_helper_identity(helper):
+    require(isinstance(helper, dict) and set(helper) == {'image', 'version', 'treeSha256', 'files'}, 'invalid licensing helper identity')
+    files = helper['files']
+    require(isinstance(files, dict) and files, 'missing licensing helper file inventory')
+    tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    require(helper['image'] == LICENSING_HELPER_IMAGE and helper['version'] == LICENSING_HELPER_VERSION and
+            helper['treeSha256'] == tree == LICENSING_HELPER_TREE_SHA256, 'licensing helper bytes or source differ from reviewed policy')
+
+
+def verify_licensing_helper(work):
+    folder = work / 'licensing/Client'
+    require(folder.is_dir() and not folder.is_symlink() and not (work / 'licensing').is_symlink(), 'missing or linked licensing helper')
+    entries = list(folder.rglob('*'))
+    require(not any(p.is_symlink() or not (p.is_file() or p.is_dir()) for p in entries), 'unsupported licensing helper entry')
+    files = {p.relative_to(folder).as_posix(): digest(p) for p in sorted(entries) if p.is_file()}
+    helper = {'image': LICENSING_HELPER_IMAGE, 'version': LICENSING_HELPER_VERSION,
+              'treeSha256': hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest(), 'files': files}
+    verify_helper_identity(helper)
+    require(os.access(folder / 'Unity.Licensing.Client', os.X_OK), 'licensing helper is not executable')
+    return helper
+
+
 def minimum_cli_command(work, stage, cli, image):
     state = json.loads((work / 'run.json').read_text())
     require(state['profile'] == '2021-legacy' and state['unity'] == '2021.3.0f1' and state['buildTarget'] == 'StandaloneLinux64',
-            'named-user CLI adapter is limited to the reviewed minimum Linux profile')
+            'Personal CLI adapter is limited to the reviewed minimum Linux profile')
     pending = state['pending']
-    require(pending['stage'] == stage, 'wrong named-user CLI phase')
+    require(pending['stage'] == stage, 'wrong Personal CLI phase')
     require(image == 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6', 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
-              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=serial', '--licenseRetryMaxAttempts=1']
-    if not os.environ.get('UNITY_SERIAL'):
-        common.append('--unitySerial=')
-    # Unity documents -serial without a key for assigned named-user seats. The
-    # old Personal path uses a different activation endpoint. Credentials stay in
-    # environment variables; the pinned CLI retains activation and return in one run.
+              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2',
+              '--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + state['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client']
+    # The supported hook selects the separate reviewed Personal-capable client.
+    # Two iterations also let a no-ULF return reach the original Editor fallback.
+    # Credentials stay in the environment; the Editor/image remain unchanged.
     if pending['testMode']:
         return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
                 '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',
@@ -697,19 +721,41 @@ def minimum_cli_command(work, stage, cli, image):
 
 def licensed_command_result(command):
     returned, warning = False, False
+    emitted = set()
+    events = {
+        'activation requested': r'Requesting activation|Trying to update entitlement license file',
+        'activation failed': r'License activation has failed|Failed to activate/update license|No seat available',
+        'licensing request timed out': r'TimeoutPolicy did not complete|Timeout occ?ur+ed while trying to update license',
+        'license not active': r'No valid Unity Editor license found|License is not active',
+        'licensing client connection failed': r'Failed to (?:connect to|launch).*licensing client',
+        'consumer compilation failed': r'error CS[0-9]+|Scripts have compiler errors|Compilation failed',
+        'consumer build failed': r'BuildFailedException|Build completed with a result of .Failed',
+        'consumer Editor initialized': r'CONSUMER_ENGINE [\w.]+ [0-9a-f]{32} [\w-]+',
+        'consumer Editor phase completed': r'CONSUMER_EDITOR [0-9a-f]{32} [\w-]+',
+        'license return fallback selected': r'No ULF license file to return',
+        'license return confirmed': r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned',
+        'license return failed': r'Failed to return|Could not return|License return failed|Seat id (?:does not|doesn.t) belong|Machine bindings don.t match|Machine bindings? (?:[0-9]+ )?mismatch|Machine identification is invalid for current license',
+    }
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1) as process:
         for line in process.stdout:
-            print(line, end='', flush=True)
-            if re.search(r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned', line):
-                returned = True
-            if re.search(r'::warning::(?:Failed to return|Could not return)', line):
-                warning = True
+            # Newly issued account tokens are not GitHub's original masked secrets.
+            # Parse privately and emit only fixed, nonsensitive event categories.
+            for label, pattern in events.items():
+                if re.search(pattern, line, re.I):
+                    if label == 'license return confirmed': returned = True
+                    if label == 'license return failed': warning = True
+                    if label not in emitted:
+                        print('CONSUMER_LICENSE ' + label, flush=True)
+                        emitted.add(label)
         code = process.wait()
+    print('CONSUMER_LICENSE CLI exit ' + str(code), flush=True)
     return {'exitCode': code, 'returnSucceeded': returned, 'returnWarning': warning}
 
 
 def verify_minimum_license(path, state, stage):
-    require(json.loads(path.read_text()) == {'runId': state['runId'], 'stage': stage, 'exitCode': 0,
+    data = json.loads(path.read_text())
+    verify_helper_identity(data.pop('helper', None))
+    require(data == {'runId': state['runId'], 'stage': stage, 'exitCode': 0,
                                             'returnSucceeded': True, 'returnWarning': False},
             'minimum Editor license return failed or was not confirmed')
 
@@ -717,14 +763,16 @@ def verify_minimum_license(path, state, stage):
 def run_minimum_cli(work, stage, cli, image):
     require(cli.is_file() and digest(cli) == CLI_LINUX_SHA256, 'pinned GameCI CLI binary checksum differs')
     state = json.loads((work / 'run.json').read_text())
+    helper = verify_licensing_helper(work)
     try:
         result = licensed_command_result(minimum_cli_command(work, stage, cli, image))
     finally:
         # The container owns generated files until this guarded handoff. The
         # host must regain them before writing its sanitized return receipt.
         subprocess.run(['bash', str(Path(__file__).with_name('consumer-permissions.sh')), str(work), 'runner'], check=True)
+    require(verify_licensing_helper(work) == helper, 'licensing helper changed during invocation')
     path = work / 'evidence' / stage / 'license.json'
-    write_json(path, {'runId': state['runId'], 'stage': stage, **result})
+    write_json(path, {'runId': state['runId'], 'stage': stage, 'helper': helper, **result})
     verify_minimum_license(path, state, stage)
 
 
@@ -767,7 +815,7 @@ def run_editor(work, name, unity, method='ConsumerJourney.ConsumerBootstrap.Run'
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('prepare', 'create', 'stage', 'before', 'after', 'fixture', 'sample-fixture', 'run-editor', 'run-cli'))
+    parser.add_argument('command', choices=('prepare', 'create', 'stage', 'before', 'after', 'fixture', 'sample-fixture', 'run-editor', 'run-cli', 'verify-licensing'))
     parser.add_argument('--candidate', type=Path, default=Path('artifacts/candidate'))
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--profile', choices=PROFILES)
@@ -813,6 +861,9 @@ def main():
     elif args.command == 'run-cli':
         require(args.cli and args.image and args.stage, '--cli, --image and --stage required')
         run_minimum_cli(args.work, args.stage, args.cli, args.image)
+    elif args.command == 'verify-licensing':
+        helper = verify_licensing_helper(args.work)
+        print(json.dumps({key: value for key, value in helper.items() if key != 'files'}))
     else:
         require(args.unity, '--unity required')
         run_editor(args.work, args.project, args.unity, args.method, args.timeout)

@@ -38,6 +38,13 @@ runs:
         chmod 700 "$consumer_cli_bin"
         printf 'CONSUMER_GAMECI_CLI=%s\n' "$consumer_cli_bin" >> "$GITHUB_ENV"
 
+    - name: Prepare the separate Personal-capable licensing client
+      if: steps.prepare.outputs.unity == '2021.3.0f1'
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+      run: bash ci/consumer-licensing.sh "$CONSUMER_WORK"
+
     - name: Give the container its generated workspace
       shell: bash
       env:
@@ -71,7 +78,7 @@ runs:
         githubToken: ${{ inputs.github-token }}
         checkName: Consumer ${{ inputs.stage }}
 
-    - name: Run minimum Editor with the assigned account seat
+    - name: Run minimum Editor with Personal-capable account activation
       if: steps.prepare.outputs.unity == '2021.3.0f1'
       shell: bash
       env:
