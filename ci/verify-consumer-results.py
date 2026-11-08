@@ -197,18 +197,18 @@ def verify_input(checkpoint, entries, window, customized, observations, previous
             if allow_quit: allowed.append(['key', '--window', window, 'q'])
             require(start >= received and argv[1:] in allowed, 'input occurred during or after its captured checkpoint')
     keys = [args[3] for args in before if args[:3] == ['key', '--window', window] and len(args) == 4]
-    moves = [args for args in before if args[:4] == ['mousemove', '--sync', '--window', window] and len(args) == 6]
+    moves = [args for args in before if args[:3] == ['mousemove', '--window', window] and len(args) == 5]
     coordinates = []
     for move in moves:
-        require(all(isinstance(value, str) and re.fullmatch(r'-?[0-9]+', value) for value in move[4:]), 'invalid external pointer coordinates')
-        x, y = map(int, move[4:])
+        require(all(isinstance(value, str) and re.fullmatch(r'-?[0-9]+', value) for value in move[3:]), 'invalid external pointer coordinates')
+        x, y = map(int, move[3:])
         require(0 <= x < observations[stage]['width'] and 0 <= y < observations[stage]['height'], 'external pointer left player viewport')
         coordinates.append((x, y))
     if sample_origin is not None:
         require(moves and before.count(['click', '1']) == 1, 'workspace control has no external pointer click')
         click = before.index(['click', '1'])
         before_click = [args for args in before[:click] if args in moves]
-        require(before_click and math.dist(tuple(map(int, before_click[-1][4:])), (sample_origin['x'], sample_origin['y'])) <= 3,
+        require(before_click and math.dist(tuple(map(int, before_click[-1][3:])), (sample_origin['x'], sample_origin['y'])) <= 3,
                 'workspace click did not hit the observed visible control')
         require(not keys, 'unexpected keyboard command during workspace click')
         return
@@ -246,7 +246,7 @@ def verify_input(checkpoint, entries, window, customized, observations, previous
         initial = [args for args in before[:down] if args in moves]
         held = [args for args in before[down + 1:end] if args in moves]
         require(initial and len(held) >= 12, 'drag lacks pointer motion while held')
-        held_points = [tuple(map(int, args[4:])) for args in [initial[-1], *held]]
+        held_points = [tuple(map(int, args[3:])) for args in [initial[-1], *held]]
         require(math.hypot(held_points[0][0] - point['x'], held_points[0][1] - point['y']) <= 3,
                 'pointer press did not start at observed handle control')
         require(len(set(held_points)) >= 5 and math.dist(held_points[0], held_points[-1]) >= 15,

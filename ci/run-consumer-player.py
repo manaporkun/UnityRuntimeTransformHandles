@@ -93,7 +93,12 @@ class PlayerDriver:
         return data
 
     def move(self, point):
-        self.command('mousemove', '--sync', '--window', self.window, round(point['x']), round(point['y']))
+        # No --sync: with --window, xdotool sync waits for the pointer to leave
+        # its current root position, comparing root coordinates against the
+        # window-relative target. A no-op move (drag start == hover end) therefore
+        # hangs for its full internal retry budget. The sleep below plus the
+        # nonce-bound state checkpoints prove the pointer actually arrived.
+        self.command('mousemove', '--window', self.window, round(point['x']), round(point['y']))
         time.sleep(.18)
 
     def key(self, key):
@@ -106,7 +111,7 @@ class PlayerDriver:
         time.sleep(.15)
         for step in range(1, 13):
             fraction = step / 12
-            self.command('mousemove', '--sync', '--window', self.window,
+            self.command('mousemove', '--window', self.window,
                          round(start['x'] + (end['x'] - start['x']) * fraction),
                          round(start['y'] + (end['y'] - start['y']) * fraction))
             time.sleep(.035)

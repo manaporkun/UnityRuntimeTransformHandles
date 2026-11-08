@@ -110,13 +110,13 @@ class ConsumerEvidenceTests(unittest.TestCase):
             (self.out / (filename + '.json')).write_text(json.dumps(observation))
             (self.out / (filename + '.png')).write_bytes(png(hover=stage == 'hover' and not withheld, custom=customized))
             report['checkpoints'].append(dict(stage=stage, nonce=observation['nonce'], json=filename + '.json', frame=filename + '.png', requestedSeconds=index + .8, receivedSeconds=index + .9))
-            move = ['mousemove', '--sync', '--window', '123', '120', '90']
+            move = ['mousemove', '--window', '123', '120', '90']
             commands = []
             if stage in ('selection', 'hover'):
-                commands.append(['mousemove', '--sync', '--window', '123', '80', '120'] if stage == 'selection' else move)
+                commands.append(['mousemove', '--window', '123', '80', '120'] if stage == 'selection' else move)
             if stage == 'selection': commands.append(['click', '1'])
             if stage in ('move', 'rotate', 'scale', 'group-move', 'disable-cleanup', 'scene-cleanup'):
-                commands += [move, ['mousedown', '1'], *[['mousemove', '--sync', '--window', '123', str(120 + step * 5), '90'] for step in range(1, 13)]]
+                commands += [move, ['mousedown', '1'], *[['mousemove', '--window', '123', str(120 + step * 5), '90'] for step in range(1, 13)]]
                 if stage not in ('disable-cleanup', 'scene-cleanup'): commands.append(['mouseup', '1'])
             keys = {'rotation-mode': ['t' if customized else 'e'], 'scale-mode': ['r'], 'old-shortcut': ['e'],
                     'local': ['w'], 'world': ['x'], 'group': ['g'], 'disable-cleanup': ['d'], 'reenable': ['d'], 'scene-cleanup': ['n']}
@@ -327,7 +327,7 @@ class ConsumerEvidenceTests(unittest.TestCase):
             (self.out / (stem + '.png')).write_bytes(png(panel=stage == 'help'))
             report['checkpoints'].append(dict(stage=stage, nonce=observation['nonce'], json=stem + '.json', frame=stem + '.png', requestedSeconds=index + .8, receivedSeconds=index + .9))
             x = '40' if stage == 'help' else '240'
-            for number, command in enumerate((['mousemove', '--sync', '--window', '123', x, '30'], ['click', '1'])):
+            for number, command in enumerate((['mousemove', '--window', '123', x, '30'], ['click', '1'])):
                 report['input'].append(dict(stage=stage, nonce=observation['nonce'], argv=['xdotool', *command],
                                            completed=True, withheld=False, seconds=index + number * .01, finishedSeconds=index + number * .01 + .001))
         (self.out / 'input.json').write_text(json.dumps(report))

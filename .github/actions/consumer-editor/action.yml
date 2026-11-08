@@ -43,8 +43,13 @@ runs:
         allowDirtyBuild: true
         customParameters: -consumerConfig .journey/config.json
 
+    # unity-test-runner translates coverageEnabled=false to --no-coverageEnabled,
+    # which game-ci/cli v0.1.72 rejects under strict parsing (negation prefix is
+    # disabled). It accepts the same option from GAME_CI_* environment instead.
     - name: Run narrow consumer or sample tests
       if: steps.prepare.outputs.testMode != ''
+      env:
+        GAME_CI_COVERAGE_ENABLED: 'false'
       uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213 # v4
       with:
         cliVersion: v0.1.72
@@ -53,7 +58,6 @@ runs:
         testMode: ${{ steps.prepare.outputs.testMode }}
         customParameters: -testFilter ${{ steps.prepare.outputs.testFilter }}
         artifactsPath: ${{ steps.prepare.outputs.artifacts }}
-        coverageEnabled: false
         githubToken: ${{ inputs.github-token }}
         checkName: Consumer ${{ inputs.stage }}
 
