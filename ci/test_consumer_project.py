@@ -405,6 +405,7 @@ class ConsumerProjectTests(unittest.TestCase):
             'activation failed password=private-password token: ' + token,
             'serial AB-1234-5678-9012-3456-7890 rejected',
             'Machine binding 3 mismatch for machine 0123456789abcdef0123456789abcdef',
+            'Machine binding 2 mismatch: (value of current machine) SHORTVAL99 != BINDVAL88X (value in license file).',
             'license body private-ulf-contents tail'])
         capture = []
         with patch.dict(os.environ, {'UNITY_EMAIL': 'account@example.invalid', 'UNITY_PASSWORD': 'private-password',
@@ -417,7 +418,8 @@ class ConsumerProjectTests(unittest.TestCase):
         self.assertIn('Machine binding 3 mismatch', text)
         self.assertNotIn('unrelated build chatter', text)
         for leaked in ('account@example.invalid', 'private-password', 'private-ulf-contents',
-                       token, 'AB-1234-5678-9012-3456-7890', '0123456789abcdef0123456789abcdef'):
+                       token, 'AB-1234-5678-9012-3456-7890', '0123456789abcdef0123456789abcdef',
+                       'SHORTVAL99', 'BINDVAL88X'):
             self.assertNotIn(leaked, text)
 
     def licensing_fixture(self, work):
@@ -462,7 +464,7 @@ class ConsumerProjectTests(unittest.TestCase):
                                      'UNITY_PASSWORD': 'private-password', 'UNITY_LICENSE': 'private-ulf-contents'}):
             command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
         self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
-        self.assertIn('--unityLicensingMethod=auto', command)
+        self.assertIn('--unityLicensingMethod=personal', command)
         self.assertIn('--licenseRetryMaxAttempts=2', command)
         self.assertIn('--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + self.config['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client', command)
         self.assertIn('--engineVersion=2021.3.0f1', command)

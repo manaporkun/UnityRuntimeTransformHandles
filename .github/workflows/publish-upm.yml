@@ -353,9 +353,9 @@ jobs:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-      # The minimum CLI activates from this version-independent Personal ULF
-      # through the reviewed newer licensing client (see ci/README.md).
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      # The minimum CLI uses account activation through the reviewed newer
+      # licensing client; the ULF plays no part (see ci/README.md).
+      UNITY_LICENSE: ''
       UNITY_LICENSING_SERVER: ''
     steps:
       - name: Free disk space
@@ -416,9 +416,9 @@ jobs:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-      # 2021-legacy activates from this ULF via the reviewed newer licensing
-      # client; its bundled client misreports the file (see ci/README.md).
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      # 2021-legacy uses account activation through the reviewed newer
+      # licensing client; the ULF plays no part (see ci/README.md).
+      UNITY_LICENSE: ${{ matrix.profile != '2021-legacy' && secrets.UNITY_LICENSE || '' }}
       UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
     strategy:
       fail-fast: false

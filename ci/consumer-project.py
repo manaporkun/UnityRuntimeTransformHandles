@@ -706,14 +706,16 @@ def minimum_cli_command(work, stage, cli, image):
     require(image == 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6', 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
-              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=auto', '--licenseRetryMaxAttempts=2',
+              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2',
               '--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + state['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client']
-    # 'auto' mirrors the licensed action jobs: file activation from the Personal
-    # ULF first, account ('personal') activation only on the file's recognisable
-    # machine-binding mismatch. Forcing either method alone failed deterministically
-    # in CI (generic account failure without a ULF; binding mismatch from the ULF).
-    # The bundled 2021.3.0f1 client misreports that mismatch, so both attempts run
-    # through the separate reviewed 1.18.1 client instead. The license and
+    # File activation cannot work on this Editor (measured in CI): its bundled
+    # 1.9 client prints the script's file-success marker ('Next license update
+    # check is after') for a machine-mismatched ULF, so the CLI's binding
+    # fallback never fires and the next launch rejects the license. The Editor
+    # always launches that bundled client; UNITY_LICENSING_CLIENT_PATH only
+    # selects the client the CLI scripts invoke directly, which happens solely
+    # on the 'personal' branch. 'personal' therefore runs the reviewed 1.18.1
+    # client (--activate-all --include-personal) itself. The license and
     # credentials stay in the environment; the Editor, image and bundled client
     # files remain unchanged.
     if pending['testMode']:
@@ -764,6 +766,8 @@ def redact_license_line(line, secrets):
     text = re.sub(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+', '[email]', text)
     text = re.sub(r'(?i)\b(password|passwd|pwd|serial|token|access[_-]?token|refresh[_-]?token|authorization|bearer)\b(\s*[:=]\s*|\s+)\S+', r'\1\2[redacted]', text)
     text = re.sub(r'\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b', '[machine]', text)
+    text = re.sub(r'(?i)(\(value of current machine\)\s*)\S+', r'\1[machine]', text)
+    text = re.sub(r'(!=\s*)\S+', r'\1[machine]', text)
     text = re.sub(r'\b[A-Za-z0-9]{2}(?:-[A-Za-z0-9]{4}){4,}\b', '[serial]', text)
     text = re.sub(r'[A-Za-z0-9+/=_-]{32,}', '[token]', text)
     return text[:300]

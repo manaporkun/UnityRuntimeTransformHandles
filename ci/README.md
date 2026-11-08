@@ -187,16 +187,18 @@ invocation and returns ownership to the runner afterward, including failed phase
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
 The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with the CLI's
-`auto` licensing method, mirroring the licensed action jobs: file activation from
-the `UNITY_LICENSE` Personal ULF secret first, account ('personal') activation
-only on the file's recognisable machine-binding mismatch. Forcing either method
-alone failed deterministically in CI (generic account failure without a ULF;
-binding mismatch from the ULF). The Editor's bundled 1.9 client misreports that
-mismatch as activated, so `consumer-licensing.sh` exports only Licensing/Client
-from the pinned Unity 6 image into a separate generated folder outside Assets.
-The complete 245-file client tree is checked against the reviewed SHA-256 policy
-before and after use. The supported `UNITY_LICENSING_CLIENT_PATH` Docker
-environment override selects client 1.18.1; the exact minimum image, original
+`personal` licensing method. File activation cannot work on this Editor, as
+measured in CI: its bundled 1.9 licensing client prints the CLI script's
+file-success marker (`Next license update check is after`) for a
+machine-mismatched ULF, so the binding fallback that rescues the other Linux
+profiles never fires and the next launch rejects the license. The Editor always
+launches that bundled client; `UNITY_LICENSING_CLIENT_PATH` only selects the
+client the CLI scripts invoke directly, which happens solely on the `personal`
+branch. That branch therefore runs the reviewed 1.18.1 client
+(`--activate-all --include-personal`) itself. `consumer-licensing.sh` exports
+only Licensing/Client from the pinned Unity 6 image into a separate generated
+folder outside Assets. The complete 245-file client tree is checked against the
+reviewed SHA-256 policy before and after use. The exact minimum image, original
 Editor and bundled client files are unchanged.
 
 Activation, the consumer phase and return stay in one CLI/container lifecycle with
