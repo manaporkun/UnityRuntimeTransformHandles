@@ -29,6 +29,10 @@ CLI_LINUX_SHA256 = 'a14afcb203920e3bf457b1a8d231c6795e4cda2f3be2dce6a1f32800c7b1
 LICENSING_HELPER_IMAGE = 'unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913'
 LICENSING_HELPER_VERSION = '1.18.1+9fbee8e'
 LICENSING_HELPER_TREE_SHA256 = '613bc1f9f3986a6570196298277a0ba163cbd4e7a255195baf2d822525df6e87'
+MINIMUM_EDITOR_IMAGE = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
+# Locally built by ci/consumer-minimum-image.sh from MINIMUM_EDITOR_IMAGE with
+# only the hash-verified Licensing/Client tree replaced; never pulled.
+MINIMUM_DERIVED_IMAGE = 'consumer-minimum-editor:2021.3.0f1-client1.18.1'
 OUTPUT_POLICY = {
     'phase': ['editor.log', 'resolution.json', 'record.json'],
     'editor': ['editor.json'],
@@ -703,7 +707,7 @@ def minimum_cli_command(work, stage, cli, image):
             'minimum CLI adapter is limited to the reviewed minimum Linux profile')
     pending = state['pending']
     require(pending['stage'] == stage, 'wrong minimum CLI phase')
-    require(image == 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6', 'minimum Editor image changed')
+    require(image in (MINIMUM_EDITOR_IMAGE, MINIMUM_DERIVED_IMAGE), 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
               '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2',
@@ -715,9 +719,11 @@ def minimum_cli_command(work, stage, cli, image):
     # always launches that bundled client; UNITY_LICENSING_CLIENT_PATH only
     # selects the client the CLI scripts invoke directly, which happens solely
     # on the 'personal' branch. 'personal' therefore runs the reviewed 1.18.1
-    # client (--activate-all --include-personal) itself. The license and
-    # credentials stay in the environment; the Editor, image and bundled client
-    # files remain unchanged.
+    # client (--activate-all --include-personal) itself, and CI runs the Editor
+    # from the derived image whose only change from the pinned base is that
+    # same client tree at the Editor's fixed client path (the 1.9 client cannot
+    # consume the resulting entitlement). The license and credentials stay in
+    # the environment; the Editor binary and the pinned base image are unchanged.
     if pending['testMode']:
         return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
                 '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',
@@ -744,9 +750,14 @@ LICENSE_EVENTS = {
     'consumer Editor phase completed': r'CONSUMER_EDITOR [0-9a-f]{32} [\w-]+',
     'license return fallback selected': r'No ULF license file to return',
     'license return confirmed': r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned',
+    # After a successful entitlement return, the Editor's legacy ULF subsystem
+    # still reports its own (never activated) ULF cannot be returned. Measured
+    # in CI immediately after 'Successfully returned the entitlement license';
+    # distinct from every other return failure, which still rejects.
+    'license return skipped: no ULF activation': r'Failed to return license: Unity license has not been activated',
     'license return failed: seat does not belong to user': r'Seat id (?:does not|doesn.t) belong',
     'license return failed: machine binding mismatch': r'Machine bindings don.t match|Machine bindings? (?:[0-9]+ )?mismatch|Machine identification is invalid for current license',
-    'license return failed': r'Failed to return|Could not return|License return failed',
+    'license return failed': r'Failed to return (?!license: Unity license has not been activated)|Could not return|License return failed',
 }
 
 
@@ -809,7 +820,9 @@ def verify_minimum_license(path, state, stage):
     require(isinstance(events, list) and len(events) == len(set(events))
             and all(event in LICENSE_EVENTS for event in events)
             and 'license return confirmed' in events
-            and not any(event.startswith('license return failed') for event in events),
+            and not any(event.startswith('license return failed') for event in events)
+            and ('license return skipped: no ULF activation' not in events
+                 or events.index('license return confirmed') < events.index('license return skipped: no ULF activation')),
             'minimum Editor license events are missing or inconsistent')
 
 

@@ -45,6 +45,18 @@ runs:
         CONSUMER_WORK: ${{ inputs.work }}
       run: bash ci/consumer-licensing.sh "$CONSUMER_WORK"
 
+    # The Editor always launches its bundled licensing client, which cannot
+    # consume a current entitlement; run it from a derived image whose only
+    # change is that client tree (see ci/consumer-minimum-image.sh).
+    - name: Build minimum Editor image with the reviewed licensing client
+      id: minimum-image
+      if: steps.prepare.outputs.unity == '2021.3.0f1'
+      shell: bash
+      env:
+        CONSUMER_WORK: ${{ inputs.work }}
+        CONSUMER_BASE_IMAGE: ${{ inputs.image }}
+      run: printf 'image=%s\n' "$(bash ci/consumer-minimum-image.sh "$CONSUMER_WORK" "$CONSUMER_BASE_IMAGE")" >> "$GITHUB_OUTPUT"
+
     - name: Give the container its generated workspace
       shell: bash
       env:
@@ -84,7 +96,7 @@ runs:
       env:
         CONSUMER_STAGE: ${{ inputs.stage }}
         CONSUMER_WORK: ${{ inputs.work }}
-        CONSUMER_IMAGE: ${{ inputs.image }}
+        CONSUMER_IMAGE: ${{ steps.minimum-image.outputs.image }}
       run: python3 ci/consumer-project.py run-cli --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE" --image "$CONSUMER_IMAGE" --cli "$CONSUMER_GAMECI_CLI"
 
     - name: Return generated files to the runner

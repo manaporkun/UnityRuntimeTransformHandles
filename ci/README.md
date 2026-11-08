@@ -198,8 +198,12 @@ branch. That branch therefore runs the reviewed 1.18.1 client
 (`--activate-all --include-personal`) itself. `consumer-licensing.sh` exports
 only Licensing/Client from the pinned Unity 6 image into a separate generated
 folder outside Assets. The complete 245-file client tree is checked against the
-reviewed SHA-256 policy before and after use. The exact minimum image, original
-Editor and bundled client files are unchanged.
+reviewed SHA-256 policy before and after use. Because the Editor launches the
+client at its own fixed path and the bundled 1.9 client cannot consume the
+resulting entitlement (also measured), `consumer-minimum-image.sh` builds a
+local derived image from the pinned base digest whose only change is replacing
+that client tree with the verified 1.18.1 export; the minimum CLI phases run
+from it. The Editor binary and the pinned base image are unchanged.
 
 Activation, the consumer phase and return stay in one CLI/container lifecycle with
 the existing license and account credentials in the environment. Other profiles
