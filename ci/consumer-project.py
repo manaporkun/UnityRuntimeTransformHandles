@@ -700,17 +700,20 @@ def verify_licensing_helper(work):
 def minimum_cli_command(work, stage, cli, image):
     state = json.loads((work / 'run.json').read_text())
     require(state['profile'] == '2021-legacy' and state['unity'] == '2021.3.0f1' and state['buildTarget'] == 'StandaloneLinux64',
-            'Personal CLI adapter is limited to the reviewed minimum Linux profile')
+            'minimum CLI adapter is limited to the reviewed minimum Linux profile')
     pending = state['pending']
-    require(pending['stage'] == stage, 'wrong Personal CLI phase')
+    require(pending['stage'] == stage, 'wrong minimum CLI phase')
     require(image == 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6', 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
-              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2',
+              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=file', '--licenseRetryMaxAttempts=2',
               '--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + state['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client']
-    # The supported hook selects the separate reviewed Personal-capable client.
-    # Two iterations also let a no-ULF return reach the original Editor fallback.
-    # Credentials stay in the environment; the Editor/image remain unchanged.
+    # Account ('personal') activation against this Editor failed deterministically
+    # in CI. The version-independent Personal ULF from UNITY_LICENSE entitles the
+    # other Linux profiles; the bundled 2021.3.0f1 client misreports that ULF, so
+    # file activation runs through the separate reviewed 1.18.1 client instead.
+    # The license and credentials stay in the environment; the Editor, image and
+    # bundled client files remain unchanged.
     if pending['testMode']:
         return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
                 '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',

@@ -24,7 +24,7 @@ runs:
         CONSUMER_WORK: ${{ inputs.work }}
       run: python3 ci/consumer-project.py before --work "$CONSUMER_WORK" --stage "$CONSUMER_STAGE" --github-output "$GITHUB_OUTPUT"
 
-    - name: Install the pinned CLI for minimum Editor account activation
+    - name: Install the pinned CLI for minimum Editor file activation
       if: steps.prepare.outputs.unity == '2021.3.0f1' && env.CONSUMER_GAMECI_CLI == ''
       shell: bash
       env:
@@ -38,7 +38,7 @@ runs:
         chmod 700 "$consumer_cli_bin"
         printf 'CONSUMER_GAMECI_CLI=%s\n' "$consumer_cli_bin" >> "$GITHUB_ENV"
 
-    - name: Prepare the separate Personal-capable licensing client
+    - name: Prepare the separate reviewed licensing client
       if: steps.prepare.outputs.unity == '2021.3.0f1'
       shell: bash
       env:
@@ -78,7 +78,7 @@ runs:
         githubToken: ${{ inputs.github-token }}
         checkName: Consumer ${{ inputs.stage }}
 
-    - name: Run minimum Editor with Personal-capable account activation
+    - name: Run minimum Editor with ULF file activation
       if: steps.prepare.outputs.unity == '2021.3.0f1'
       shell: bash
       env:

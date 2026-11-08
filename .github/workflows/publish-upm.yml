@@ -353,7 +353,9 @@ jobs:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-      UNITY_LICENSE: ''
+      # The minimum CLI activates from this version-independent Personal ULF
+      # through the reviewed newer licensing client (see ci/README.md).
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       UNITY_LICENSING_SERVER: ''
     steps:
       - name: Free disk space
@@ -374,8 +376,8 @@ jobs:
         run: python3 ci/consumer-project.py prepare --candidate artifacts/candidate --work artifacts/consumer-work --profile 2021-legacy --transport tarball --mount-root /github/workspace/artifacts/consumer-work
 
       # One bounded lifecycle must prove real UPM bootstrap and an explicit license
-      # return before any matrix row can repeatedly acquire the same account seat.
-      - name: Resolve Core and return the account license
+      # return before any matrix row can repeatedly acquire the same license.
+      - name: Resolve Core and return the license
         timeout-minutes: 20
         uses: ./.github/actions/consumer-editor
         with:
@@ -414,9 +416,9 @@ jobs:
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-      # The old 2021.3.0f1 client misreports a mismatched ULF as activated,
-      # preventing the CLI's account fallback. Select account activation directly.
-      UNITY_LICENSE: ${{ matrix.profile != '2021-legacy' && secrets.UNITY_LICENSE || '' }}
+      # 2021-legacy activates from this ULF via the reviewed newer licensing
+      # client; its bundled client misreports the file (see ci/README.md).
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       UNITY_LICENSING_SERVER: ${{ secrets.UNITY_LICENSING_SERVER }}
     strategy:
       fail-fast: false

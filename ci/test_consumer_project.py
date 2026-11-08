@@ -431,19 +431,21 @@ class ConsumerProjectTests(unittest.TestCase):
         changed['image'] = 'unreviewed image'
         with self.assertRaises(ValueError): consumer.verify_helper_identity(changed)
 
-    def test_minimum_cli_keeps_personal_account_secrets_in_environment_and_uses_full_commands(self):
+    def test_minimum_cli_keeps_license_secrets_in_environment_and_uses_full_commands(self):
         self.prepare()
         consumer.before_stage(self.work, 'core-resolve')
         image = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
-        with patch.dict(os.environ, {'UNITY_SERIAL': '', 'UNITY_EMAIL': 'account@example.invalid', 'UNITY_PASSWORD': 'private-password'}):
+        with patch.dict(os.environ, {'UNITY_SERIAL': '', 'UNITY_EMAIL': 'account@example.invalid',
+                                     'UNITY_PASSWORD': 'private-password', 'UNITY_LICENSE': 'private-ulf-contents'}):
             command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
         self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
-        self.assertIn('--unityLicensingMethod=personal', command)
+        self.assertIn('--unityLicensingMethod=file', command)
         self.assertIn('--licenseRetryMaxAttempts=2', command)
         self.assertIn('--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + self.config['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client', command)
         self.assertIn('--engineVersion=2021.3.0f1', command)
         self.assertNotIn('--skipActivation', command)
-        self.assertFalse(any('private-password' in item or 'account@example.invalid' in item for item in command))
+        self.assertFalse(any('private-password' in item or 'account@example.invalid' in item
+                             or 'private-ulf-contents' in item for item in command))
         state = json.loads((self.work / 'run.json').read_text())
         state['pending'].update(testMode='playmode', testFilter='Sample.One;Sample.Two')
         consumer.write_json(self.work / 'run.json', state)

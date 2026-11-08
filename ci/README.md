@@ -186,22 +186,23 @@ transfers only the generated workspace under `artifacts/` to that user before ea
 invocation and returns ownership to the runner afterward, including failed phases.
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
-The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with Personal
-account activation. `consumer-licensing.sh` exports only Licensing/Client from the
-pinned Unity 6 image into a separate generated folder outside Assets. The complete
-245-file client tree is checked against the reviewed SHA-256 policy before and
-after use. The supported `UNITY_LICENSING_CLIENT_PATH` Docker environment override
-selects client 1.18.1; the exact minimum image, original Editor and bundled client
-are unchanged. Its older 1.9 client lacks the Personal option and reached a legacy
-activation endpoint that timed out in CI. No Mac-bound license is copied.
+The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with file
+activation from the `UNITY_LICENSE` Personal ULF secret. Account ('personal')
+activation against this Editor failed deterministically in CI, while the same
+version-independent ULF entitles the other Linux profiles. The Editor's bundled
+1.9 client misreports that ULF as activated, so `consumer-licensing.sh` exports
+only Licensing/Client from the pinned Unity 6 image into a separate generated
+folder outside Assets. The complete 245-file client tree is checked against the
+reviewed SHA-256 policy before and after use. The supported
+`UNITY_LICENSING_CLIENT_PATH` Docker environment override selects client 1.18.1;
+the exact minimum image, original Editor and bundled client files are unchanged.
 
 Activation, the consumer phase and return stay in one CLI/container lifecycle with
-the existing account credentials. Other profiles retain the pinned action wrappers.
-The retry budget is two for both activation and return: when no ULF exists, the
-second return iteration permits the original Editor's entitlement-return fallback.
-This permits up to two activation attempts too. A partially acquired license before
-a nonzero activation exit can precede upstream's cleanup trap; uncertain cleanup
-stops acceptance and may require returning that CI activation through Unity ID.
+the existing license and account credentials in the environment. Other profiles
+retain the pinned action wrappers. The retry budget is two for both activation
+and return. A partially acquired license before a nonzero activation exit can
+precede upstream's cleanup trap; uncertain cleanup stops acceptance and may
+require returning that CI activation through Unity ID.
 
 The `Minimum consumer activation and return` prerequisite runs one fresh Core
 resolution before the eight matrix rows. It requires real old-Editor bootstrap,
