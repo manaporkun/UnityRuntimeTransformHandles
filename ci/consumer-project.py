@@ -710,20 +710,21 @@ def minimum_cli_command(work, stage, cli, image):
     require(image in (MINIMUM_EDITOR_IMAGE, MINIMUM_DERIVED_IMAGE), 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
-              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2',
-              '--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + state['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client']
+              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2']
     # File activation cannot work on this Editor (measured in CI): its bundled
     # 1.9 client prints the script's file-success marker ('Next license update
     # check is after') for a machine-mismatched ULF, so the CLI's binding
     # fallback never fires and the next launch rejects the license. The Editor
-    # always launches that bundled client; UNITY_LICENSING_CLIENT_PATH only
-    # selects the client the CLI scripts invoke directly, which happens solely
-    # on the 'personal' branch. 'personal' therefore runs the reviewed 1.18.1
-    # client (--activate-all --include-personal) itself, and CI runs the Editor
-    # from the derived image whose only change from the pinned base is that
-    # same client tree at the Editor's fixed client path (the 1.9 client cannot
-    # consume the resulting entitlement). The license and credentials stay in
-    # the environment; the Editor binary and the pinned base image are unchanged.
+    # always launches the client at its fixed install path, so CI runs it from
+    # the derived image whose only change from the pinned base is the reviewed
+    # 1.18.1 client tree at that path. With no UNITY_LICENSING_CLIENT_PATH
+    # override, the CLI scripts' 'personal' activation invokes that same default
+    # client (--activate-all --include-personal): one client binary, install path
+    # and token/entitlement cache for activation and Editor alike, matching the
+    # topology of the licensed action jobs. (Pointing the scripts at the mounted
+    # export instead left the Editor's client without the activation token.)
+    # The license and credentials stay in the environment; the Editor binary and
+    # the pinned base image are unchanged.
     if pending['testMode']:
         return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
                 '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',

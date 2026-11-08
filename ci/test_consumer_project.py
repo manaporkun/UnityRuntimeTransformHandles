@@ -470,7 +470,8 @@ class ConsumerProjectTests(unittest.TestCase):
         self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
         self.assertIn('--unityLicensingMethod=personal', command)
         self.assertIn('--licenseRetryMaxAttempts=2', command)
-        self.assertIn('--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + self.config['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client', command)
+        self.assertFalse(any('UNITY_LICENSING_CLIENT_PATH' in item for item in command),
+                         'scripts must use the derived image default client path')
         self.assertIn('--engineVersion=2021.3.0f1', command)
         self.assertNotIn('--skipActivation', command)
         self.assertFalse(any('private-password' in item or 'account@example.invalid' in item

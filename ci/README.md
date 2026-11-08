@@ -192,18 +192,18 @@ measured in CI: its bundled 1.9 licensing client prints the CLI script's
 file-success marker (`Next license update check is after`) for a
 machine-mismatched ULF, so the binding fallback that rescues the other Linux
 profiles never fires and the next launch rejects the license. The Editor always
-launches that bundled client; `UNITY_LICENSING_CLIENT_PATH` only selects the
-client the CLI scripts invoke directly, which happens solely on the `personal`
-branch. That branch therefore runs the reviewed 1.18.1 client
-(`--activate-all --include-personal`) itself. `consumer-licensing.sh` exports
+launches the client at its fixed install path. `consumer-licensing.sh` exports
 only Licensing/Client from the pinned Unity 6 image into a separate generated
 folder outside Assets. The complete 245-file client tree is checked against the
-reviewed SHA-256 policy before and after use. Because the Editor launches the
-client at its own fixed path and the bundled 1.9 client cannot consume the
-resulting entitlement (also measured), `consumer-minimum-image.sh` builds a
-local derived image from the pinned base digest whose only change is replacing
-that client tree with the verified 1.18.1 export; the minimum CLI phases run
-from it. The Editor binary and the pinned base image are unchanged.
+reviewed SHA-256 policy before and after use. Because the bundled 1.9 client
+cannot consume a current entitlement (also measured), `consumer-minimum-image.sh`
+builds a local derived image from the pinned base digest whose only change is
+replacing that client tree with the verified 1.18.1 export; the minimum CLI
+phases run from it. No `UNITY_LICENSING_CLIENT_PATH` override is passed, so the
+CLI scripts' `personal` activation (`--activate-all --include-personal`) invokes
+that same default-path client: one client binary, install path and
+token/entitlement cache for activation and Editor alike, matching the licensed
+action jobs. The Editor binary and the pinned base image are unchanged.
 
 Activation, the consumer phase and return stay in one CLI/container lifecycle with
 the existing license and account credentials in the environment. Other profiles
