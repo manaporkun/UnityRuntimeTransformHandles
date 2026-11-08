@@ -355,6 +355,48 @@ class ConsumerProjectTests(unittest.TestCase):
         self.assertNotIn('account@example.invalid', console.getvalue())
         self.assertIn('CONSUMER_LICENSE license return confirmed', console.getvalue())
 
+    def test_license_events_distinguish_activation_and_return_reasons(self):
+        def parse(output, code=0):
+            with redirect_stdout(io.StringIO()):
+                return consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + '); raise SystemExit(' + str(code) + ')'])
+
+        result = parse('Requesting activation\nNo seat available for this license', 1)
+        self.assertEqual(['activation requested', 'activation failed: no seat available'], result['events'])
+        self.assertEqual(['activation failed: authentication rejected'],
+                         parse('Authentication failed for the supplied account')['events'])
+        self.assertEqual(['activation failed'], parse('License activation has failed')['events'])
+        result = parse('Seat id does not belong to this user\nSuccessfully returned the entitlement license')
+        self.assertEqual(['license return failed: seat does not belong to user', 'license return confirmed'],
+                         result['events'])
+        self.assertTrue(result['returnWarning'])
+        result = parse('Successfully returned ULF license\nMachine binding 2 mismatch: invalid')
+        self.assertEqual(['license return confirmed', 'license return failed: machine binding mismatch'],
+                         result['events'])
+        self.assertTrue(result['returnWarning'])
+
+    def test_license_receipt_events_must_corroborate_booleans(self):
+        self.prepare()
+        helper = self.licensing_fixture(self.work)
+        path = self.work / 'license.json'
+        good = {'runId': self.config['runId'], 'stage': 'core-resolve', 'helper': helper,
+                'exitCode': 0, 'returnSucceeded': True, 'returnWarning': False,
+                'events': ['activation requested', 'license return confirmed']}
+        consumer.write_json(path, good)
+        consumer.verify_minimum_license(path, self.config, 'core-resolve')
+        for events in [None, [], ['license return confirmed', 'license return confirmed'],
+                       ['license return confirmed', 'license return failed'],
+                       ['license return confirmed', 'license return failed: machine binding mismatch'],
+                       ['activation requested'], ['unlisted category']]:
+            forged = dict(good)
+            if events is None:
+                del forged['events']
+            else:
+                forged['events'] = events
+            consumer.write_json(path, forged)
+            with self.subTest(events=events):
+                with self.assertRaises(ValueError):
+                    consumer.verify_minimum_license(path, self.config, 'core-resolve')
+
     def licensing_fixture(self, work):
         folder = work / 'licensing/Client'
         folder.mkdir(parents=True)

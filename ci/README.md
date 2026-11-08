@@ -208,9 +208,14 @@ resolution before the eight matrix rows. It requires real old-Editor bootstrap,
 UPM observation and explicit successful return; missing or contradictory return
 confirmation stops the matrix. Success automatically releases the normal required
 matrix. Each minimum phase records a sanitized `license.json` bound to its run,
-stage and complete helper identity. The aggregate rechecks it against current policy.
+stage and complete helper identity, including the ordered license-event
+categories observed. The aggregate rechecks it against current policy and
+requires the events to corroborate the recorded return outcome.
 Raw activation/return output is parsed privately; only fixed nonsensitive status
-categories reach the Actions console. Wrong-user, binding-mismatch or failed-return
+categories reach the Actions console and the receipt. Activation categories
+distinguish an unavailable account seat and rejected authentication from other
+failures, and return categories distinguish wrong-user and binding-mismatch
+reasons. Wrong-user, binding-mismatch or failed-return
 messages cannot be overridden by a success marker. Managed consumer Editor diagnostics
 remain separate. This prerequisite adds one consumer Editor phase outside the
 full/probe counts. Test phases also reject late Editor errors, exceptions and

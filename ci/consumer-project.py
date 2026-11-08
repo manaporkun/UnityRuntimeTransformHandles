@@ -719,45 +719,63 @@ def minimum_cli_command(work, stage, cli, image):
             '--customParameters=-consumerConfig .journey/config.json', '--versioningStrategy=None', '--allowDirtyBuild', *common]
 
 
+# Fixed, nonsensitive categories parsed from private licensed-CLI output.
+# Specific activation/return reasons stay distinct so a failed run's receipt
+# and console identify the cause (e.g. an exhausted account seat) without
+# retaining raw output, credentials or newly issued tokens.
+LICENSE_EVENTS = {
+    'activation requested': r'Requesting activation|Trying to update entitlement license file',
+    'activation failed: no seat available': r'No seat available',
+    'activation failed: authentication rejected': r'Authentication failed|Failed to authenticate|Invalid (?:username|credentials)|Failed to sign in|Sign-in failed',
+    'activation failed': r'License activation has failed|Failed to activate/update license',
+    'licensing request timed out': r'TimeoutPolicy did not complete|Timeout occ?ur+ed while trying to update license',
+    'license not active': r'No valid Unity Editor license found|License is not active',
+    'licensing client connection failed': r'Failed to (?:connect to|launch).*licensing client',
+    'consumer compilation failed': r'error CS[0-9]+|Scripts have compiler errors|Compilation failed',
+    'consumer build failed': r'BuildFailedException|Build completed with a result of .Failed',
+    'consumer Editor initialized': r'CONSUMER_ENGINE [\w.]+ [0-9a-f]{32} [\w-]+',
+    'consumer Editor phase completed': r'CONSUMER_EDITOR [0-9a-f]{32} [\w-]+',
+    'license return fallback selected': r'No ULF license file to return',
+    'license return confirmed': r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned',
+    'license return failed: seat does not belong to user': r'Seat id (?:does not|doesn.t) belong',
+    'license return failed: machine binding mismatch': r'Machine bindings don.t match|Machine bindings? (?:[0-9]+ )?mismatch|Machine identification is invalid for current license',
+    'license return failed': r'Failed to return|Could not return|License return failed',
+}
+
+
 def licensed_command_result(command):
     returned, warning = False, False
-    emitted = set()
-    events = {
-        'activation requested': r'Requesting activation|Trying to update entitlement license file',
-        'activation failed': r'License activation has failed|Failed to activate/update license|No seat available',
-        'licensing request timed out': r'TimeoutPolicy did not complete|Timeout occ?ur+ed while trying to update license',
-        'license not active': r'No valid Unity Editor license found|License is not active',
-        'licensing client connection failed': r'Failed to (?:connect to|launch).*licensing client',
-        'consumer compilation failed': r'error CS[0-9]+|Scripts have compiler errors|Compilation failed',
-        'consumer build failed': r'BuildFailedException|Build completed with a result of .Failed',
-        'consumer Editor initialized': r'CONSUMER_ENGINE [\w.]+ [0-9a-f]{32} [\w-]+',
-        'consumer Editor phase completed': r'CONSUMER_EDITOR [0-9a-f]{32} [\w-]+',
-        'license return fallback selected': r'No ULF license file to return',
-        'license return confirmed': r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned',
-        'license return failed': r'Failed to return|Could not return|License return failed|Seat id (?:does not|doesn.t) belong|Machine bindings don.t match|Machine bindings? (?:[0-9]+ )?mismatch|Machine identification is invalid for current license',
-    }
+    sequence = []
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1) as process:
         for line in process.stdout:
             # Newly issued account tokens are not GitHub's original masked secrets.
             # Parse privately and emit only fixed, nonsensitive event categories.
-            for label, pattern in events.items():
+            for label, pattern in LICENSE_EVENTS.items():
                 if re.search(pattern, line, re.I):
                     if label == 'license return confirmed': returned = True
-                    if label == 'license return failed': warning = True
-                    if label not in emitted:
+                    if label.startswith('license return failed'): warning = True
+                    if label not in sequence:
                         print('CONSUMER_LICENSE ' + label, flush=True)
-                        emitted.add(label)
+                        sequence.append(label)
         code = process.wait()
     print('CONSUMER_LICENSE CLI exit ' + str(code), flush=True)
-    return {'exitCode': code, 'returnSucceeded': returned, 'returnWarning': warning}
+    return {'exitCode': code, 'returnSucceeded': returned, 'returnWarning': warning, 'events': sequence}
 
 
 def verify_minimum_license(path, state, stage):
     data = json.loads(path.read_text())
     verify_helper_identity(data.pop('helper', None))
+    events = data.pop('events', None)
     require(data == {'runId': state['runId'], 'stage': stage, 'exitCode': 0,
                                             'returnSucceeded': True, 'returnWarning': False},
             'minimum Editor license return failed or was not confirmed')
+    # The recorded sequence must corroborate the booleans: a confirmed return
+    # and no return-failure category anywhere, in first-observed order.
+    require(isinstance(events, list) and len(events) == len(set(events))
+            and all(event in LICENSE_EVENTS for event in events)
+            and 'license return confirmed' in events
+            and not any(event.startswith('license return failed') for event in events),
+            'minimum Editor license events are missing or inconsistent')
 
 
 def run_minimum_cli(work, stage, cli, image):
