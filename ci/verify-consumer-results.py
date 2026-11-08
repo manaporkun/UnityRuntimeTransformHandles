@@ -487,8 +487,6 @@ def verify_journey(work, candidate_dir, profile, transport):
         actual = {p.relative_to(out).as_posix(): digest(p) for p in out.rglob('*') if p.is_file() and p.name != 'record.json'}
         require(actual == record['files'], 'lifecycle artifact missing, extra or changed')
         project.verify_editor_log(out / 'editor.log', state, stage, editor_evidence=editor_evidence)
-        if profile == '2021-legacy':
-            project.verify_minimum_license(out / 'license.json', state, stage)
         if stage == 'customize':
             text = (out / 'editor.log').read_text()
             require(all(marker + ' ' + state['runId'] in text for marker in ('CONSUMER_IMPORT_PRESERVED', 'CONSUMER_DUPLICATE_REJECTED')),

@@ -20,16 +20,11 @@ CORE, DEMOS = candidate.CORE, candidate.DEMOS
 require, digest, hashes = candidate.require, candidate.digest, candidate.hashes
 PROFILES = ('2021-legacy', '6-legacy', '6-input', '6-urp')
 PROFILE_POLICY = {
-    '2021-legacy': ('2021.3.0f1', 0, False),
+    '2021-legacy': ('2021.3.45f1', 0, False),
     '6-legacy': ('6000.3.16f1', 0, False),
     '6-input': ('6000.3.16f1', 1, False),
     '6-urp': ('6000.3.16f1', 1, True)
 }
-CLI_LINUX_SHA256 = 'a14afcb203920e3bf457b1a8d231c6795e4cda2f3be2dce6a1f32800c7b1bc66'
-LICENSING_HELPER_IMAGE = 'unityci/editor@sha256:7b001255b94971fa056d67966eed2191dd892cf23d948233f87e711b615a9913'
-LICENSING_HELPER_VERSION = '1.18.1+9fbee8e'
-LICENSING_HELPER_TREE_SHA256 = '613bc1f9f3986a6570196298277a0ba163cbd4e7a255195baf2d822525df6e87'
-MINIMUM_EDITOR_IMAGE = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
 OUTPUT_POLICY = {
     'phase': ['editor.log', 'resolution.json', 'record.json'],
     'editor': ['editor.json'],
@@ -569,8 +564,6 @@ def after_stage(work, stage):
               'editorFinished': finished, 'builds': [], 'players': [], 'tests': None}
     log = project / '.journey/editor' / (stage + '.log')
     require(log.exists(), 'Editor never initialized the frozen consumer bootstrap')
-    if state['profile'] == '2021-legacy' and state['buildTarget'] == 'StandaloneLinux64':
-        verify_minimum_license(out / 'license.json', state, stage)
     shutil.copy2(log, out / 'editor.log')
     verify_editor_log(log, state, stage, editor_evidence=read_editor_evidence(work / 'candidate/consumer'))
     record['editorPids'] = sorted(set(re.findall(r'^CONSUMER_PID ([0-9]+)$', log.read_text(), re.M)))
@@ -676,172 +669,6 @@ def after_stage(work, stage):
     return record
 
 
-def verify_helper_identity(helper):
-    require(isinstance(helper, dict) and set(helper) == {'image', 'version', 'treeSha256', 'files'}, 'invalid licensing helper identity')
-    files = helper['files']
-    require(isinstance(files, dict) and files, 'missing licensing helper file inventory')
-    tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-    require(helper['image'] == LICENSING_HELPER_IMAGE and helper['version'] == LICENSING_HELPER_VERSION and
-            helper['treeSha256'] == tree == LICENSING_HELPER_TREE_SHA256, 'licensing helper bytes or source differ from reviewed policy')
-
-
-def verify_licensing_helper(work):
-    folder = work / 'licensing/Client'
-    require(folder.is_dir() and not folder.is_symlink() and not (work / 'licensing').is_symlink(), 'missing or linked licensing helper')
-    entries = list(folder.rglob('*'))
-    require(not any(p.is_symlink() or not (p.is_file() or p.is_dir()) for p in entries), 'unsupported licensing helper entry')
-    files = {p.relative_to(folder).as_posix(): digest(p) for p in sorted(entries) if p.is_file()}
-    helper = {'image': LICENSING_HELPER_IMAGE, 'version': LICENSING_HELPER_VERSION,
-              'treeSha256': hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest(), 'files': files}
-    verify_helper_identity(helper)
-    require(os.access(folder / 'Unity.Licensing.Client', os.X_OK), 'licensing helper is not executable')
-    return helper
-
-
-def minimum_cli_command(work, stage, cli, image):
-    state = json.loads((work / 'run.json').read_text())
-    require(state['profile'] == '2021-legacy' and state['unity'] == '2021.3.0f1' and state['buildTarget'] == 'StandaloneLinux64',
-            'minimum CLI adapter is limited to the reviewed minimum Linux profile')
-    pending = state['pending']
-    require(pending['stage'] == stage, 'wrong minimum CLI phase')
-    require(image == MINIMUM_EDITOR_IMAGE, 'minimum Editor image changed')
-    project = work / 'projects' / pending['project']
-    common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
-              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2']
-    # Stock image and bundled client, deliberately (all measured in CI): file
-    # activation cannot work here because the bundled 1.9 client prints the
-    # script's file-success marker for a machine-mismatched ULF, so the binding
-    # fallback never fires. Client-granted entitlements cannot work either: a
-    # current client (mounted or image-installed) assigns the seat, but this
-    # Editor's licensing module then rejects the entitlement and falls back to
-    # its legacy credential dialog. The remaining route is the CLI script's own
-    # old-Editor path: the bundled client lacks --include-personal, so the
-    # 'personal' branch activates through the Editor itself with the account
-    # credentials (no serial), which assigns a UnityPersonal serial the module
-    # accepts natively. No UNITY_LICENSING_CLIENT_PATH override may be passed,
-    # or the probe would select the client route again.
-    if pending['testMode']:
-        return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
-                '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',
-                '--customParameters=-testFilter ' + pending['testFilter'], *common]
-    return [str(cli), 'build', str(project), '--targetPlatform=StandaloneLinux64', '--buildMethod=' + pending['method'],
-            '--customParameters=-consumerConfig .journey/config.json', '--versioningStrategy=None', '--allowDirtyBuild', *common]
-
-
-# Fixed, nonsensitive categories parsed from private licensed-CLI output.
-# Specific activation/return reasons stay distinct so a failed run's receipt
-# and console identify the cause (e.g. an exhausted account seat) without
-# retaining raw output, credentials or newly issued tokens.
-LICENSE_EVENTS = {
-    'activation requested': r'Requesting activation|Trying to update entitlement license file',
-    'activation failed: no seat available': r'No seat available',
-    'activation failed: authentication rejected': r'Authentication failed|Failed to authenticate|Invalid (?:username|credentials)|Failed to sign in|Sign-in failed',
-    'activation failed': r'License activation has failed|Failed to activate/update license',
-    'licensing request timed out': r'TimeoutPolicy did not complete|Timeout occ?ur+ed while trying to update license',
-    'license not active': r'No valid Unity Editor license found|License is not active',
-    'licensing client connection failed': r'Failed to (?:connect to|launch).*licensing client',
-    'consumer compilation failed': r'error CS[0-9]+|Scripts have compiler errors|Compilation failed',
-    'consumer build failed': r'BuildFailedException|Build completed with a result of .Failed',
-    'consumer Editor initialized': r'CONSUMER_ENGINE [\w.]+ [0-9a-f]{32} [\w-]+',
-    'consumer Editor phase completed': r'CONSUMER_EDITOR [0-9a-f]{32} [\w-]+',
-    'license return fallback selected': r'No ULF license file to return',
-    'license return confirmed': r'Successfully returned (?:ULF license|floating license|the entitlement license)|License has been returned',
-    # After a successful entitlement return, the Editor's legacy ULF subsystem
-    # still reports its own (never activated) ULF cannot be returned. Measured
-    # in CI immediately after 'Successfully returned the entitlement license';
-    # distinct from every other return failure, which still rejects.
-    'license return skipped: no ULF activation': r'Failed to return license: Unity license has not been activated',
-    'license return failed: seat does not belong to user': r'Seat id (?:does not|doesn.t) belong',
-    'license return failed: machine binding mismatch': r'Machine bindings don.t match|Machine bindings? (?:[0-9]+ )?mismatch|Machine identification is invalid for current license',
-    'license return failed': r'Failed to return (?!license: Unity license has not been activated)|Could not return|License return failed',
-}
-
-
-LICENSE_LOG_KEYWORDS = re.compile(
-    r'licen[cs]|activ|entitle|\bulf\b|seat|binding|serial|machine|ipc|genesis|token|timeout|error|fail|warn', re.I)
-LICENSE_LOG_LIMIT = 300
-
-
-def redact_license_line(line, secrets):
-    # The evidence artifact retains redacted licensing lines for diagnosis.
-    # Anything that could identify the account, machine or license is removed:
-    # exact environment secret values first, then structured patterns, then
-    # any remaining long opaque token (ids, hashes, session material).
-    text = line.rstrip('\n')
-    for secret in secrets:
-        text = text.replace(secret, '[redacted]')
-    text = re.sub(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+', '[email]', text)
-    text = re.sub(r'(?i)\b(password|passwd|pwd|serial|token|access[_-]?token|refresh[_-]?token|authorization|bearer)\b(\s*[:=]\s*|\s+)\S+', r'\1\2[redacted]', text)
-    text = re.sub(r'\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b', '[machine]', text)
-    text = re.sub(r'(?i)(\(value of current machine\)\s*)\S+', r'\1[machine]', text)
-    text = re.sub(r'(!=\s*)\S+', r'\1[machine]', text)
-    text = re.sub(r'\b[A-Za-z0-9]{2}(?:-[A-Za-z0-9]{4}){4,}\b', '[serial]', text)
-    text = re.sub(r'[A-Za-z0-9+/=_-]{32,}', '[token]', text)
-    return text[:300]
-
-
-def licensed_command_result(command, capture=None):
-    returned, warning = False, False
-    sequence = []
-    secrets = sorted({part.strip() for name in ('UNITY_EMAIL', 'UNITY_PASSWORD', 'UNITY_SERIAL', 'UNITY_LICENSE')
-                      for part in os.environ.get(name, '').splitlines() if len(part.strip()) >= 8},
-                     key=len, reverse=True)
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1) as process:
-        for line in process.stdout:
-            # Newly issued account tokens are not GitHub's original masked secrets.
-            # Parse privately and emit only fixed, nonsensitive event categories.
-            if capture is not None and len(capture) < LICENSE_LOG_LIMIT and LICENSE_LOG_KEYWORDS.search(line):
-                capture.append(redact_license_line(line, secrets))
-            for label, pattern in LICENSE_EVENTS.items():
-                if re.search(pattern, line, re.I):
-                    if label == 'license return confirmed': returned = True
-                    if label.startswith('license return failed'): warning = True
-                    if label not in sequence:
-                        print('CONSUMER_LICENSE ' + label, flush=True)
-                        sequence.append(label)
-        code = process.wait()
-    print('CONSUMER_LICENSE CLI exit ' + str(code), flush=True)
-    return {'exitCode': code, 'returnSucceeded': returned, 'returnWarning': warning, 'events': sequence}
-
-
-def verify_minimum_license(path, state, stage):
-    data = json.loads(path.read_text())
-    verify_helper_identity(data.pop('helper', None))
-    events = data.pop('events', None)
-    require(data == {'runId': state['runId'], 'stage': stage, 'exitCode': 0,
-                                            'returnSucceeded': True, 'returnWarning': False},
-            'minimum Editor license return failed or was not confirmed')
-    # The recorded sequence must corroborate the booleans: a confirmed return
-    # and no return-failure category anywhere, in first-observed order.
-    require(isinstance(events, list) and len(events) == len(set(events))
-            and all(event in LICENSE_EVENTS for event in events)
-            and 'license return confirmed' in events
-            and not any(event.startswith('license return failed') for event in events)
-            and ('license return skipped: no ULF activation' not in events
-                 or events.index('license return confirmed') < events.index('license return skipped: no ULF activation')),
-            'minimum Editor license events are missing or inconsistent')
-
-
-def run_minimum_cli(work, stage, cli, image):
-    require(cli.is_file() and digest(cli) == CLI_LINUX_SHA256, 'pinned GameCI CLI binary checksum differs')
-    state = json.loads((work / 'run.json').read_text())
-    helper = verify_licensing_helper(work)
-    captured = []
-    try:
-        result = licensed_command_result(minimum_cli_command(work, stage, cli, image), captured)
-    finally:
-        # The container owns generated files until this guarded handoff. The
-        # host must regain them before writing its sanitized return receipt.
-        subprocess.run(['bash', str(Path(__file__).with_name('consumer-permissions.sh')), str(work), 'runner'], check=True)
-    require(verify_licensing_helper(work) == helper, 'licensing helper changed during invocation')
-    path = work / 'evidence' / stage / 'license.json'
-    write_json(path, {'runId': state['runId'], 'stage': stage, 'helper': helper, **result})
-    # Diagnostic sidecar only; written before verification so rejected runs keep
-    # it in the uploaded evidence. It never reaches the Actions console.
-    path.with_name('license.log').write_text(''.join(line + '\n' for line in captured))
-    verify_minimum_license(path, state, stage)
-
-
 def run_editor(work, name, unity, method='ConsumerJourney.ConsumerBootstrap.Run', timeout=900):
     project = work / 'projects' / name
     config = json.loads((project / '.journey/config.json').read_text())
@@ -881,7 +708,7 @@ def run_editor(work, name, unity, method='ConsumerJourney.ConsumerBootstrap.Run'
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('prepare', 'create', 'stage', 'before', 'after', 'fixture', 'sample-fixture', 'run-editor', 'run-cli', 'verify-licensing'))
+    parser.add_argument('command', choices=('prepare', 'create', 'stage', 'before', 'after', 'fixture', 'sample-fixture', 'run-editor'))
     parser.add_argument('--candidate', type=Path, default=Path('artifacts/candidate'))
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--profile', choices=PROFILES)
@@ -894,8 +721,6 @@ def main():
     parser.add_argument('--stage')
     parser.add_argument('--sample', default='')
     parser.add_argument('--unity', type=Path)
-    parser.add_argument('--cli', type=Path)
-    parser.add_argument('--image')
     parser.add_argument('--method', default='ConsumerJourney.ConsumerBootstrap.Run')
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--github-output', type=Path)
@@ -924,12 +749,6 @@ def main():
     elif args.command == 'after':
         require(args.stage, '--stage required')
         after_stage(args.work, args.stage)
-    elif args.command == 'run-cli':
-        require(args.cli and args.image and args.stage, '--cli, --image and --stage required')
-        run_minimum_cli(args.work, args.stage, args.cli, args.image)
-    elif args.command == 'verify-licensing':
-        helper = verify_licensing_helper(args.work)
-        print(json.dumps({key: value for key, value in helper.items() if key != 'files'}))
     else:
         require(args.unity, '--unity required')
         run_editor(args.work, args.project, args.unity, args.method, args.timeout)

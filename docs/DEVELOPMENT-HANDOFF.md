@@ -272,6 +272,34 @@ Linux CI acceptance. A draft PR, uploaded artifact or earlier candidate's passin
 does not establish that acceptance. No merge, publication or deployment is authorized
 by this checkpoint.
 
+## Minimum-consumer licensing decision (2026-11-09)
+
+The `Minimum consumer activation and return` prerequisite from the checkpoint above
+never passed: Unity 2021.3.0f1 has no working headless Personal activation path in
+CI today. November 2026 runs measured every route with redacted licensing output
+retained in the job artifacts: (1) ULF file activation — the bundled 1.9 licensing
+client prints the CLI script's success marker for a machine-mismatched ULF, so the
+binding fallback that rescues 2021.3.45f1/Unity 6 never fires and the next launch
+rejects the license; (2) current-client entitlement activation (reviewed 1.18.1
+client, mounted or in a derived image) — the seat is assigned
+(`[200] ASSIGN_SEAT`) and cleanly returned, but this Editor's licensing module
+rejects the entitlement and falls back to its legacy credential dialog; (3) the
+CLI script's old-Editor route (Editor account activation on the stock image) —
+the access token updates, then Unity's legacy `license.unity3d.com/update/poll`
+endpoint fails immediately, as it already did in October. Seat exhaustion was
+ruled out by owner revocation of stray Unity ID activations and by distinct
+failure categories.
+
+Owner decision: the `2021-legacy` consumer profile now runs Unity 2021.3.45f1
+(the final 2021.3 patch, also the compatibility-floor Editor) through the same
+pinned GameCI action wrappers as the Unity 6 profiles. The minimum-CLI adapter,
+licensing-client export/helper, license receipt/log verification and the
+prerequisite job are deleted. Declared 2021.3.0f1 support is unchanged and rests
+on the recorded local macOS candidate validation at that exact version, the
+2021.3.45f1 floor/consumer suites and the narrow min-API lint; CI consumer
+journeys must not be described as 2021.3.0f1 evidence. No merge or publication is
+authorized by this checkpoint.
+
 ## Start a consumer or demo
 
 Install both package folders through explicit local file dependencies for development. For a Git consumer, pin both project manifest URLs to the same branch commit; the optional demos README includes the two-entry example. Git dependencies inside a package manifest do not recursively install sibling Git packages.

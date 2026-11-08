@@ -69,7 +69,7 @@ Demos-only release must explicitly update its own version/changelog and use its 
 
 The publish workflow automates the journey below using five full journeys and three Git
 installation/build/player probes. Tarball installation runs the full lifecycle in all four
-profiles: Unity 2021.3.0f1 Legacy/Built-in, Unity 6000.3.16f1 Legacy/Built-in, Input System/Built-in,
+profiles: Unity 2021.3.45f1 Legacy/Built-in, Unity 6000.3.16f1 Legacy/Built-in, Input System/Built-in,
 and Input System/active URP 17.3.0. Git runs the full lifecycle in Unity 6 Input System/Built-in
 and probes in the other three profiles. Git URLs use a temporary local Core root/tag and
 same-commit Core/Demos subpaths, resolved by UPM. This validates transport shapes without
@@ -104,7 +104,7 @@ Lamp Assembly; the internal ProductConfigurator identities are intentionally ret
 
 | Editor | Input | Required evidence |
 | --- | --- | --- |
-| 2021.3.0f1 | Legacy; no Input System or URP | Core 199 PlayMode / 74 EditMode, 24 session cycles; samples 116 |
+| 2021.3.0f1 | Legacy; no Input System or URP | Core 199 PlayMode / 74 EditMode, 24 session cycles; samples 116 (local candidate validation; CI consumer journeys run 2021.3.45f1 because Unity offers no working headless Personal activation for 2021.3.0f1 — see `ci/README.md`) |
 | 2021.3.45f1 | Legacy; no Input System or URP | Same suites; also the configured remote compatibility floor |
 | 6000.3.16f1 | Legacy | Same Core suites/session cycles; samples 116 |
 | 6000.3.16f1 | Input System | Same Core suites/session cycles; samples 119 |

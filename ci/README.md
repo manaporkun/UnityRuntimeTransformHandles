@@ -144,7 +144,7 @@ Pages uses auto detection. Test startup logs independently verify the observed e
 ## Clean consumer journeys
 
 `publish-upm.yml` runs eight fresh consumer jobs after the existing Core/Demos suites.
-Tarball jobs run the full lifecycle in 2021.3.0f1 Legacy/Built-in and 6000.3.16f1
+Tarball jobs run the full lifecycle in 2021.3.45f1 Legacy/Built-in and 6000.3.16f1
 Legacy/Built-in, Input System/Built-in and Input System/URP 17.3.0. Git runs a full
 journey in Unity 6 Input System/Built-in and installation/build/player probes in the
 other three profiles. Every full lifecycle stage therefore runs in each profile;
@@ -186,54 +186,28 @@ transfers only the generated workspace under `artifacts/` to that user before ea
 invocation and returns ownership to the runner afterward, including failed phases.
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
-The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with the CLI's
-`personal` licensing method on the stock pinned image. File activation cannot
-work on this Editor, as measured in CI: its bundled 1.9 licensing client prints
-the CLI script's file-success marker (`Next license update check is after`) for
-a machine-mismatched ULF, so the binding fallback that rescues the other Linux
-profiles never fires and the next launch rejects the license. Client-granted
-entitlements cannot work either (also measured, with the reviewed 1.18.1 client
-mounted or image-installed): the seat is assigned, but this Editor's licensing
-module rejects the entitlement and falls back to its legacy credential dialog.
-The remaining route is the CLI script's own old-Editor path: the bundled client
-lacks `--include-personal`, so the `personal` branch activates through the
-Editor itself with the account credentials (no serial), assigning a
-UnityPersonal serial the module accepts natively. No
-`UNITY_LICENSING_CLIENT_PATH` override may be passed, or the script's probe
-would select the client route again. `consumer-licensing.sh` still exports only
-Licensing/Client from the pinned Unity 6 image into a separate generated folder
-outside Assets, checked against the reviewed SHA-256 policy before and after
-use; on this route it is not invoked, and its verified identity remains bound to
-each phase receipt while the route is validated.
+All profiles license through the pinned GameCI action wrappers with the existing
+license and account credentials in the environment; activation, the consumer
+phase and license return stay inside one CLI/container lifecycle. A partially
+acquired license before a nonzero activation exit can precede upstream's cleanup
+trap; uncertain cleanup may require returning that CI activation through Unity ID.
+Managed consumer Editor diagnostics remain separate. Test phases also reject late
+Editor errors, exceptions and assertions after XML results have been written.
 
-Activation, the consumer phase and return stay in one CLI/container lifecycle with
-the existing license and account credentials in the environment. Other profiles
-retain the pinned action wrappers. The retry budget is two for both activation
-and return. A partially acquired license before a nonzero activation exit can
-precede upstream's cleanup trap; uncertain cleanup stops acceptance and may
-require returning that CI activation through Unity ID.
+The `2021-legacy` profile runs Unity 2021.3.45f1 (the final 2021.3 patch, also
+the compatibility-floor Editor), **not** the packages' declared 2021.3.0f1
+minimum. Unity currently offers no working headless Personal activation path for
+2021.3.0f1; every route was measured failing in CI in November 2026 (see the
+development handoff checkpoint for the redacted evidence): the bundled 1.9
+licensing client misreports a machine-mismatched ULF as activated, a current
+client assigns a seat whose entitlement this Editor's licensing module then
+rejects, and the Editor's own account activation dies at Unity's deprecated
+legacy endpoint. Declared 2021.3.0f1 support therefore rests on the recorded
+local macOS candidate validation at that exact version (above), the 2021.3.45f1
+floor and consumer suites, and the license-free min-API lint, which is a narrow
+heuristic for known post-2021.3.0 API families — not a 2021.3.0f1 compile. Do not
+describe the CI consumer journeys as 2021.3.0f1 evidence.
 
-The `Minimum consumer activation and return` prerequisite runs one fresh Core
-resolution before the eight matrix rows. It requires real old-Editor bootstrap,
-UPM observation and explicit successful return; missing or contradictory return
-confirmation stops the matrix. Success automatically releases the normal required
-matrix. Each minimum phase records a sanitized `license.json` bound to its run,
-stage and complete helper identity, including the ordered license-event
-categories observed. The aggregate rechecks it against current policy and
-requires the events to corroborate the recorded return outcome.
-Raw activation/return output is parsed privately; only fixed nonsensitive status
-categories reach the Actions console and the receipt. Activation categories
-distinguish an unavailable account seat and rejected authentication from other
-failures, and return categories distinguish wrong-user and binding-mismatch
-reasons. For diagnosis, each minimum phase also writes a `license.log` sidecar in
-the uploaded evidence (never the console): at most 300 keyword-selected licensing
-lines, redacted of environment secret values, account/machine identifiers, serials
-and long opaque tokens. It is diagnostic only and carries no acceptance weight.
-Wrong-user, binding-mismatch or failed-return
-messages cannot be overridden by a success marker. Managed consumer Editor diagnostics
-remain separate. This prerequisite adds one consumer Editor phase outside the
-full/probe counts. Test phases also reject late Editor errors, exceptions and
-assertions after XML results have been written.
 The pinned builder also requires its standard completion marker for custom Editor
 methods. The bootstrap emits it after persisting the phase observation. It is an
 adapter acknowledgement, not native build evidence: the host verifier still requires

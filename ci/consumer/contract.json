@@ -7,7 +7,7 @@
     "tree": "e91a2454388de4ac9e0b3ff1f2b1def8cb1884ae"
   },
   "profiles": {
-    "2021-legacy": {"unity": "2021.3.0f1", "input": 0, "urp": false, "dependencies": {"com.unity.test-framework": "1.1.33"}},
+    "2021-legacy": {"unity": "2021.3.45f1", "input": 0, "urp": false, "dependencies": {"com.unity.test-framework": "1.1.33"}},
     "6-legacy": {"unity": "6000.3.16f1", "input": 0, "urp": false, "dependencies": {"com.unity.test-framework": "1.6.0"}},
     "6-input": {"unity": "6000.3.16f1", "input": 1, "urp": false, "dependencies": {"com.unity.test-framework": "1.6.0", "com.unity.inputsystem": "1.19.0"}},
     "6-urp": {"unity": "6000.3.16f1", "input": 1, "urp": true, "dependencies": {"com.unity.test-framework": "1.6.0", "com.unity.inputsystem": "1.19.0", "com.unity.render-pipelines.universal": "17.3.0"}}

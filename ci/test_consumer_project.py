@@ -62,7 +62,7 @@ class ConsumerProjectTests(unittest.TestCase):
             self.assertNotIn(name, manifest['dependencies'])
         for name in ('Library', 'Packages/packages-lock.json', 'Packages/' + consumer.CORE):
             self.assertFalse((self.project / name).exists())
-        self.assertEqual((self.project / 'ProjectSettings/ProjectVersion.txt').read_text(), 'm_EditorVersion: 2021.3.0f1\n')
+        self.assertEqual((self.project / 'ProjectSettings/ProjectVersion.txt').read_text(), 'm_EditorVersion: 2021.3.45f1\n')
         self.assertTrue((self.project / 'Assets/ConsumerJourney/Bootstrap/ConsumerBootstrap.cs').is_file())
         self.assertFalse((self.project / 'Assets/ConsumerJourney/Runtime').exists())
 
@@ -162,7 +162,7 @@ class ConsumerProjectTests(unittest.TestCase):
     def test_stale_missing_identity_source_and_embedded_install_fail(self):
         self.prepare()
         observation = self.observation()
-        for key, wrong in (('runId', 'old'), ('source', 'f' * 40), ('unity', '2021.3.45f1'), ('input', 1)):
+        for key, wrong in (('runId', 'old'), ('source', 'f' * 40), ('unity', '2021.3.0f1'), ('input', 1)):
             with self.subTest(key=key):
                 bad = {**observation, key: wrong}
                 with self.assertRaisesRegex(ValueError, 'mismatch'):
@@ -275,7 +275,7 @@ class ConsumerProjectTests(unittest.TestCase):
         self.prepare()
         evidence = json.loads((self.work / 'candidate/consumer/editor-evidence.json').read_text())
         path = self.work / 'dialog.log'
-        for unity in ('2021.3.0f1', '6000.3.16f1'):
+        for unity in ('2021.3.45f1', '6000.3.16f1'):
             state = {**self.config, 'unity': unity}
             for stage in ('core-setup', 'upgrade-setup', 'sample-Demo-import'):
                 path.write_text(self.dialog_log(state, stage, evidence))
@@ -317,188 +317,6 @@ class ConsumerProjectTests(unittest.TestCase):
             path.write_text(header + kind + ': late shutdown failure\n')
             with self.assertRaises(ValueError): consumer.verify_editor_log(path, self.config, 'core-tests')
 
-    def test_license_receipt_requires_real_return_success_and_native_exit(self):
-        self.prepare()
-        helper = self.licensing_fixture(self.work)
-        path = self.work / 'license.json'
-        for output, code, accepted in [
-                ('Successfully returned the entitlement license', 0, True),
-                ('Successfully returned the entitlement license\nLICENSE SYSTEM [2026118 19:6:4] Failed to return license: Unity license has not been activated, and cannot be returned.', 0, True),
-                ('Successfully returned ULF license', 23, False),
-                ('activation succeeded', 0, False),
-                ('::warning::Failed to return the Unity license', 0, False),
-                ('Successfully returned the entitlement license\n::warning::Could not return the Unity license', 0, False),
-                ('Successfully returned the entitlement license\n[Licensing::Client] Error: Seat id does not belong to this user', 0, False),
-                ("Successfully returned ULF license\nSeat id doesn't belong to user", 0, False),
-                ("Machine bindings don't match\nSuccessfully returned the entitlement license", 0, False),
-                ('Machine binding 1 mismatch: invalid\nSuccessfully returned the entitlement license', 0, False),
-                ('Successfully returned the entitlement license\nMachine binding 2 mismatch: invalid', 0, False),
-                ('Successfully returned the entitlement license\nFailed to return entitlement license', 0, False),
-                ('Failed to return license: Unity license has not been activated, and cannot be returned.', 0, False),
-                ('Failed to return license: Unity license has not been activated, and cannot be returned.\nSuccessfully returned the entitlement license', 0, False)]:
-            with redirect_stdout(io.StringIO()):
-                result = consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + '); raise SystemExit(' + str(code) + ')'])
-            consumer.write_json(path, {'runId': self.config['runId'], 'stage': 'core-resolve', 'helper': helper, **result})
-            if accepted:
-                consumer.verify_minimum_license(path, self.config, 'core-resolve')
-                with self.assertRaises(ValueError): consumer.verify_minimum_license(path, self.config, 'core-build')
-            else:
-                with self.assertRaises(ValueError): consumer.verify_minimum_license(path, self.config, 'core-resolve')
-
-    def test_licensing_console_never_prints_generated_tokens_or_credentials(self):
-        token = 'newly-issued-session-' + 'b' * 120
-        output = 'Requesting activation password=private-password\naccessToken=' + token
-        output += '\nSuccessfully returned the entitlement license account@example.invalid ' + token
-        console = io.StringIO()
-        with redirect_stdout(console):
-            result = consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + ')'])
-        self.assertTrue(result['returnSucceeded'])
-        self.assertNotIn(token, console.getvalue())
-        self.assertNotIn('private-password', console.getvalue())
-        self.assertNotIn('account@example.invalid', console.getvalue())
-        self.assertIn('CONSUMER_LICENSE license return confirmed', console.getvalue())
-
-    def test_license_events_distinguish_activation_and_return_reasons(self):
-        def parse(output, code=0):
-            with redirect_stdout(io.StringIO()):
-                return consumer.licensed_command_result([sys.executable, '-c', 'print(' + repr(output) + '); raise SystemExit(' + str(code) + ')'])
-
-        result = parse('Requesting activation\nNo seat available for this license', 1)
-        self.assertEqual(['activation requested', 'activation failed: no seat available'], result['events'])
-        self.assertEqual(['activation failed: authentication rejected'],
-                         parse('Authentication failed for the supplied account')['events'])
-        self.assertEqual(['activation failed'], parse('License activation has failed')['events'])
-        result = parse('Seat id does not belong to this user\nSuccessfully returned the entitlement license')
-        self.assertEqual(['license return failed: seat does not belong to user', 'license return confirmed'],
-                         result['events'])
-        self.assertTrue(result['returnWarning'])
-        result = parse('Successfully returned ULF license\nMachine binding 2 mismatch: invalid')
-        self.assertEqual(['license return confirmed', 'license return failed: machine binding mismatch'],
-                         result['events'])
-        self.assertTrue(result['returnWarning'])
-
-    def test_license_receipt_events_must_corroborate_booleans(self):
-        self.prepare()
-        helper = self.licensing_fixture(self.work)
-        path = self.work / 'license.json'
-        good = {'runId': self.config['runId'], 'stage': 'core-resolve', 'helper': helper,
-                'exitCode': 0, 'returnSucceeded': True, 'returnWarning': False,
-                'events': ['activation requested', 'license return confirmed']}
-        consumer.write_json(path, good)
-        consumer.verify_minimum_license(path, self.config, 'core-resolve')
-        for events in [None, [], ['license return confirmed', 'license return confirmed'],
-                       ['license return confirmed', 'license return failed'],
-                       ['license return confirmed', 'license return failed: machine binding mismatch'],
-                       ['license return skipped: no ULF activation', 'license return confirmed'],
-                       ['activation requested'], ['unlisted category']]:
-            forged = dict(good)
-            if events is None:
-                del forged['events']
-            else:
-                forged['events'] = events
-            consumer.write_json(path, forged)
-            with self.subTest(events=events):
-                with self.assertRaises(ValueError):
-                    consumer.verify_minimum_license(path, self.config, 'core-resolve')
-
-    def test_license_log_capture_redacts_secrets_and_filters_lines(self):
-        token = 'session-material-' + 'c' * 64
-        output = '\n'.join([
-            'unrelated build chatter with no keywords',
-            'Licensing: trying entitlement for account@example.invalid',
-            'activation failed password=private-password token: ' + token,
-            'serial AB-1234-5678-9012-3456-7890 rejected',
-            'Machine binding 3 mismatch for machine 0123456789abcdef0123456789abcdef',
-            'Machine binding 2 mismatch: (value of current machine) SHORTVAL99 != BINDVAL88X (value in license file).',
-            'license body private-ulf-contents tail'])
-        capture = []
-        with patch.dict(os.environ, {'UNITY_EMAIL': 'account@example.invalid', 'UNITY_PASSWORD': 'private-password',
-                                     'UNITY_SERIAL': '', 'UNITY_LICENSE': 'private-ulf-contents'}):
-            with redirect_stdout(io.StringIO()):
-                consumer.licensed_command_result(
-                    [sys.executable, '-c', 'print(' + repr(output) + ')'], capture)
-        text = '\n'.join(capture)
-        self.assertIn('entitlement', text)
-        self.assertIn('Machine binding 3 mismatch', text)
-        self.assertNotIn('unrelated build chatter', text)
-        for leaked in ('account@example.invalid', 'private-password', 'private-ulf-contents',
-                       token, 'AB-1234-5678-9012-3456-7890', '0123456789abcdef0123456789abcdef',
-                       'SHORTVAL99', 'BINDVAL88X'):
-            self.assertNotIn(leaked, text)
-
-    def licensing_fixture(self, work):
-        folder = work / 'licensing/Client'
-        folder.mkdir(parents=True)
-        binary = folder / 'Unity.Licensing.Client'
-        binary.write_text('synthetic client used only by host guard tests')
-        binary.chmod(0o755)
-        (folder / 'runtime.dll').write_bytes(b'checked runtime bytes')
-        files = consumer.hashes(folder)
-        tree = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        policy = patch.object(consumer, 'LICENSING_HELPER_TREE_SHA256', tree)
-        policy.start(); self.addCleanup(policy.stop)
-        return consumer.verify_licensing_helper(work)
-
-    def test_licensing_helper_rejects_changed_extra_missing_and_linked_bytes(self):
-        self.prepare()
-        original = self.licensing_fixture(self.work)
-        folder = self.work / 'licensing/Client'
-        path = folder / 'runtime.dll'
-        for change in ('changed', 'missing', 'extra', 'linked'):
-            with self.subTest(change=change):
-                path.write_bytes(b'checked runtime bytes')
-                extra = folder / 'extra.dll'
-                if extra.exists(): extra.unlink()
-                if change == 'changed': path.write_bytes(b'other runtime')
-                elif change == 'missing': path.unlink()
-                elif change == 'extra': extra.write_bytes(b'new file')
-                elif change == 'linked':
-                    path.unlink(); path.symlink_to(folder / 'Unity.Licensing.Client')
-                with self.assertRaises(ValueError): consumer.verify_licensing_helper(self.work)
-                if path.is_symlink(): path.unlink()
-        changed = copy.deepcopy(original)
-        changed['image'] = 'unreviewed image'
-        with self.assertRaises(ValueError): consumer.verify_helper_identity(changed)
-
-    def test_minimum_cli_keeps_license_secrets_in_environment_and_uses_full_commands(self):
-        self.prepare()
-        consumer.before_stage(self.work, 'core-resolve')
-        image = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
-        with patch.dict(os.environ, {'UNITY_SERIAL': '', 'UNITY_EMAIL': 'account@example.invalid',
-                                     'UNITY_PASSWORD': 'private-password', 'UNITY_LICENSE': 'private-ulf-contents'}):
-            command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
-        self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
-        self.assertIn('--unityLicensingMethod=personal', command)
-        self.assertIn('--licenseRetryMaxAttempts=2', command)
-        self.assertFalse(any('UNITY_LICENSING_CLIENT_PATH' in item for item in command),
-                         'scripts must probe the stock bundled client')
-        self.assertIn('--engineVersion=2021.3.0f1', command)
-        self.assertNotIn('--skipActivation', command)
-        self.assertFalse(any('private-password' in item or 'account@example.invalid' in item
-                             or 'private-ulf-contents' in item for item in command))
-        state = json.loads((self.work / 'run.json').read_text())
-        state['pending'].update(testMode='playmode', testFilter='Sample.One;Sample.Two')
-        consumer.write_json(self.work / 'run.json', state)
-        command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
-        self.assertEqual(command[1], 'test')
-        self.assertIn('--docker', command)
-        self.assertIn('--testPlatforms=playmode', command)
-        self.assertIn('--customParameters=-testFilter Sample.One;Sample.Two', command)
-        self.assertIn('--coverageEnabled=false', command)
-        with self.assertRaises(ValueError):
-            consumer.minimum_cli_command(self.work, 'different-stage', Path('/verified/game-ci'), image)
-        with self.assertRaises(ValueError):
-            consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'),
-                                         'consumer-minimum-editor:2021.3.0f1-client1.18.1')
-        with self.assertRaises(ValueError):
-            consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), 'unityci/editor:latest')
-
-    def test_minimum_cli_rejects_unverified_binary_before_execution(self):
-        self.prepare()
-        binary = self.work / 'wrong-cli'
-        binary.write_text('not the pinned CLI')
-        with self.assertRaisesRegex(ValueError, 'checksum'):
-            consumer.run_minimum_cli(self.work, 'core-resolve', binary, 'unused')
 
     def test_incomplete_or_self_downgraded_journey_cannot_pass(self):
         self.prepare()
@@ -577,101 +395,6 @@ class ConsumerProjectTests(unittest.TestCase):
             self.assertEqual(self.permission_trace.read_text().splitlines(),
                              ['chown', '-R', '-P', '--no-dereference', identity, '--', str(folder.resolve())])
 
-    def test_minimum_cli_returns_workspace_before_receipt_write_and_on_spawn_failure(self):
-        folder = self.permission_fixture()
-        self.licensing_fixture(folder)
-        consumer.write_json(folder / 'run.json', {'runId': 'one-assigned-seat-attempt'})
-        binary = folder / 'verified-cli'
-        binary.write_text('checked test binary')
-        original_write = consumer.write_json
-
-        def runner_write(path, data):
-            self.assertTrue(self.permission_trace.exists(), 'host receipt written before ownership handoff')
-            original_write(path, data)
-
-        with patch.dict(os.environ, self.permission_env), patch.object(consumer, 'CLI_LINUX_SHA256', consumer.digest(binary)):
-            command = [sys.executable, '-c', "print('Successfully returned the entitlement license')"]
-            with patch.object(consumer, 'minimum_cli_command', return_value=command), patch.object(consumer, 'write_json', side_effect=runner_write), redirect_stdout(io.StringIO()):
-                consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
-            self.assertTrue((folder / 'evidence/core-resolve/license.json').is_file())
-            log = folder / 'evidence/core-resolve/license.log'
-            self.assertTrue(log.is_file())
-            self.assertIn('Successfully returned the entitlement license', log.read_text())
-            self.permission_trace.unlink()
-            with patch.object(consumer, 'minimum_cli_command', return_value=[str(folder / 'missing-command')]):
-                with self.assertRaises(FileNotFoundError): consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
-            self.assertTrue(self.permission_trace.exists(), 'spawn failure skipped ownership recovery')
-            (folder / 'evidence/core-resolve/license.json').unlink()
-            command = [sys.executable, '-c', 'from pathlib import Path; Path(' + repr(str(folder / 'licensing/Client/runtime.dll')) +
-                       ").write_text('modified'); print('Successfully returned the entitlement license')"]
-            with patch.object(consumer, 'minimum_cli_command', return_value=command), redirect_stdout(io.StringIO()):
-                with self.assertRaises(ValueError): consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
-            self.assertFalse((folder / 'evidence/core-resolve/license.json').exists(), 'changed helper produced a valid receipt')
-
-    def licensing_script_fixture(self):
-        folder = self.permission_fixture()
-        consumer.write_json(folder / 'run.json', {'profile': '2021-legacy', 'unity': '2021.3.0f1', 'buildTarget': 'StandaloneLinux64'})
-        source = self.root / 'public-client'
-        source.mkdir()
-        (source / 'Unity.Licensing.Client').write_text('public fixture bytes')
-        scripts = self.root / 'fixture-ci'
-        scripts.mkdir()
-        shutil.copy2(Path(__file__).with_name('consumer-licensing.sh'), scripts / 'consumer-licensing.sh')
-        (scripts / 'consumer-project.py').write_text(
-            "import sys\nfrom pathlib import Path\nassert sys.argv[1:3] == ['verify-licensing', '--work']\n"
-            "assert (Path(sys.argv[3])/'licensing/Client/Unity.Licensing.Client').read_text() == 'public fixture bytes'\n")
-        binaries = self.root / 'permission-bin'
-        timeout = binaries / 'timeout'
-        timeout.write_text('#!/bin/sh\nshift\nexec "$@"\n')
-        timeout.chmod(0o755)
-        docker = binaries / 'docker'
-        docker.write_text("""#!/usr/bin/env python3
-import json, os, shutil, sys
-from pathlib import Path
-a = sys.argv[1:]
-with open(os.environ['TEST_DOCKER_TRACE'], 'a') as f: f.write(json.dumps(a) + '\\n')
-if a[:2] == ['image', 'inspect']: raise SystemExit(1)
-if a[0] == 'create': print('created-owned-container')
-if a[0] == 'cp':
-    if os.environ.get('TEST_DOCKER_FAIL_COPY'): raise SystemExit(19)
-    shutil.copytree(os.environ['TEST_HELPER_SOURCE'], a[2])
-""")
-        docker.chmod(0o755)
-        self.docker_trace = self.root / 'docker-trace.jsonl'
-        env = {**self.permission_env, 'TEST_DOCKER_TRACE': str(self.docker_trace), 'TEST_HELPER_SOURCE': str(source)}
-        return folder, scripts / 'consumer-licensing.sh', env
-
-    def test_licensing_export_is_guarded_cached_and_never_starts_a_container(self):
-        folder, script, env = self.licensing_script_fixture()
-        result = subprocess.run(['bash', str(script), str(folder)], env=env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        calls = [json.loads(line) for line in self.docker_trace.read_text().splitlines()]
-        create = next(call for call in calls if call[0] == 'create')
-        name = create[create.index('--name') + 1]
-        self.assertEqual(create[-1], consumer.LICENSING_HELPER_IMAGE)
-        self.assertEqual(create[create.index('--network') + 1], 'none')
-        self.assertEqual(create[create.index('--entrypoint') + 1], '/bin/bash')
-        self.assertFalse(any(call[0] in ('run', 'start', 'exec') for call in calls))
-        self.assertIn(['rm', name], calls)
-        self.assertIn(['image', 'rm', consumer.LICENSING_HELPER_IMAGE], calls)
-        before = self.docker_trace.read_text()
-        self.assertEqual(subprocess.run(['bash', str(script), str(folder)], env=env, capture_output=True).returncode, 0)
-        self.assertEqual(self.docker_trace.read_text(), before)
-        outside = self.root / 'outside'
-        shutil.copytree(folder, outside)
-        self.assertNotEqual(subprocess.run(['bash', str(script), str(outside)], env=env, capture_output=True).returncode, 0)
-        self.assertEqual(self.docker_trace.read_text(), before)
-
-    def test_licensing_export_failure_cleans_only_its_owned_container_and_image(self):
-        folder, script, env = self.licensing_script_fixture()
-        result = subprocess.run(['bash', str(script), str(folder)], env={**env, 'TEST_DOCKER_FAIL_COPY': '1'}, capture_output=True)
-        self.assertEqual(result.returncode, 19, result.stderr)
-        calls = [json.loads(line) for line in self.docker_trace.read_text().splitlines()]
-        create = next(call for call in calls if call[0] == 'create')
-        name = create[create.index('--name') + 1]
-        self.assertIn(['rm', name], calls)
-        self.assertIn(['image', 'rm', consumer.LICENSING_HELPER_IMAGE], calls)
-        self.assertFalse(any('prune' in call or '--force' in call for call in calls))
 
 
     def test_ownership_rejects_checkout_outside_paths_and_symlink_escapes(self):
