@@ -187,23 +187,24 @@ invocation and returns ownership to the runner afterward, including failed phase
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
 The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with the CLI's
-`personal` licensing method. File activation cannot work on this Editor, as
-measured in CI: its bundled 1.9 licensing client prints the CLI script's
-file-success marker (`Next license update check is after`) for a
-machine-mismatched ULF, so the binding fallback that rescues the other Linux
-profiles never fires and the next launch rejects the license. The Editor always
-launches the client at its fixed install path. `consumer-licensing.sh` exports
-only Licensing/Client from the pinned Unity 6 image into a separate generated
-folder outside Assets. The complete 245-file client tree is checked against the
-reviewed SHA-256 policy before and after use. Because the bundled 1.9 client
-cannot consume a current entitlement (also measured), `consumer-minimum-image.sh`
-builds a local derived image from the pinned base digest whose only change is
-replacing that client tree with the verified 1.18.1 export; the minimum CLI
-phases run from it. No `UNITY_LICENSING_CLIENT_PATH` override is passed, so the
-CLI scripts' `personal` activation (`--activate-all --include-personal`) invokes
-that same default-path client: one client binary, install path and
-token/entitlement cache for activation and Editor alike, matching the licensed
-action jobs. The Editor binary and the pinned base image are unchanged.
+`personal` licensing method on the stock pinned image. File activation cannot
+work on this Editor, as measured in CI: its bundled 1.9 licensing client prints
+the CLI script's file-success marker (`Next license update check is after`) for
+a machine-mismatched ULF, so the binding fallback that rescues the other Linux
+profiles never fires and the next launch rejects the license. Client-granted
+entitlements cannot work either (also measured, with the reviewed 1.18.1 client
+mounted or image-installed): the seat is assigned, but this Editor's licensing
+module rejects the entitlement and falls back to its legacy credential dialog.
+The remaining route is the CLI script's own old-Editor path: the bundled client
+lacks `--include-personal`, so the `personal` branch activates through the
+Editor itself with the account credentials (no serial), assigning a
+UnityPersonal serial the module accepts natively. No
+`UNITY_LICENSING_CLIENT_PATH` override may be passed, or the script's probe
+would select the client route again. `consumer-licensing.sh` still exports only
+Licensing/Client from the pinned Unity 6 image into a separate generated folder
+outside Assets, checked against the reviewed SHA-256 policy before and after
+use; on this route it is not invoked, and its verified identity remains bound to
+each phase receipt while the route is validated.
 
 Activation, the consumer phase and return stay in one CLI/container lifecycle with
 the existing license and account credentials in the environment. Other profiles

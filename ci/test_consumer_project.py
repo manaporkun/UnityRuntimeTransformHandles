@@ -471,7 +471,7 @@ class ConsumerProjectTests(unittest.TestCase):
         self.assertIn('--unityLicensingMethod=personal', command)
         self.assertIn('--licenseRetryMaxAttempts=2', command)
         self.assertFalse(any('UNITY_LICENSING_CLIENT_PATH' in item for item in command),
-                         'scripts must use the derived image default client path')
+                         'scripts must probe the stock bundled client')
         self.assertIn('--engineVersion=2021.3.0f1', command)
         self.assertNotIn('--skipActivation', command)
         self.assertFalse(any('private-password' in item or 'account@example.invalid' in item
@@ -487,8 +487,9 @@ class ConsumerProjectTests(unittest.TestCase):
         self.assertIn('--coverageEnabled=false', command)
         with self.assertRaises(ValueError):
             consumer.minimum_cli_command(self.work, 'different-stage', Path('/verified/game-ci'), image)
-        derived = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), consumer.MINIMUM_DERIVED_IMAGE)
-        self.assertIn('--customImage=' + consumer.MINIMUM_DERIVED_IMAGE, derived)
+        with self.assertRaises(ValueError):
+            consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'),
+                                         'consumer-minimum-editor:2021.3.0f1-client1.18.1')
         with self.assertRaises(ValueError):
             consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), 'unityci/editor:latest')
 
@@ -616,7 +617,6 @@ class ConsumerProjectTests(unittest.TestCase):
         scripts = self.root / 'fixture-ci'
         scripts.mkdir()
         shutil.copy2(Path(__file__).with_name('consumer-licensing.sh'), scripts / 'consumer-licensing.sh')
-        shutil.copy2(Path(__file__).with_name('consumer-minimum-image.sh'), scripts / 'consumer-minimum-image.sh')
         (scripts / 'consumer-project.py').write_text(
             "import sys\nfrom pathlib import Path\nassert sys.argv[1:3] == ['verify-licensing', '--work']\n"
             "assert (Path(sys.argv[3])/'licensing/Client/Unity.Licensing.Client').read_text() == 'public fixture bytes'\n")
@@ -630,10 +630,7 @@ import json, os, shutil, sys
 from pathlib import Path
 a = sys.argv[1:]
 with open(os.environ['TEST_DOCKER_TRACE'], 'a') as f: f.write(json.dumps(a) + '\\n')
-if a[:2] == ['image', 'inspect']: raise SystemExit(0 if Path(os.environ['TEST_DOCKER_BUILT']).exists() else 1)
-if a[0] == 'build':
-    Path(os.environ['TEST_DOCKER_STDIN']).write_text(sys.stdin.read())
-    Path(os.environ['TEST_DOCKER_BUILT']).write_text('built')
+if a[:2] == ['image', 'inspect']: raise SystemExit(1)
 if a[0] == 'create': print('created-owned-container')
 if a[0] == 'cp':
     if os.environ.get('TEST_DOCKER_FAIL_COPY'): raise SystemExit(19)
@@ -642,7 +639,6 @@ if a[0] == 'cp':
         docker.chmod(0o755)
         self.docker_trace = self.root / 'docker-trace.jsonl'
         env = {**self.permission_env, 'TEST_DOCKER_TRACE': str(self.docker_trace), 'TEST_HELPER_SOURCE': str(source)}
-        env.update(TEST_DOCKER_STDIN=str(self.root / 'docker-stdin.txt'), TEST_DOCKER_BUILT=str(self.root / 'docker-built.txt'))
         return folder, scripts / 'consumer-licensing.sh', env
 
     def test_licensing_export_is_guarded_cached_and_never_starts_a_container(self):
@@ -677,38 +673,6 @@ if a[0] == 'cp':
         self.assertIn(['image', 'rm', consumer.LICENSING_HELPER_IMAGE], calls)
         self.assertFalse(any('prune' in call or '--force' in call for call in calls))
 
-    def test_minimum_image_builds_only_from_pinned_base_and_verified_client(self):
-        folder, script, env = self.licensing_script_fixture()
-        exported = subprocess.run(['bash', str(script), str(folder)], env=env, text=True, capture_output=True)
-        self.assertEqual(exported.returncode, 0, exported.stderr)
-        image_script = script.with_name('consumer-minimum-image.sh')
-        result = subprocess.run(['bash', str(image_script), str(folder), consumer.MINIMUM_EDITOR_IMAGE],
-                                env=env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), consumer.MINIMUM_DERIVED_IMAGE)
-        calls = [json.loads(line) for line in self.docker_trace.read_text().splitlines()]
-        builds = [call for call in calls if call[0] == 'build']
-        self.assertEqual(len(builds), 1)
-        self.assertEqual(builds[0][-1], str((folder / 'licensing').resolve()))
-        self.assertIn(consumer.MINIMUM_DERIVED_IMAGE, builds[0])
-        dockerfile = Path(env['TEST_DOCKER_STDIN']).read_text()
-        self.assertIn('FROM ' + consumer.MINIMUM_EDITOR_IMAGE, dockerfile)
-        self.assertIn('COPY Client/ /opt/unity/Editor/Data/Resources/Licensing/Client/', dockerfile)
-        again = subprocess.run(['bash', str(image_script), str(folder), consumer.MINIMUM_EDITOR_IMAGE],
-                               env=env, text=True, capture_output=True)
-        self.assertEqual(again.returncode, 0, again.stderr)
-        builds = [json.loads(line) for line in self.docker_trace.read_text().splitlines() if json.loads(line)[0] == 'build']
-        self.assertEqual(len(builds), 1, 'existing derived image was rebuilt')
-        wrong = subprocess.run(['bash', str(image_script), str(folder), 'unityci/editor:latest'],
-                               env=env, text=True, capture_output=True)
-        self.assertNotEqual(wrong.returncode, 0)
-        outside = self.root / 'outside-image'
-        shutil.copytree(folder, outside)
-        refused = subprocess.run(['bash', str(image_script), str(outside), consumer.MINIMUM_EDITOR_IMAGE],
-                                 env=env, text=True, capture_output=True)
-        self.assertNotEqual(refused.returncode, 0)
-        builds = [json.loads(line) for line in self.docker_trace.read_text().splitlines() if json.loads(line)[0] == 'build']
-        self.assertEqual(len(builds), 1, 'refused invocation reached docker build')
 
     def test_ownership_rejects_checkout_outside_paths_and_symlink_escapes(self):
         folder = self.permission_fixture()

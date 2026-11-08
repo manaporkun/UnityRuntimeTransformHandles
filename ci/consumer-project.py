@@ -30,9 +30,6 @@ LICENSING_HELPER_IMAGE = 'unityci/editor@sha256:7b001255b94971fa056d67966eed2191
 LICENSING_HELPER_VERSION = '1.18.1+9fbee8e'
 LICENSING_HELPER_TREE_SHA256 = '613bc1f9f3986a6570196298277a0ba163cbd4e7a255195baf2d822525df6e87'
 MINIMUM_EDITOR_IMAGE = 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6'
-# Locally built by ci/consumer-minimum-image.sh from MINIMUM_EDITOR_IMAGE with
-# only the hash-verified Licensing/Client tree replaced; never pulled.
-MINIMUM_DERIVED_IMAGE = 'consumer-minimum-editor:2021.3.0f1-client1.18.1'
 OUTPUT_POLICY = {
     'phase': ['editor.log', 'resolution.json', 'record.json'],
     'editor': ['editor.json'],
@@ -707,24 +704,22 @@ def minimum_cli_command(work, stage, cli, image):
             'minimum CLI adapter is limited to the reviewed minimum Linux profile')
     pending = state['pending']
     require(pending['stage'] == stage, 'wrong minimum CLI phase')
-    require(image in (MINIMUM_EDITOR_IMAGE, MINIMUM_DERIVED_IMAGE), 'minimum Editor image changed')
+    require(image == MINIMUM_EDITOR_IMAGE, 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
               '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=personal', '--licenseRetryMaxAttempts=2']
-    # File activation cannot work on this Editor (measured in CI): its bundled
-    # 1.9 client prints the script's file-success marker ('Next license update
-    # check is after') for a machine-mismatched ULF, so the CLI's binding
-    # fallback never fires and the next launch rejects the license. The Editor
-    # always launches the client at its fixed install path, so CI runs it from
-    # the derived image whose only change from the pinned base is the reviewed
-    # 1.18.1 client tree at that path. With no UNITY_LICENSING_CLIENT_PATH
-    # override, the CLI scripts' 'personal' activation invokes that same default
-    # client (--activate-all --include-personal): one client binary, install path
-    # and token/entitlement cache for activation and Editor alike, matching the
-    # topology of the licensed action jobs. (Pointing the scripts at the mounted
-    # export instead left the Editor's client without the activation token.)
-    # The license and credentials stay in the environment; the Editor binary and
-    # the pinned base image are unchanged.
+    # Stock image and bundled client, deliberately (all measured in CI): file
+    # activation cannot work here because the bundled 1.9 client prints the
+    # script's file-success marker for a machine-mismatched ULF, so the binding
+    # fallback never fires. Client-granted entitlements cannot work either: a
+    # current client (mounted or image-installed) assigns the seat, but this
+    # Editor's licensing module then rejects the entitlement and falls back to
+    # its legacy credential dialog. The remaining route is the CLI script's own
+    # old-Editor path: the bundled client lacks --include-personal, so the
+    # 'personal' branch activates through the Editor itself with the account
+    # credentials (no serial), which assigns a UnityPersonal serial the module
+    # accepts natively. No UNITY_LICENSING_CLIENT_PATH override may be passed,
+    # or the probe would select the client route again.
     if pending['testMode']:
         return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
                 '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',
