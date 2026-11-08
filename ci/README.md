@@ -186,16 +186,18 @@ transfers only the generated workspace under `artifacts/` to that user before ea
 invocation and returns ownership to the runner afterward, including failed phases.
 This also keeps temporary Git repository ownership consistent with UPM. The guarded
 helper never follows symlinks or changes ownership of the checkout or outside paths.
-The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with file
-activation from the `UNITY_LICENSE` Personal ULF secret. Account ('personal')
-activation against this Editor failed deterministically in CI, while the same
-version-independent ULF entitles the other Linux profiles. The Editor's bundled
-1.9 client misreports that ULF as activated, so `consumer-licensing.sh` exports
-only Licensing/Client from the pinned Unity 6 image into a separate generated
-folder outside Assets. The complete 245-file client tree is checked against the
-reviewed SHA-256 policy before and after use. The supported
-`UNITY_LICENSING_CLIENT_PATH` Docker environment override selects client 1.18.1;
-the exact minimum image, original Editor and bundled client files are unchanged.
+The 2021.3.0f1 profile uses the same checksum-pinned CLI directly with the CLI's
+`auto` licensing method, mirroring the licensed action jobs: file activation from
+the `UNITY_LICENSE` Personal ULF secret first, account ('personal') activation
+only on the file's recognisable machine-binding mismatch. Forcing either method
+alone failed deterministically in CI (generic account failure without a ULF;
+binding mismatch from the ULF). The Editor's bundled 1.9 client misreports that
+mismatch as activated, so `consumer-licensing.sh` exports only Licensing/Client
+from the pinned Unity 6 image into a separate generated folder outside Assets.
+The complete 245-file client tree is checked against the reviewed SHA-256 policy
+before and after use. The supported `UNITY_LICENSING_CLIENT_PATH` Docker
+environment override selects client 1.18.1; the exact minimum image, original
+Editor and bundled client files are unchanged.
 
 Activation, the consumer phase and return stay in one CLI/container lifecycle with
 the existing license and account credentials in the environment. Other profiles

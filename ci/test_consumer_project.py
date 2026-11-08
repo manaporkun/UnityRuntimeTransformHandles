@@ -439,7 +439,7 @@ class ConsumerProjectTests(unittest.TestCase):
                                      'UNITY_PASSWORD': 'private-password', 'UNITY_LICENSE': 'private-ulf-contents'}):
             command = consumer.minimum_cli_command(self.work, 'core-resolve', Path('/verified/game-ci'), image)
         self.assertEqual(command[:2], ['/verified/game-ci', 'build'])
-        self.assertIn('--unityLicensingMethod=file', command)
+        self.assertIn('--unityLicensingMethod=auto', command)
         self.assertIn('--licenseRetryMaxAttempts=2', command)
         self.assertIn('--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + self.config['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client', command)
         self.assertIn('--engineVersion=2021.3.0f1', command)

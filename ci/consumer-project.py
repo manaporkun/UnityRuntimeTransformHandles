@@ -706,14 +706,16 @@ def minimum_cli_command(work, stage, cli, image):
     require(image == 'unityci/editor@sha256:6ca652f117ddbec52602ae3079df3cefc9fd2a4ec1282e07c8fbd638ef102eb6', 'minimum Editor image changed')
     project = work / 'projects' / pending['project']
     common = ['--engine=unity', '--engineVersion=' + state['unity'], '--customImage=' + image,
-              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=file', '--licenseRetryMaxAttempts=2',
+              '--dockerWorkspacePath=/github/workspace', '--unityLicensingMethod=auto', '--licenseRetryMaxAttempts=2',
               '--dockerEnv=UNITY_LICENSING_CLIENT_PATH=' + state['editorWorkRoot'] + '/licensing/Client/Unity.Licensing.Client']
-    # Account ('personal') activation against this Editor failed deterministically
-    # in CI. The version-independent Personal ULF from UNITY_LICENSE entitles the
-    # other Linux profiles; the bundled 2021.3.0f1 client misreports that ULF, so
-    # file activation runs through the separate reviewed 1.18.1 client instead.
-    # The license and credentials stay in the environment; the Editor, image and
-    # bundled client files remain unchanged.
+    # 'auto' mirrors the licensed action jobs: file activation from the Personal
+    # ULF first, account ('personal') activation only on the file's recognisable
+    # machine-binding mismatch. Forcing either method alone failed deterministically
+    # in CI (generic account failure without a ULF; binding mismatch from the ULF).
+    # The bundled 2021.3.0f1 client misreports that mismatch, so both attempts run
+    # through the separate reviewed 1.18.1 client instead. The license and
+    # credentials stay in the environment; the Editor, image and bundled client
+    # files remain unchanged.
     if pending['testMode']:
         return [str(cli), 'test', str(project), '--docker', '--testPlatforms=' + pending['testMode'],
                 '--artifactsPath=' + str(work / 'evidence' / stage), '--coverageEnabled=false', '--dockerShmSize=1025m',
