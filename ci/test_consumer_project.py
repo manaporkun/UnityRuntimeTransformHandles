@@ -397,6 +397,29 @@ class ConsumerProjectTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     consumer.verify_minimum_license(path, self.config, 'core-resolve')
 
+    def test_license_log_capture_redacts_secrets_and_filters_lines(self):
+        token = 'session-material-' + 'c' * 64
+        output = '\n'.join([
+            'unrelated build chatter with no keywords',
+            'Licensing: trying entitlement for account@example.invalid',
+            'activation failed password=private-password token: ' + token,
+            'serial AB-1234-5678-9012-3456-7890 rejected',
+            'Machine binding 3 mismatch for machine 0123456789abcdef0123456789abcdef',
+            'license body private-ulf-contents tail'])
+        capture = []
+        with patch.dict(os.environ, {'UNITY_EMAIL': 'account@example.invalid', 'UNITY_PASSWORD': 'private-password',
+                                     'UNITY_SERIAL': '', 'UNITY_LICENSE': 'private-ulf-contents'}):
+            with redirect_stdout(io.StringIO()):
+                consumer.licensed_command_result(
+                    [sys.executable, '-c', 'print(' + repr(output) + ')'], capture)
+        text = '\n'.join(capture)
+        self.assertIn('entitlement', text)
+        self.assertIn('Machine binding 3 mismatch', text)
+        self.assertNotIn('unrelated build chatter', text)
+        for leaked in ('account@example.invalid', 'private-password', 'private-ulf-contents',
+                       token, 'AB-1234-5678-9012-3456-7890', '0123456789abcdef0123456789abcdef'):
+            self.assertNotIn(leaked, text)
+
     def licensing_fixture(self, work):
         folder = work / 'licensing/Client'
         folder.mkdir(parents=True)
@@ -559,6 +582,9 @@ class ConsumerProjectTests(unittest.TestCase):
             with patch.object(consumer, 'minimum_cli_command', return_value=command), patch.object(consumer, 'write_json', side_effect=runner_write), redirect_stdout(io.StringIO()):
                 consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')
             self.assertTrue((folder / 'evidence/core-resolve/license.json').is_file())
+            log = folder / 'evidence/core-resolve/license.log'
+            self.assertTrue(log.is_file())
+            self.assertIn('Successfully returned the entitlement license', log.read_text())
             self.permission_trace.unlink()
             with patch.object(consumer, 'minimum_cli_command', return_value=[str(folder / 'missing-command')]):
                 with self.assertRaises(FileNotFoundError): consumer.run_minimum_cli(folder, 'core-resolve', binary, 'test image')

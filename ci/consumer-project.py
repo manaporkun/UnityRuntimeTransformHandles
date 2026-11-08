@@ -748,13 +748,39 @@ LICENSE_EVENTS = {
 }
 
 
-def licensed_command_result(command):
+LICENSE_LOG_KEYWORDS = re.compile(
+    r'licen[cs]|activ|entitle|\bulf\b|seat|binding|serial|machine|ipc|genesis|token|timeout|error|fail|warn', re.I)
+LICENSE_LOG_LIMIT = 300
+
+
+def redact_license_line(line, secrets):
+    # The evidence artifact retains redacted licensing lines for diagnosis.
+    # Anything that could identify the account, machine or license is removed:
+    # exact environment secret values first, then structured patterns, then
+    # any remaining long opaque token (ids, hashes, session material).
+    text = line.rstrip('\n')
+    for secret in secrets:
+        text = text.replace(secret, '[redacted]')
+    text = re.sub(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+', '[email]', text)
+    text = re.sub(r'(?i)\b(password|passwd|pwd|serial|token|access[_-]?token|refresh[_-]?token|authorization|bearer)\b(\s*[:=]\s*|\s+)\S+', r'\1\2[redacted]', text)
+    text = re.sub(r'\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b', '[machine]', text)
+    text = re.sub(r'\b[A-Za-z0-9]{2}(?:-[A-Za-z0-9]{4}){4,}\b', '[serial]', text)
+    text = re.sub(r'[A-Za-z0-9+/=_-]{32,}', '[token]', text)
+    return text[:300]
+
+
+def licensed_command_result(command, capture=None):
     returned, warning = False, False
     sequence = []
+    secrets = sorted({part.strip() for name in ('UNITY_EMAIL', 'UNITY_PASSWORD', 'UNITY_SERIAL', 'UNITY_LICENSE')
+                      for part in os.environ.get(name, '').splitlines() if len(part.strip()) >= 8},
+                     key=len, reverse=True)
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1) as process:
         for line in process.stdout:
             # Newly issued account tokens are not GitHub's original masked secrets.
             # Parse privately and emit only fixed, nonsensitive event categories.
+            if capture is not None and len(capture) < LICENSE_LOG_LIMIT and LICENSE_LOG_KEYWORDS.search(line):
+                capture.append(redact_license_line(line, secrets))
             for label, pattern in LICENSE_EVENTS.items():
                 if re.search(pattern, line, re.I):
                     if label == 'license return confirmed': returned = True
@@ -787,8 +813,9 @@ def run_minimum_cli(work, stage, cli, image):
     require(cli.is_file() and digest(cli) == CLI_LINUX_SHA256, 'pinned GameCI CLI binary checksum differs')
     state = json.loads((work / 'run.json').read_text())
     helper = verify_licensing_helper(work)
+    captured = []
     try:
-        result = licensed_command_result(minimum_cli_command(work, stage, cli, image))
+        result = licensed_command_result(minimum_cli_command(work, stage, cli, image), captured)
     finally:
         # The container owns generated files until this guarded handoff. The
         # host must regain them before writing its sanitized return receipt.
@@ -796,6 +823,9 @@ def run_minimum_cli(work, stage, cli, image):
     require(verify_licensing_helper(work) == helper, 'licensing helper changed during invocation')
     path = work / 'evidence' / stage / 'license.json'
     write_json(path, {'runId': state['runId'], 'stage': stage, 'helper': helper, **result})
+    # Diagnostic sidecar only; written before verification so rejected runs keep
+    # it in the uploaded evidence. It never reaches the Actions console.
+    path.with_name('license.log').write_text(''.join(line + '\n' for line in captured))
     verify_minimum_license(path, state, stage)
 
 

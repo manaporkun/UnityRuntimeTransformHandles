@@ -218,7 +218,11 @@ Raw activation/return output is parsed privately; only fixed nonsensitive status
 categories reach the Actions console and the receipt. Activation categories
 distinguish an unavailable account seat and rejected authentication from other
 failures, and return categories distinguish wrong-user and binding-mismatch
-reasons. Wrong-user, binding-mismatch or failed-return
+reasons. For diagnosis, each minimum phase also writes a `license.log` sidecar in
+the uploaded evidence (never the console): at most 300 keyword-selected licensing
+lines, redacted of environment secret values, account/machine identifiers, serials
+and long opaque tokens. It is diagnostic only and carries no acceptance weight.
+Wrong-user, binding-mismatch or failed-return
 messages cannot be overridden by a success marker. Managed consumer Editor diagnostics
 remain separate. This prerequisite adds one consumer Editor phase outside the
 full/probe counts. Test phases also reject late Editor errors, exceptions and
