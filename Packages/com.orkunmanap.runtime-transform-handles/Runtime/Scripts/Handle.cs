@@ -133,11 +133,14 @@ namespace TransformHandles
             set
             {
                 if (_axes == value) return;
-                var cancelledUniform = UniformGroupScale;
-                if (cancelledUniform) TransformHandleManager.ExistingInstance?.CancelInteraction(this);
+                // See Type: an active drag must end before its axes are rebuilt.
+                var manager = TransformHandleManager.ExistingInstance;
+                var wasInteracting = manager != null && manager.IsInteracting;
+                if (manager != null) manager.CancelInteraction(this);
                 if (this == null) return;
+                var cancelled = wasInteracting && (manager == null || !manager.IsInteracting);
                 _axes = value;
-                if (cancelledUniform && (Pivot == null || !isActiveAndEnabled)) return;
+                if (cancelled && (Pivot == null || !isActiveAndEnabled)) return;
                 Clear();
                 CreateHandles();
             }
@@ -197,11 +200,18 @@ namespace TransformHandles
             set
             {
                 if (_type == value) return;
-                var cancelledUniform = UniformGroupScale;
-                if (cancelledUniform) TransformHandleManager.ExistingInstance?.CancelInteraction(this);
+                // Any active drag on this handle must end before the child axes are rebuilt:
+                // the dragging axis belongs to the old type, and the ghost dispatches on the
+                // new type, so continuing would drop the delta and absorb the drifted pivot
+                // as the new baseline. CancelInteraction is a no-op when this handle is not
+                // the drag owner.
+                var manager = TransformHandleManager.ExistingInstance;
+                var wasInteracting = manager != null && manager.IsInteracting;
+                if (manager != null) manager.CancelInteraction(this);
                 if (this == null) return;
+                var cancelled = wasInteracting && (manager == null || !manager.IsInteracting);
                 _type = value;
-                if (cancelledUniform && (Pivot == null || !isActiveAndEnabled)) return;
+                if (cancelled && (Pivot == null || !isActiveAndEnabled)) return;
                 Clear();
                 CreateHandles();
             }

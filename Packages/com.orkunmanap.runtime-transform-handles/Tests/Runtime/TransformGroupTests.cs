@@ -108,6 +108,26 @@ namespace TransformHandles.Tests
             Assert.AreEqual(new Vector3(-2, 1, 0), a.position);
         }
 
+
+        [Test]
+        public void UniformScaleSurvivesDragEndingPastPivot()
+        {
+            var group = UniformGroup(out var a, out _);
+            group.GroupGhost.transform.localScale = Vector3.one * 2;
+            group.UpdateScales(Vector3.one);
+            // Crossing the pivot drives the ghost scale non-positive; that frame is rejected.
+            group.GroupGhost.transform.localScale = -Vector3.one;
+            group.UpdateScales(Vector3.one);
+            group.EndInteraction();
+            // The ghost must be restored to the last valid scale, or every later drag is
+            // rejected by the non-positive baseline guard.
+            Assert.AreEqual(Vector3.one * 2, group.GroupGhost.transform.localScale);
+            group.BeginInteraction();
+            group.GroupGhost.transform.localScale = Vector3.one * 3;
+            group.UpdateScales(Vector3.one);
+            Assert.AreEqual(new Vector3(3, 6, 9), a.localScale);
+        }
+
         [Test]
         public void UniformScaleRejectsInvalidNonuniformAndOverflowAtomically()
         {

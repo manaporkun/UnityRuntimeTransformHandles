@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
 namespace TransformHandles.Tests
@@ -308,6 +309,33 @@ namespace TransformHandles.Tests
 
             Assert.AreEqual(HandleType.Rotation, handle.Type);
             Assert.AreEqual(Space.World, handle.Space);
+        }
+
+        [Test]
+        public void CreateHandleWithoutPrefabFailsWithoutLeakingGhost()
+        {
+            var field = typeof(TransformHandleManager).GetField("transformHandlePrefab",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var prefab = (GameObject)field.GetValue(_manager);
+            var ghostsBefore = CountGhosts();
+            LogAssert.Expect(LogType.Error,
+                "TransformHandles: transformHandlePrefab is missing or has no Handle component.");
+            field.SetValue(_manager, null);
+            try
+            {
+                Assert.IsNull(_manager.CreateHandle(NewObject("target").transform));
+            }
+            finally { field.SetValue(_manager, prefab); }
+            Assert.AreEqual(ghostsBefore, CountGhosts(), "A failed creation must not leak a ghost.");
+        }
+
+        private static int CountGhosts()
+        {
+#if UNITY_2023_1_OR_NEWER
+            return Object.FindObjectsByType<Ghost>(FindObjectsSortMode.None).Length;
+#else
+            return Object.FindObjectsOfType<Ghost>().Length;
+#endif
         }
     }
 }

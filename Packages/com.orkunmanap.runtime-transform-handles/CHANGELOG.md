@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same handles. A replaced `MainCamera` cancels an active drag and refreshes live handle cameras.
 
 ### Fixed
+- Uniform group scaling survives a drag that crosses the pivot: the ghost scale is restored to
+  the last valid factor at interaction end instead of poisoning every later drag.
+- Changing a handle's type or axes mid-drag now ends that drag exactly once (previously only
+  uniform group scaling did), so the ghost cannot drift away from its targets.
+- Keyboard shortcuts iterate a snapshot of the handle map; interaction-end callbacks that
+  create, remove or destroy handles can no longer invalidate the enumeration.
+- `CreateHandle`/`CreateHandleFromList` initialize an unenabled manager on demand and fail
+  cleanly (no exception, no leaked ghost) when the handle prefab is missing or has no
+  `Handle` component.
 - Initialize plane controls in the camera-facing quadrant immediately, including rotated pivots.
 - Synchronize handle position, orientation and existing camera-dependent size before creation
   returns, including creation in LateUpdate, membership recentering and mode/axes rebuilds.

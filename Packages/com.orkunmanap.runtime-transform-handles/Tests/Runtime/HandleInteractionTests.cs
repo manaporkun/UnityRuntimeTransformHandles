@@ -98,6 +98,20 @@ namespace TransformHandles.Tests
         }
 
         [Test]
+        public void ChangingTypeDuringDragEndsInteractionOnce()
+        {
+            var handle = _manager.CreateHandle(NewObject("target").transform);
+            var axis = handle.GetComponentInChildren<PositionAxis>(true);
+            var ends = 0;
+            handle.OnInteractionEndEvent += _ => ends++;
+            Assert.IsTrue(_manager.BeginInteraction(axis, handle.transform.position));
+            handle.Type = HandleType.Rotation;
+            Assert.AreEqual(1, ends, "A mid-drag type change must end the drag exactly once.");
+            Assert.IsFalse(_manager.IsInteracting);
+            Assert.AreEqual(HandleType.Rotation, handle.Type);
+        }
+
+        [Test]
         public void Inspector_unity_events_fire_alongside_csharp_events()
         {
             var handle = _manager.CreateHandle(NewObject("target").transform);

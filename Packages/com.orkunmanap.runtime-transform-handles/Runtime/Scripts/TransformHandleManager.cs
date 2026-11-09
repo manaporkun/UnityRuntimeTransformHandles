@@ -333,6 +333,10 @@ namespace TransformHandles
         {
             if (target == null) throw new ArgumentNullException(nameof(target));
             if (RejectCreationDuringTeardown()) return null;
+            // A never-enabled manager has no initialized maps; initialize on demand rather
+            // than dereferencing them.
+            InitializeManager();
+            if (!HasValidHandlePrefab()) return null;
 
             if (_transformHashSet.Contains(target))
             {
@@ -349,7 +353,15 @@ namespace TransformHandles
 
             ghost.Initialize();
 
-            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            var handleInstance = Instantiate(transformHandlePrefab);
+            var transformHandle = handleInstance.GetComponent<Handle>();
+            if (transformHandle == null)
+            {
+                Destroy(handleInstance);
+                Destroy(ghost.gameObject);
+                Debug.LogError("TransformHandles: transformHandlePrefab has no Handle component.");
+                return null;
+            }
             SetLayerRecursively(transformHandle.gameObject, _handleLayer);
             transformHandle.Enable(ghost.transform);
 
@@ -389,6 +401,8 @@ namespace TransformHandles
             if (targets == null) throw new ArgumentNullException(nameof(targets));
             if (targets.Count == 0) throw new ArgumentException("Target list is empty.", nameof(targets));
             if (RejectCreationDuringTeardown()) return null;
+            InitializeManager();
+            if (!HasValidHandlePrefab()) return null;
 
             var validTargets = new List<Transform>();
             foreach (var target in targets)
@@ -423,7 +437,15 @@ namespace TransformHandles
 
             ghost.Initialize();
 
-            var transformHandle = Instantiate(transformHandlePrefab).GetComponent<Handle>();
+            var handleInstance = Instantiate(transformHandlePrefab);
+            var transformHandle = handleInstance.GetComponent<Handle>();
+            if (transformHandle == null)
+            {
+                Destroy(handleInstance);
+                Destroy(ghost.gameObject);
+                Debug.LogError("TransformHandles: transformHandlePrefab has no Handle component.");
+                return null;
+            }
             SetLayerRecursively(transformHandle.gameObject, _handleLayer);
             transformHandle.Enable(ghost.transform);
 
@@ -476,10 +498,20 @@ namespace TransformHandles
             }
             else
             {
-                ghost = Instantiate(ghostPrefab).GetComponent<Ghost>();
+                var ghostInstance = Instantiate(ghostPrefab);
+                ghost = ghostInstance.GetComponent<Ghost>();
+                if (ghost == null) Destroy(ghostInstance);
             }
 
             return ghost;
+        }
+
+        private bool HasValidHandlePrefab()
+        {
+            if (transformHandlePrefab != null && transformHandlePrefab.GetComponent<Handle>() != null)
+                return true;
+            Debug.LogError("TransformHandles: transformHandlePrefab is missing or has no Handle component.");
+            return false;
         }
 
         /// <summary>
@@ -1293,54 +1325,66 @@ namespace TransformHandles
             _previousMousePosition = MousePosition;
         }
 
+        // Type/space/pivot changes can deliver interaction-end callbacks, and consumers may
+        // create, remove or destroy handles from those callbacks. Enumerate a snapshot and
+        // re-validate membership per handle instead of enumerating the live map.
+        private List<Handle> SnapshotHandles() => new List<Handle>(_handleGroupMap.Keys);
+
         protected virtual void KeyboardInput()
         {
             if (!ShortcutsEnabled) return;
 
             if (GetKeyDown(PositionKey))
             {
-                foreach (var handle in _handleGroupMap.Keys)
+                foreach (var handle in SnapshotHandles())
                 {
+                    if (_handleGroupMap == null || handle == null || !_handleGroupMap.ContainsKey(handle)) continue;
                     ChangeHandleType(handle, HandleType.Position);
                 }
             }
 
             if (GetKeyDown(RotationKey))
             {
-                foreach (var handle in _handleGroupMap.Keys)
+                foreach (var handle in SnapshotHandles())
                 {
+                    if (_handleGroupMap == null || handle == null || !_handleGroupMap.ContainsKey(handle)) continue;
                     ChangeHandleType(handle, HandleType.Rotation);
                 }
             }
 
             if (GetKeyDown(ScaleKey))
             {
-                foreach (var handle in _handleGroupMap.Keys)
+                foreach (var handle in SnapshotHandles())
                 {
+                    if (_handleGroupMap == null || handle == null || !_handleGroupMap.ContainsKey(handle)) continue;
                     ChangeHandleType(handle, HandleType.Scale);
                 }
             }
 
             if (GetKeyDown(AllKey))
             {
-                foreach (var handle in _handleGroupMap.Keys)
+                foreach (var handle in SnapshotHandles())
                 {
+                    if (_handleGroupMap == null || handle == null || !_handleGroupMap.ContainsKey(handle)) continue;
                     ChangeHandleType(handle, HandleType.All);
                 }
             }
 
             if (GetKeyDown(SpaceToggleKey))
             {
-                foreach (var handle in _handleGroupMap.Keys)
+                foreach (var handle in SnapshotHandles())
                 {
+                    if (_handleGroupMap == null || handle == null || !_handleGroupMap.ContainsKey(handle)) continue;
                     ChangeHandleSpace(handle, handle.Space == Space.World ? Space.Self : Space.World);
                 }
             }
 
             if (GetKeyDown(PivotToggleKey))
             {
-                foreach (var group in _handleGroupMap.Values)
+                foreach (var group in new List<TransformGroup>(_handleGroupMap.Values))
                 {
+                    if (_handleGroupMap == null || group == null || group.GroupHandle == null ||
+                        !_handleGroupMap.ContainsKey(group.GroupHandle)) continue;
                     ChangeHandlePivot(group, !group.IsOriginOnCenter);
                 }
             }

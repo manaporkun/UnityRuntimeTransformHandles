@@ -53,7 +53,7 @@ namespace TransformHandles
         }
 
         private readonly Dictionary<Transform, PosRotScale> _scaleStart = new Dictionary<Transform, PosRotScale>();
-        private Vector3 _scaleCenter, _ghostStartScale;
+        private Vector3 _scaleCenter, _ghostStartScale, _lastValidGhostScale = Vector3.one;
 
         internal void BeginInteraction()
         {
@@ -62,12 +62,33 @@ namespace TransformHandles
                 GroupHandle.Axes != HandleAxes.XYZ || Transforms.Count < 2 || GroupGhost == null) return;
             _scaleCenter = GroupGhost.transform.position;
             _ghostStartScale = GroupGhost.transform.localScale;
+            // A previous drag may have left the ghost at a non-positive scale (crossing the
+            // pivot). GetAveragePosRotScale defines ghost scale as one; recapture from that
+            // invariant instead of poisoning every later uniform-scale drag.
+            if (!Finite(_ghostStartScale) || _ghostStartScale.x <= 0 || _ghostStartScale.y <= 0 ||
+                _ghostStartScale.z <= 0)
+            {
+                GroupGhost.transform.localScale = Vector3.one;
+                _ghostStartScale = Vector3.one;
+            }
+            _lastValidGhostScale = _ghostStartScale;
             foreach (var target in Transforms)
                 if (target != null) _scaleStart.Add(target, new PosRotScale
                 { Position = target.position, Rotation = target.rotation, Scale = target.localScale });
         }
 
-        internal void EndInteraction() => _scaleStart.Clear();
+        internal void EndInteraction()
+        {
+            // If the drag ended past the pivot, targets still hold the last valid factor;
+            // restore the ghost to that scale so the next drag starts from a valid baseline.
+            if (_scaleStart.Count > 0 && GroupGhost != null)
+            {
+                var current = GroupGhost.transform.localScale;
+                if (!Finite(current) || current.x <= 0 || current.y <= 0 || current.z <= 0)
+                    GroupGhost.transform.localScale = _lastValidGhostScale;
+            }
+            _scaleStart.Clear();
+        }
 
         private static bool Finite(Vector3 value) =>
             !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
@@ -91,6 +112,7 @@ namespace TransformHandles
                     !Finite(pair.Value.Scale * factor) ||
                     !Finite(_scaleCenter + (pair.Value.Position - _scaleCenter) * factor)) return;
             }
+            _lastValidGhostScale = current;
             foreach (var pair in _scaleStart)
             {
                 pair.Key.localScale = pair.Value.Scale * factor;
