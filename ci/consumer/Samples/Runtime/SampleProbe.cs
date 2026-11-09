@@ -83,7 +83,7 @@ namespace ConsumerJourney
 
         private void Update()
         {
-            if (InputWrapper.GetKeyDown(KeyCode.Q)) Application.Quit(0);
+            if (TransformHandles.Utils.InputWrapper.GetKeyDown(KeyCode.Q)) Application.Quit(0);
         }
 
         private void OnDestroy()
