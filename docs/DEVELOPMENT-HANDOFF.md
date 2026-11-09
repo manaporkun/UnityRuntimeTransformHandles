@@ -300,6 +300,21 @@ on the recorded local macOS candidate validation at that exact version, the
 journeys must not be described as 2021.3.0f1 evidence. No merge or publication is
 authorized by this checkpoint.
 
+Outcome: at `25dfe41`, run
+[42596677952](https://github.com/manaporkun/UnityRuntimeTransformHandles/actions/runs/42596677952)
+(attempt 3) is fully green — all eight consumer jobs, Core/Demos suites on both
+input backends, the 2021.3.45 floor, min-API lint, commit hygiene and package
+validation pass; the remaining skips are the check-reporting jobs and `publish`
+(main-only). The matrix's first runs surfaced and fixed several latent
+fixture/driver defects (coverage-flag CLI rejection, an xdotool `--sync` hang on
+no-op moves, a cleared-pivot capture crash, the World/Local key sequence, the
+distinct consumer prefab size, a Unity 6 symbol ambiguity and a handle-less
+showcase expectation). Operational note: full-matrix runs can exhaust Unity's
+per-account activation attempt budget (`143.002` — "User reaches maximum same
+user attempt retry count") because every Editor phase re-authenticates; when a
+phase fails with that code, wait and rerun the failed job alone
+(`gh run rerun <run> --job <id>`) rather than pushing a new run.
+
 ## Start a consumer or demo
 
 Install both package folders through explicit local file dependencies for development. For a Git consumer, pin both project manifest URLs to the same branch commit; the optional demos README includes the two-entry example. Git dependencies inside a package manifest do not recursively install sibling Git packages.
