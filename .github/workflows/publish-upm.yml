@@ -836,7 +836,7 @@ jobs:
           assert m['publishable'], 'local previews cannot publish'
           # The version reaches shell steps and git refs below. Reject anything beyond plain
           # semver (no build metadata, spaces or shell metacharacters) before it is written
-          # to GITHUB_OUTPUT, and pass it to run blocks via env, never ${{ }} interpolation.
+          # to GITHUB_OUTPUT, and pass it to run blocks via env, never expression interpolation.
           import re
           assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?', m['version']), \
               'unsafe release version: ' + repr(m['version'])
