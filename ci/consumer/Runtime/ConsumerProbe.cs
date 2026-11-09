@@ -191,7 +191,7 @@ namespace ConsumerJourney
                 observation.handleX = Pixel(camera, handle.transform.TransformPoint(new Vector3(.7f, 0, 0)));
                 observation.handleY = Pixel(camera, handle.transform.TransformPoint(new Vector3(0, .7f, 0)));
                 observation.handleRing = Pixel(camera, handle.transform.TransformPoint(new Vector3(.7f, .7f, 0)));
-                observation.pivotPixel = Pixel(camera, handle.Pivot.position);
+                observation.pivotPixel = handle.Pivot != null ? Pixel(camera, handle.Pivot.position) : Vector2.zero;
             }
             var stem = request.stage == "ready" ? "ready" : request.stage + "-" + request.nonce;
             var image = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
