@@ -49,15 +49,18 @@ jobs:
           # the floor concern grows. FindObjectOfType (the pre-2021.3 API) is intentionally allowed.
           DENY='FindAnyObjectByType|FindFirstObjectByType|FindObjectsByType'
 
-          # awk tracks #if/#elif/#else/#endif nesting and marks a level "version-guarded" when its
-          # condition mentions UNITY_<year> or *_OR_NEWER. A denied API is reported only when it sits
-          # outside every version-guarded region (comment-only lines are ignored).
+          # awk tracks #if/#elif/#else/#endif nesting. A level's current branch is "new-only"
+          # (denied API allowed) only when its condition proves the branch compiles solely on
+          # post-floor Unity: a positive UNITY_..._OR_NEWER condition, or the #else of a
+          # negated one (!UNITY_..._OR_NEWER). The #else of a positive guard is the branch
+          # 2021.3 actually compiles, so it must NOT inherit the guard.
           HITS=$(while IFS= read -r -d '' f; do
             awk -v deny="$DENY" -v file="$f" '
               function isver(s){ return (s ~ /UNITY_[0-9]/ || s ~ /OR_NEWER/) }
-              /^[ \t]*#[ \t]*if/    { depth++; g[depth]=isver($0)?1:0; next }
-              /^[ \t]*#[ \t]*elif/  { if(depth>0 && isver($0)) g[depth]=1; next }
-              /^[ \t]*#[ \t]*else/  { next }
+              function kind(s){ if(!isver(s)) return 0; if(s ~ /![ \t]*\(?[A-Za-z_0-9]*(_OR_NEWER|UNITY_[0-9])/) return -1; return 1 }
+              /^[ \t]*#[ \t]*if/    { depth++; k=kind($0); g[depth]=(k==1)?1:0; e[depth]=(k==-1)?1:0; next }
+              /^[ \t]*#[ \t]*elif/  { if(depth>0) g[depth]=(kind($0)==1)?1:0; next }
+              /^[ \t]*#[ \t]*else/  { if(depth>0) g[depth]=e[depth]; next }
               /^[ \t]*#[ \t]*endif/ { if(depth>0) depth--; next }
               {
                 ing=0; for(i=1;i<=depth;i++) if(g[i]) ing=1

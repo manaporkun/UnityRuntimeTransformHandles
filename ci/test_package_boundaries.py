@@ -96,6 +96,28 @@ class PackageBoundaryTests(unittest.TestCase):
                 path.write_text('.x { -unity-font: url("' + value + '"); }')
                 with self.assertRaises(ValueError): boundary.validate(self.root)
 
+    def test_cross_sample_asmdef_reference_rejected(self):
+        p = self.demos / 'Samples~/Demo/TransformHandles.Samples.Demo.asmdef'
+        m = json.loads(p.read_text()); m['references'].append('TransformHandles.Samples.LevelEditor')
+        p.write_text(json.dumps(m))
+        with self.assertRaisesRegex(ValueError, 'crosses'): boundary.validate(self.root)
+
+    def test_unknown_asmdef_reference_rejected(self):
+        p = self.demos / 'Samples~/Demo/TransformHandles.Samples.Demo.asmdef'
+        m = json.loads(p.read_text()); m['references'].append('Totally.Nonexistent.Assembly')
+        p.write_text(json.dumps(m))
+        with self.assertRaisesRegex(ValueError, 'does not resolve'): boundary.validate(self.root)
+
+    def test_malformed_asmdef_rejected(self):
+        p = self.demos / 'Samples~/Demo/TransformHandles.Samples.Demo.asmdef'
+        p.write_text('{oops')
+        with self.assertRaisesRegex(ValueError, 'invalid asmdef'): boundary.validate(self.root)
+
+    def test_unlisted_sample_folder_rejected(self):
+        folder = self.demos / 'Samples~/Orphan'
+        folder.mkdir()
+        (folder / 'Orphan.unity').write_text('')
+        with self.assertRaisesRegex(ValueError, 'must all be registered'): boundary.validate(self.root)
 
 
 # Release-history scoping and candidate integrity are exercised in test_release_candidate.py.

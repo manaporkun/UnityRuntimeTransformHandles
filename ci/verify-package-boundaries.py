@@ -81,6 +81,36 @@ def validate(root):
     samples = dm.get('samples', [])
     require(samples and len({s['path'] for s in samples}) == len(samples), 'sample paths missing/duplicated')
     require(len({s['displayName'] for s in samples}) == len(samples), 'duplicate sample name')
+    samples_root = (demos / 'Samples~').resolve()
+    listed_folders = {(demos / s['path']).resolve() for s in samples}
+    if samples_root.is_dir():
+        actual_folders = {path.resolve() for path in samples_root.iterdir() if path.is_dir()}
+        require(actual_folders == listed_folders,
+                f'Samples~ folders must all be registered in package.json: '
+                f'unlisted={sorted(str(p) for p in actual_folders - listed_folders)} '
+                f'missing={sorted(str(p) for p in listed_folders - actual_folders)}')
+    # Parse every asmdef. The GUID text scan below cannot see name-based references, so a
+    # sample referencing another sample (or a nonexistent assembly) would otherwise ship
+    # green and only fail in a consumer project that imports that single sample.
+    asmdefs = {}
+    assembly_names = {}
+    asmdef_by_guid = {}
+    for package in (core, demos):
+        for path in package.rglob('*.asmdef'):
+            try:
+                asmdef = json.loads(path.read_text())
+            except json.JSONDecodeError as error:
+                raise ValueError(f'invalid asmdef JSON: {path}: {error}') from error
+            name = asmdef.get('name')
+            require(isinstance(name, str) and name, f'asmdef missing name: {path}')
+            require(name not in assembly_names, f'duplicate assembly name: {name}: {path}')
+            assembly_names[name] = path
+            asmdefs[path] = asmdef
+            meta = Path(str(path) + '.meta')
+            if meta.is_file():
+                match = re.search(r'^guid: ([0-9a-f]{32})$', meta.read_text(), re.M)
+                if match:
+                    asmdef_by_guid[match[1]] = path
     for sample in samples:
         folder = (demos / sample['path']).resolve()
         require(folder.is_relative_to((demos / 'Samples~').resolve()) and folder.is_dir(), 'invalid sample path')
@@ -96,6 +126,34 @@ def validate(root):
             for guid in GUID.findall(text):
                 require(guid.startswith('0000000000000000') or guid in allowed,
                         f'sample reference escapes its import/Core/Unity dependencies: {path}: {guid}')
+    unity_named = {'UnityEngine.TestRunner', 'UnityEditor.TestRunner'}
+
+    def sample_folder_of(path):
+        for sample in samples:
+            folder = (demos / sample['path']).resolve()
+            if path.resolve().is_relative_to(folder):
+                return folder
+        return None
+
+    for path, asmdef in asmdefs.items():
+        own_sample = sample_folder_of(path) if path.resolve().is_relative_to(demos.resolve()) else None
+        for reference in asmdef.get('references', []):
+            if reference.startswith('GUID:'):
+                guid = reference[5:]
+                if guid in UNITY_ASSEMBLIES:
+                    continue
+                target = asmdef_by_guid.get(guid)
+                require(target is not None, f'asmdef reference does not resolve to an assembly: {path}: {reference}')
+            elif reference in unity_named:
+                continue
+            else:
+                target = assembly_names.get(reference)
+                require(target is not None, f'asmdef reference does not resolve to an assembly: {path}: {reference}')
+            if target.resolve().is_relative_to(core.resolve()):
+                continue
+            target_sample = sample_folder_of(target)
+            require(own_sample is not None and target_sample == own_sample,
+                    f'asmdef reference crosses the Core/sample boundary: {path}: {reference}')
     return len(samples)
 
 
