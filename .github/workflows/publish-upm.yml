@@ -834,6 +834,12 @@ jobs:
           from pathlib import Path
           m = json.loads(Path('artifacts/candidate/candidate.json').read_text())
           assert m['publishable'], 'local previews cannot publish'
+          # The version reaches shell steps and git refs below. Reject anything beyond plain
+          # semver (no build metadata, spaces or shell metacharacters) before it is written
+          # to GITHUB_OUTPUT, and pass it to run blocks via env, never ${{ }} interpolation.
+          import re
+          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?', m['version']), \
+              'unsafe release version: ' + repr(m['version'])
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('skip=' + str(m['skip']).lower() + '\n')
               output.write('version=' + m['version'] + '\n')
@@ -860,9 +866,12 @@ jobs:
 
       - name: Verify existing tag before updating distribution
         if: steps.release.outputs.skip != 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_REF: ${{ steps.release.outputs.release_ref }}
         run: |
-          VERSION="v${{ steps.release.outputs.version }}"
-          EXPECTED_TREE="$(git rev-parse "${{ steps.release.outputs.release_ref }}:Packages/com.orkunmanap.runtime-transform-handles")"
+          VERSION="v$RELEASE_VERSION"
+          EXPECTED_TREE="$(git rev-parse "$RELEASE_REF:Packages/com.orkunmanap.runtime-transform-handles")"
           git ls-remote --tags origin "refs/tags/$VERSION" > /tmp/existing-release-tag
           if [ -s /tmp/existing-release-tag ]; then
             git fetch origin "refs/tags/$VERSION:refs/tags/$VERSION"
@@ -871,12 +880,15 @@ jobs:
 
       - name: Create/Update UPM branch
         if: steps.release.outputs.skip != 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_REF: ${{ steps.release.outputs.release_ref }}
         run: |
           PACKAGE_PATH="Packages/com.orkunmanap.runtime-transform-handles"
           UPM_BRANCH="upm"
           # Exact commit whose package this release ships: the bump commit (normal) or the
           # interrupted bump being recovered. Never plain `main`, which may have moved on.
-          RELEASE_REF="${{ steps.release.outputs.release_ref }}"
+          RELEASE_REF="$RELEASE_REF"
 
           if git ls-remote --heads origin $UPM_BRANCH | grep -q $UPM_BRANCH; then
             echo "UPM branch exists, updating..."
@@ -905,7 +917,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Release v${{ steps.release.outputs.version }}"
+            git commit -m "Release v$RELEASE_VERSION"
             test "$(git rev-parse HEAD^{tree})" = "$(git rev-parse "$RELEASE_REF:$PACKAGE_PATH")"
             # force-with-lease: the remote-tracking ref is fresh from the pull above, so this
             # behaves like --force unless someone moved upm mid-run - then it fails loudly
@@ -916,11 +928,14 @@ jobs:
 
       - name: Create version tag
         if: steps.release.outputs.skip != 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_REF: ${{ steps.release.outputs.release_ref }}
         run: |
-          VERSION="v${{ steps.release.outputs.version }}"
+          VERSION="v$RELEASE_VERSION"
 
           git checkout upm
-          EXPECTED_TREE="$(git rev-parse "${{ steps.release.outputs.release_ref }}:Packages/com.orkunmanap.runtime-transform-handles")"
+          EXPECTED_TREE="$(git rev-parse "$RELEASE_REF:Packages/com.orkunmanap.runtime-transform-handles")"
           test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE"
 
           # Idempotent: a recovery run (completing an earlier interrupted publish) may reach here with
@@ -978,15 +993,19 @@ jobs:
           prerelease: false
 
       - name: Summary
+        env:
+          RELEASE_SKIP: ${{ steps.release.outputs.skip }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_BUMP: ${{ steps.release.outputs.bump }}
         run: |
-          if [ "${{ steps.release.outputs.skip }}" = "true" ]; then
+          if [ "$RELEASE_SKIP" = "true" ]; then
             echo "## No Release Needed" >> $GITHUB_STEP_SUMMARY
             echo "No Core release was triggered. Demos-only changes are validated source distributions; they do not create a Core tag." >> $GITHUB_STEP_SUMMARY
           else
             echo "## UPM Package Released 🎉" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Version:** v${{ steps.release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Bump Type:** ${{ steps.release.outputs.bump }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Version:** v$RELEASE_VERSION" >> $GITHUB_STEP_SUMMARY
+            echo "**Bump Type:** $RELEASE_BUMP" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Installation" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
