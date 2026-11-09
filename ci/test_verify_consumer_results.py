@@ -309,9 +309,8 @@ class ConsumerEvidenceTests(unittest.TestCase):
         ui = self.contract['ui']
         help_button = dict(id=ui['help'], text='Help', x=40, y=30, width=30, height=20, enabled=True)
         close_button = dict(id=ui['closeHelp'], text='Close', x=240, y=30, width=30, height=20, enabled=True)
-        ready.update(scene=self.contract['samples']['Demo']['scene'], visibleRenderers=2, liveHandles=1,
-                     visuals=[dict(kind='target', color=dict(r=230/255, g=140/255, b=40/255), left=60, right=100, top=100, bottom=140),
-                              dict(kind='handle', color=dict(r=1, g=20/255, b=20/255), left=115, right=125, top=85, bottom=95)],
+        ready.update(scene=self.contract['samples']['Demo']['scene'], visibleRenderers=2, liveHandles=0,
+                     visuals=[dict(kind='target', color=dict(r=230/255, g=140/255, b=40/255), left=60, right=100, top=100, bottom=140)],
                      controls=[help_button], labels=['Handle showcase'])
         (self.out / 'ready.json').write_text(json.dumps(ready))
         report = dict(schema=1, runId=self.expected['runId'], session='session', customized=False, withheld=False,

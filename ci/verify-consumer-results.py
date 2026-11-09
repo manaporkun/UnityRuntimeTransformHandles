@@ -453,7 +453,11 @@ def verify_sample_player(out, expected, contract, sample, customized=False):
             control_point(observation, identifier=ui['help'])
             verify_rendered_visuals(observation, frames[stage])
         if name == 'Demo':
-            require(observation.get('liveHandles', 0) > 0 and observation.get('positions'), 'showcase did not render/own its supplied targets and handles')
+            # The showcase starts handle-less by design ("click a cube to create
+            # its handle") and this driver only exercises its Help UI, so prove
+            # the supplied targets rendered instead of demanding a live handle.
+            require(observation.get('positions') and any(visual.get('kind') == 'target' for visual in observation.get('visuals', [])),
+                    'showcase did not render its supplied targets')
             if customized:
                 require(all(abs(observation['cameraBackground'][key] - value) < .0001 for key, value in {'r': .08, 'g': .11, 'b': .16}.items()), 'customized imported scene property did not survive reopen/build')
     return report
