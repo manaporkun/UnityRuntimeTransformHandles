@@ -43,7 +43,7 @@ namespace TransformHandles
             _lineGameObject = lineMeshRenderer.gameObject;
 
             _coneTransform = _coneGameObject.transform;
-            _cameraTransform = _handleCamera.transform;
+            _cameraTransform = _handleCamera != null ? _handleCamera.transform : null;
 
             // Instantiate materials once; Initialize is re-runnable via Handle.ChangeAxes
             // and MeshRenderer.material allocates a new instance on every access.
@@ -65,9 +65,18 @@ namespace TransformHandles
             _visibilitySet = false;
         }
 
+        private bool EnsureCamera()
+        {
+            _handleCamera = ParentHandle != null ? ParentHandle.HandleCamera : null;
+            _cameraTransform = _handleCamera != null ? _handleCamera.transform : null;
+            return _handleCamera != null;
+        }
+
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
+            if (!EnsureCamera()) return;
+
             var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
 
             var closestT = MathUtils.ClosestPointOnRay(_rAxisRay, cameraRay);
@@ -103,6 +112,7 @@ namespace TransformHandles
         public override void StartInteraction(Vector3 hitPoint)
         {
             base.StartInteraction(hitPoint);
+            if (!EnsureCamera()) return;
 
             _startPosition = ParentHandle.Pivot.position;
 
@@ -146,6 +156,8 @@ namespace TransformHandles
 
         private void LateUpdate()
         {
+            if (!EnsureCamera()) return;
+
             var dot = Vector3.Dot(_coneTransform.up, _cameraTransform.forward);
             var visible = dot >= -AxisVisibilityDotThreshold && dot <= AxisVisibilityDotThreshold;
             if (_visibilitySet && visible == _lastVisible) return;

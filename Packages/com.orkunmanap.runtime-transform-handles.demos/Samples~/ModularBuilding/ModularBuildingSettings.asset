@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb68f15561ac04c53b192fc1a484a836, type: 3}
+  m_Name: ModularBuildingSettings
+  m_EditorClassIdentifier:
+  enableShortcuts: 0
+  positionKey: 119
+  rotationKey: 101
+  scaleKey: 114
+  allKey: 97
+  spaceToggleKey: 120
+  pivotToggleKey: 122
+  emphasizeHandleColorOnHover: 1
+  preserveHandleColorOnHover: 0
+  highlightColor: {r: 0.08, g: 0.4, b: 0.82, a: 1}
+  xAxisColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  yAxisColor: {r: 0.2, g: 1, b: 0.2, a: 1}
+  zAxisColor: {r: 0.2, g: 0.6, b: 1, a: 1}
+  globalHandleColor: {r: 1, g: 0.6, b: 0, a: 1}
+  handleScale: 1
+  defaultHandleType: 0
+  defaultSpace: 1
+  defaultAxes: 6
+  autoScaleHandles: 1

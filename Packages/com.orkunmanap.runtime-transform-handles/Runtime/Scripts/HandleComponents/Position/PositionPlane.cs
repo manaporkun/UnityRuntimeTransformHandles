@@ -9,7 +9,7 @@ namespace TransformHandles
     public class PositionPlane : HandleBase
     {
         private const float PlaneVisibilityDotThreshold = 0.25f;
-        private const float PlaneVisualOffset = 0.2f;
+        [SerializeField, Min(0f)] private float planeVisualOffset = 0.2f;
         private const float CameraAngleThreshold = 90f;
 
         [SerializeField] private Color defaultColor;
@@ -49,13 +49,14 @@ namespace TransformHandles
 
             _quadGameObject = quadMeshRenderer.gameObject;
             _quadTransform = _quadGameObject.transform;
-            _cameraTransform = _handleCamera.transform;
+            _cameraTransform = _handleCamera != null ? _handleCamera.transform : null;
 
             // Instantiate the material once; Initialize is re-runnable via Handle.ChangeAxes
             // and MeshRenderer.material allocates a new instance on every access.
             if (_quadMaterial == null) _quadMaterial = quadMeshRenderer.material;
 
-            _quadTransform.localPosition = (_axis1 + _axis2) * PlaneVisualOffset;
+            _quadTransform.localPosition = (_axis1 + _axis2) * planeVisualOffset;
+            RefreshVisualPlacement();
 
             // Initialize re-runs via Handle.ChangeAxes, which re-enables the plane GameObject but
             // leaves the quad child's active state and this cache as they were. Clear the cache so
@@ -63,9 +64,18 @@ namespace TransformHandles
             _visibilitySet = false;
         }
 
+        private bool EnsureCamera()
+        {
+            _handleCamera = ParentHandle != null ? ParentHandle.HandleCamera : null;
+            _cameraTransform = _handleCamera != null ? _handleCamera.transform : null;
+            return _handleCamera != null;
+        }
+
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
+            if (!EnsureCamera()) return;
+
             var ray = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
 
             _plane.Raycast(ray, out var d);
@@ -104,6 +114,8 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void StartInteraction(Vector3 hitPoint)
         {
+            if (!EnsureCamera()) return;
+
             var rPerp = GetRotatedAxis(_perp);
 
             var position = ParentHandle.Pivot.position;
@@ -118,9 +130,12 @@ namespace TransformHandles
             _interactionOffset = _startPosition - rayHitPoint;
         }
 
-        private void Update()
+        private void Update() => RefreshVisualPlacement();
+
+        internal void RefreshVisualPlacement()
         {
-            if (_handleCamera == null) return;
+            if (_quadTransform == null || ParentHandle == null || ParentHandle.Pivot == null) return;
+            if (!EnsureCamera()) return;
 
             var axis1 = _axis1;
             var rAxis1 = GetRotatedAxis(axis1);
@@ -134,7 +149,7 @@ namespace TransformHandles
             if (angle2 < CameraAngleThreshold)
                 axis2 = -axis2;
 
-            _quadTransform.localPosition = (axis1 + axis2) * PlaneVisualOffset;
+            _quadTransform.localPosition = (axis1 + axis2) * planeVisualOffset;
         }
 
         protected override void OnDestroy()
@@ -150,6 +165,8 @@ namespace TransformHandles
 
         private void LateUpdate()
         {
+            if (!EnsureCamera()) return;
+
             var dot = Vector3.Dot(_quadTransform.up, _cameraTransform.forward);
             var notVisible = dot < -PlaneVisibilityDotThreshold || dot > PlaneVisibilityDotThreshold;
             if (_visibilitySet && notVisible == _lastNotVisible) return;

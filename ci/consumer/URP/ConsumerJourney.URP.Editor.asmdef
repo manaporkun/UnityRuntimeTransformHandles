@@ -1,0 +1,7 @@
+{
+  "name": "ConsumerJourney.URP.Editor",
+  "rootNamespace": "ConsumerJourney",
+  "references": ["ConsumerJourney.Bootstrap", "ConsumerJourney.Editor", "Unity.RenderPipelines.Universal.Runtime"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

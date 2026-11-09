@@ -66,10 +66,12 @@ namespace TransformHandles.Tests
         public void Destroying_handle_after_manager_does_not_recreate_manager()
         {
             var handle = _manager.CreateHandle(NewObject("target").transform);
-            _spawned.Add(handle.gameObject);
+            var handleObject = handle.gameObject;
+            _spawned.Add(handleObject);
             _spawned.Add(handle.Pivot.gameObject);
             Object.DestroyImmediate(_manager.gameObject);
-            Object.DestroyImmediate(handle.gameObject);
+            // Owned handles may already be destroyed synchronously by manager cleanup.
+            if (handleObject != null) Object.DestroyImmediate(handleObject);
 #if UNITY_2023_1_OR_NEWER
             _manager = Object.FindFirstObjectByType<TransformHandleManager>();
 #else
@@ -93,6 +95,20 @@ namespace TransformHandles.Tests
             handle.InteractionEnd();
 
             CollectionAssert.AreEqual(new[] { "start", "stay", "stay", "end" }, calls);
+        }
+
+        [Test]
+        public void ChangingTypeDuringDragEndsInteractionOnce()
+        {
+            var handle = _manager.CreateHandle(NewObject("target").transform);
+            var axis = handle.GetComponentInChildren<PositionAxis>(true);
+            var ends = 0;
+            handle.OnInteractionEndEvent += _ => ends++;
+            Assert.IsTrue(_manager.BeginInteraction(axis, handle.transform.position));
+            handle.Type = HandleType.Rotation;
+            Assert.AreEqual(1, ends, "A mid-drag type change must end the drag exactly once.");
+            Assert.IsFalse(_manager.IsInteracting);
+            Assert.AreEqual(HandleType.Rotation, handle.Type);
         }
 
         [Test]
@@ -168,6 +184,7 @@ namespace TransformHandles.Tests
         public void RemoveHandle_terminates_the_ghost()
         {
             var handle = _manager.CreateHandle(NewObject("target").transform);
+            _spawned.Add(handle.gameObject);
             Assert.AreEqual(1, CountGhosts());
 
             _manager.RemoveHandle(handle);

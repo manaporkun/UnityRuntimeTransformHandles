@@ -1,0 +1,4 @@
+# Reviewed standalone inventory; update with sample tests, never from accepted XML.
+TransformHandles.Samples.DemoBrowser.Tests.DemoBrowserTests.GalleryListsOnlyScenesIncludedInBuild
+TransformHandles.Samples.DemoBrowser.Tests.DemoBrowserTests.RejectsAmbiguousSceneNames
+TransformHandles.Samples.DemoBrowser.Tests.DemoBrowserTests.ResolvesFullPathAndOmitsMissingScenes

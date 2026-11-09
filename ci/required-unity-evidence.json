@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "exceptions": {
+    "play": [
+      "InvalidOperationException: disable end",
+      "InvalidOperationException: end callback",
+      "InvalidOperationException: destroyed callback",
+      "InvalidOperationException: end callback 2",
+      "InvalidOperationException: destroyed callback 2",
+      "InvalidOperationException: direct end callback",
+      "InvalidOperationException: end callback",
+      "InvalidOperationException: destroyed callback",
+      "InvalidOperationException: direct destruction CSharp",
+      "InvalidOperationException: direct destruction CSharp",
+      "InvalidOperationException: direct destruction UnityEvent",
+      "InvalidOperationException: direct destruction UnityEvent",
+      "InvalidOperationException: destruction after remove",
+      "InvalidOperationException: destruction after manager"
+    ],
+    "edit": []
+  },
+  "session_cases": [
+    {
+      "name": "None/authored",
+      "require_quit_on_exit": false
+    },
+    {
+      "name": "None/factory",
+      "require_quit_on_exit": false
+    },
+    {
+      "name": "DisableDomainReload/authored",
+      "require_quit_on_exit": true
+    },
+    {
+      "name": "DisableDomainReload/factory",
+      "require_quit_on_exit": true
+    },
+    {
+      "name": "DisableSceneReload/authored",
+      "require_quit_on_exit": false
+    },
+    {
+      "name": "DisableSceneReload/factory",
+      "require_quit_on_exit": false
+    },
+    {
+      "name": "DisableDomainReload, DisableSceneReload/authored",
+      "require_quit_on_exit": true
+    },
+    {
+      "name": "DisableDomainReload, DisableSceneReload/factory",
+      "require_quit_on_exit": true
+    }
+  ],
+  "phases": [
+    "entry-requested",
+    "entered-and-asserted",
+    "exit-requested",
+    "exited-and-asserted"
+  ]
+}

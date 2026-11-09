@@ -1,0 +1,7 @@
+{
+  "name": "ConsumerJourney.Samples",
+  "rootNamespace": "ConsumerJourney",
+  "references": ["ConsumerJourney.Runtime", "com.orkunmanap.runtime-transform-handles"],
+  "autoReferenced": true,
+  "defineConstraints": []
+}

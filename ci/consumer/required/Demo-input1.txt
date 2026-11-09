@@ -1,0 +1,7 @@
+# Reviewed standalone inventory; update with sample tests, never from accepted XML.
+TransformHandles.Samples.Demo.Tests.HandleDemoTests.AdvancedControlsPreserveSnappingMultiplierAndSettings
+TransformHandles.Samples.Demo.Tests.HandleDemoTests.CameraMovesOutsideUiAndChromeClaimsPressWithoutBrowser
+TransformHandles.Samples.Demo.Tests.HandleDemoTests.EveryTypeAxisAndSnapModeRemainsAvailable
+TransformHandles.Samples.Demo.Tests.HandleDemoTests.GroupAndClearLeaveBorrowedHandlesAlone
+TransformHandles.Samples.Demo.Tests.HandleDemoTests.ResetOnlyRestoresOwnedSceneAndKeepsPixelPreference
+TransformHandles.Samples.Demo.Tests.HandleDemoTests.SizeEntryCommitsCancelsAndSurvivesReenable

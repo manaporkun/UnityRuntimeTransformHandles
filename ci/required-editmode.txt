@@ -1,0 +1,74 @@
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(X,(1.00, 0.00, 0.00))
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(XY,(1.00, 1.00, 0.00))
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(XYZ,(1.00, 1.00, 1.00))
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(XZ,(1.00, 0.00, 1.00))
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(Y,(0.00, 1.00, 0.00))
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(YZ,(0.00, 1.00, 1.00))
+TransformHandles.Tests.Editor.GetVectorFromAxesTests.GetVectorFromAxes_maps_mask_to_multiplier(Z,(0.00, 0.00, 1.00))
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(X,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(XY,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(XYZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(XZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(Y,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(YZ,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_X(Z,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(X,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(XY,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(XYZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(XZ,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(Y,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(YZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Y(Z,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(X,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(XY,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(XYZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(XZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(Y,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(YZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasAxis_Z(Z,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.HasBothAxes_XY_true_only_when_both_present
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(X,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(XY,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(XYZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(XZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(Y,False)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(YZ,True)
+TransformHandles.Tests.Editor.HandleAxesExtensionsTests.IsMultiAxis(Z,False)
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.CalcLineTranslation_returns_zero_when_src_equals_dest
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.GetHandleSize_returns_fallback_when_camera_is_null
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.GetParametrization_returns_one_when_point_is_at_line_end
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.GetParametrization_returns_zero_when_point_is_at_line_start
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.LineScaleForCubeReach_clamps_at_zero_when_cube_overlaps_origin
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.LineScaleForCubeReach_returns_zero_for_degenerate_line_mesh
+TransformHandles.Tests.Editor.HandleTransformUtilityTests.LineScaleForCubeReach_stops_line_at_cube_inner_face
+TransformHandles.Tests.Editor.MathUtilsTests.ClosestPointOnRay_returns_parameter_of_intersection
+TransformHandles.Tests.Editor.MathUtilsTests.ClosestPointOnRay_returns_zero_for_antiparallel_rays
+TransformHandles.Tests.Editor.MathUtilsTests.ClosestPointOnRay_returns_zero_for_parallel_rays
+TransformHandles.Tests.Editor.MeshUtilsTests.CreateArc_simple_has_expected_topology(32)
+TransformHandles.Tests.Editor.MeshUtilsTests.CreateArc_simple_has_expected_topology(8)
+TransformHandles.Tests.Editor.MeshUtilsTests.CreateArc_with_center_places_points_at_radius_around_center
+TransformHandles.Tests.Editor.MeshUtilsTests.RebuildArc_reuses_the_same_mesh_instance
+TransformHandles.Tests.Editor.PlayModeSessionTests.Default_authored
+TransformHandles.Tests.Editor.PlayModeSessionTests.Default_factory
+TransformHandles.Tests.Editor.PlayModeSessionTests.NoDomain_authored
+TransformHandles.Tests.Editor.PlayModeSessionTests.NoDomain_factory
+TransformHandles.Tests.Editor.PlayModeSessionTests.NoReload_authored
+TransformHandles.Tests.Editor.PlayModeSessionTests.NoReload_factory
+TransformHandles.Tests.Editor.PlayModeSessionTests.NoScene_authored
+TransformHandles.Tests.Editor.PlayModeSessionTests.NoScene_factory
+TransformHandles.Tests.Editor.PrecisionPrefabTests.DefaultUsesPrecisionAndClassicRemainsAvailable
+TransformHandles.Tests.Editor.PrecisionPrefabTests.OverlayQueuesSeparateEveryColoredPartAndBackingsCannotBePicked
+TransformHandles.Tests.Editor.PrecisionPrefabTests.PlaneBordersAreOptInAndMatchSerializedDefaultColors
+TransformHandles.Tests.Editor.PrecisionPrefabTests.PrecisionPreservesAxisPickingAndAlignsCompactPlaneVolumes
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_returns_value_unchanged_when_increment_is_zero(-12.5f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_returns_value_unchanged_when_increment_is_zero(0.0f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_returns_value_unchanged_when_increment_is_zero(0.73f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_rounds_to_nearest_multiple(-0.7f,0.5f,-0.5f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_rounds_to_nearest_multiple(0.0f,0.5f,0.0f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_rounds_to_nearest_multiple(0.7f,0.5f,0.5f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_rounds_to_nearest_multiple(0.8f,0.5f,1.0f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_rounds_to_nearest_multiple(2.4f,1.0f,2.0f)
+TransformHandles.Tests.Editor.SnapUtilsTests.Snap_rounds_to_nearest_multiple(2.6f,1.0f,3.0f)
+TransformHandles.Tests.Editor.TransformUtilsTests.GetBounds_multiple_renderers_encapsulates_all
+TransformHandles.Tests.Editor.TransformUtilsTests.GetBounds_no_renderers_returns_zero_size_at_position_without_nan
+TransformHandles.Tests.Editor.TransformUtilsTests.GetBounds_single_renderer_matches_renderer_bounds

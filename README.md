@@ -46,6 +46,15 @@ Unity Runtime Transform Handles is a powerful tool that allows developers to tra
 > **Upgrading from 2.x?** No code changes required — 3.0.0 shipped no breaking changes (the
 > major bump was a release-automation artifact, corrected in 3.0.1).
 
+## Optional demos and the next release
+
+The approved release candidate is Core **4.0.0** and optional Demos **1.0.0**; it is not published yet.
+Core remains independently usable. The original showcase moves to the Demos package alongside
+Level Editor, Modular Building, Lamp Assembly and Demo Browser. This changes sample distribution:
+back up old imports outside Assets and remove them before importing their replacements, which retain
+asset GUIDs. See the [Demos installation and migration guide](Packages/com.orkunmanap.runtime-transform-handles.demos/README.md)
+and [release preparation](docs/RELEASE-PREPARATION.md).
+
 ## Installation
 
 ### Option 1: Package Manager (Recommended)
@@ -189,16 +198,26 @@ TransformHandleManager.Instance.BlockWhenPointerOverUI = true;
 
 ## Samples
 
-The package ships an importable demo:
+Examples are distributed in the separate optional **Runtime Transform Handles Demos** package.
+Core users do not need it. See [installation and migration](Packages/com.orkunmanap.runtime-transform-handles.demos/README.md).
+Import individual examples from that package's Samples tab, then run Tools > Transform Handles > Setup Layer.
+Existing imported Assets copies are user-owned; back up custom changes outside Assets before migration.
 
-1. Open `Window > Package Manager` and select **Runtime Transform Handles**.
-2. Open the **Samples** tab and import **Runtime Transform Handles Demo**.
-3. Open `Assets/Samples/Runtime Transform Handles/<version>/Runtime Transform Handles Demo/RuntimeTransformHandlesDemo.unity` and enter Play mode.
+### Demo gallery
 
-The demo spawns its own targets and exercises every handle type, axis mask, coordinate space,
-snapping mode, multi-object grouping, auto-scaling, and the interaction event system through an
-on-screen control panel (see the sample's own README for the controls table). The imported copy
-under `Assets/Samples/` is regenerable — it can be deleted and reimported at any time.
+All four workspaces use the same UI Toolkit header and scrollable inspector. **Demos** is in the header when running the combined player; **Reset scene** and **Help** stay in consistent positions. Advanced showcase tools and the event log remain available in foldouts.
+
+Import the optional [Demo Browser](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/DemoBrowser/README.md) to open all included demo scenes from one UI Toolkit gallery. Each workspace has a Demos button to return; leaving resets that scene. The repository supports a combined WebGL build while preserving individual demo builds and independent sample imports.
+
+### Lamp Assembly sample
+
+The optional **Lamp Assembly** sample demonstrates socket attachment, constrained local hinges and parent-child detachment, using the common UI Toolkit design. It is available independently and through Demo Browser. See [sample instructions](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ProductConfigurator/README.md).
+
+### Modular Building sample
+
+Modular Building uses UI Toolkit with an editable UXML/USS layout. See the [sample setup](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md). Core remains independent of demo UI.
+
+The optional Demos package also includes [Modular Building](Packages/com.orkunmanap.runtime-transform-handles.demos/Samples~/ModularBuilding/README.md): arrange supplied wall and corner modules using a fixed horizontal grid and 90-degree rotations. Import it separately from Level Editor; Core-only installs stay unchanged.
 
 ## Package Structure
 
@@ -226,7 +245,6 @@ Packages/com.orkunmanap.runtime-transform-handles/
 │   │   └── TransformHandleSettings.cs       # ScriptableObject settings
 │   └── Shader/                              # Handle and origin shaders (Built-in + URP)
 ├── Tests/                                   # EditMode + PlayMode test assemblies
-├── Samples~/Demo/                           # Importable demo sample (Package Manager)
 ├── Documentation~/                          # index.md (architecture + API) + migration guide
 └── package.json
 ```
@@ -323,3 +341,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 If you encounter any issues or have questions, please [open an issue](https://github.com/manaporkun/UnityRuntimeTransformHandles/issues) on GitHub.
+
+Development checkpoint and next demo work: [development handoff](docs/DEVELOPMENT-HANDOFF.md).

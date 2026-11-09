@@ -18,3 +18,8 @@ It deliberately differs from the development project at the repository root:
 
 Do not open this project with a newer editor — Unity would upgrade `ProjectVersion.txt` and
 defeat the purpose of the job.
+
+The job explicitly enables isolated session testing and verifies exact XML names/results plus
+three real Play/Stop cycles for each reload/origin case. See [test evidence](../README.md).
+It validates the pinned 2021.3.45f1 patch; the package's declared 2021.3.0f1 minimum needs its own
+local test result. Never replace that claim with a newer-patch result or a skipped CI job.

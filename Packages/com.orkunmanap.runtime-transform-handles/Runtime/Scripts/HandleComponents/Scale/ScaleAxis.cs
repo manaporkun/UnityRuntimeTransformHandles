@@ -52,6 +52,12 @@ namespace TransformHandles
             ApplyVisualDelta(1f);
         }
 
+        private bool EnsureCamera()
+        {
+            _handleCamera = ParentHandle != null ? ParentHandle.HandleCamera : null;
+            return _handleCamera != null;
+        }
+
         private void CacheVisualRestLengths()
         {
             _cubeRestDistance = Mathf.Abs(Vector3.Dot(cubeMeshRenderer.transform.localPosition, _axis));
@@ -92,7 +98,7 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
-            if (_handleCamera == null) return;
+            if (!EnsureCamera()) return;
 
             var position = ParentHandle.Pivot.position;
             var direction = GetRotatedAxis(_axis);

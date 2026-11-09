@@ -1,0 +1,4 @@
+@import url("DemoTheme.uss");
+.demo-shell .move-icon { background-image: url("Move.png"); }
+.demo-shell .rotate-icon { background-image: url("Rotate.png"); }
+.demo-shell .scale-icon { background-image: url("Scale.png"); }

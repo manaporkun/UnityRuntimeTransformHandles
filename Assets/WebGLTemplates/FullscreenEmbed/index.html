@@ -104,6 +104,9 @@
         document.head.appendChild(meta);
       }
 
+      // Reserve right-drag for camera panning inside the player canvas.
+      canvas.addEventListener("contextmenu", function(event) { event.preventDefault(); });
+
       var config = {
         arguments: [],
         dataUrl: "Build/{{{ DATA_FILENAME }}}",

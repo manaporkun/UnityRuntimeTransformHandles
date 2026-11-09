@@ -50,9 +50,10 @@ namespace TransformHandles
         {
             _parentHandle = handle;
 
-            var hasX = handle.Axes.HasAxis(HandleAxes.X);
-            var hasY = handle.Axes.HasAxis(HandleAxes.Y);
-            var hasZ = handle.Axes.HasAxis(HandleAxes.Z);
+            var uniform = handle.UsesUniformGroupScale;
+            var hasX = !uniform && handle.Axes.HasAxis(HandleAxes.X);
+            var hasY = !uniform && handle.Axes.HasAxis(HandleAxes.Y);
+            var hasZ = !uniform && handle.Axes.HasAxis(HandleAxes.Z);
 
             _xAxis.gameObject.SetActive(hasX);
             if (hasX) _xAxis.Initialize(handle, Vector3.right);
@@ -63,7 +64,7 @@ namespace TransformHandles
             _zAxis.gameObject.SetActive(hasZ);
             if (hasZ) _zAxis.Initialize(handle, Vector3.forward);
 
-            var multiAxis = handle.Axes.IsMultiAxis();
+            var multiAxis = uniform ? handle.Axes == HandleAxes.XYZ : handle.Axes.IsMultiAxis();
             _globalScale.gameObject.SetActive(multiAxis);
             if (multiAxis)
             {
@@ -92,16 +93,16 @@ namespace TransformHandles
 
         private void OnGlobalInteractionStart()
         {
-            if (_parentHandle.Axes.HasAxis(HandleAxes.X)) _xAxis.SetColor(Color.yellow);
-            if (_parentHandle.Axes.HasAxis(HandleAxes.Y)) _yAxis.SetColor(Color.yellow);
-            if (_parentHandle.Axes.HasAxis(HandleAxes.Z)) _zAxis.SetColor(Color.yellow);
+            if (_xAxis.gameObject.activeSelf) _xAxis.SetColor(Color.yellow);
+            if (_yAxis.gameObject.activeSelf) _yAxis.SetColor(Color.yellow);
+            if (_zAxis.gameObject.activeSelf) _zAxis.SetColor(Color.yellow);
         }
 
         private void OnGlobalInteractionUpdate(float scaleDelta)
         {
-            if (_parentHandle.Axes.HasAxis(HandleAxes.X)) _xAxis.Delta = scaleDelta;
-            if (_parentHandle.Axes.HasAxis(HandleAxes.Y)) _yAxis.Delta = scaleDelta;
-            if (_parentHandle.Axes.HasAxis(HandleAxes.Z)) _zAxis.Delta = scaleDelta;
+            if (_xAxis.gameObject.activeSelf) _xAxis.Delta = scaleDelta;
+            if (_yAxis.gameObject.activeSelf) _yAxis.Delta = scaleDelta;
+            if (_zAxis.gameObject.activeSelf) _zAxis.Delta = scaleDelta;
         }
 
         private void OnGlobalInteractionEnd()
@@ -114,9 +115,9 @@ namespace TransformHandles
             _yAxis.Delta = 0;
             _zAxis.Delta = 0;
 
-            if (_parentHandle.Axes.HasAxis(HandleAxes.X)) _xAxis.SetDefaultColor();
-            if (_parentHandle.Axes.HasAxis(HandleAxes.Y)) _yAxis.SetDefaultColor();
-            if (_parentHandle.Axes.HasAxis(HandleAxes.Z)) _zAxis.SetDefaultColor();
+            if (_xAxis.gameObject.activeSelf) _xAxis.SetDefaultColor();
+            if (_yAxis.gameObject.activeSelf) _yAxis.SetDefaultColor();
+            if (_zAxis.gameObject.activeSelf) _zAxis.SetDefaultColor();
         }
     }
 }

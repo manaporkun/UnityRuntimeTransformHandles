@@ -22,6 +22,35 @@ namespace TransformHandles
         private Vector3 _biTangent;
 
         private Quaternion _startRotation;
+        private Vector2? _dragAngleLimits;
+        private float _previousPointerAngle;
+        private float _limitedAngle;
+        private bool _limitsLocked;
+
+        /// <summary>Optional angle bounds in degrees relative to the start of a drag.
+        /// Both bounds must be finite, within [-180, 180], and contain zero.
+        /// Configure before a drag or in InteractionStart. Changes after the first interaction
+        /// step throw InvalidOperationException until EndInteraction. Null preserves unrestricted rotation.
+        /// Limits apply after snapping; a boundary can therefore be off the snap grid.</summary>
+        public Vector2? DragAngleLimits
+        {
+            get => _dragAngleLimits;
+            set
+            {
+                if (_limitsLocked)
+                    throw new System.InvalidOperationException("Configure angle limits before the first interaction step.");
+                if (value.HasValue)
+                {
+                    var limits = value.Value;
+                    if (float.IsNaN(limits.x) || float.IsInfinity(limits.x) ||
+                        float.IsNaN(limits.y) || float.IsInfinity(limits.y) ||
+                        limits.x > 0 || limits.y < 0 || limits.x < -180 || limits.y > 180)
+                        throw new System.ArgumentOutOfRangeException(nameof(value),
+                            "Drag angle limits must be finite, within [-180, 180], and contain zero.");
+                }
+                _dragAngleLimits = value;
+            }
+        }
 
         private Transform _rotationHandleTransform;
         private Material _torusMaterial;
@@ -47,9 +76,18 @@ namespace TransformHandles
             if (_torusMaterial == null) _torusMaterial = torusMeshRenderer.material;
         }
 
+        private bool EnsureCamera()
+        {
+            _handleCamera = ParentHandle != null ? ParentHandle.HandleCamera : null;
+            return _handleCamera != null;
+        }
+
         /// <inheritdoc/>
         public override void Interact(Vector3 previousPosition)
         {
+            if (!EnsureCamera()) return;
+            _limitsLocked = true;
+
             var cameraRay = _handleCamera.ScreenPointToRay(InputWrapper.MousePosition);
 
             if (!_axisPlane.Raycast(cameraRay, out var hitT))
@@ -68,6 +106,15 @@ namespace TransformHandles
             if (ParentHandle.RotationSnap != 0)
             {
                 angleDegrees = SnapUtils.Snap(angleDegrees, ParentHandle.RotationSnap);
+                angleRadians = angleDegrees * Mathf.Deg2Rad;
+            }
+
+            if (_dragAngleLimits.HasValue)
+            {
+                _limitedAngle = Mathf.Clamp(_limitedAngle + Mathf.DeltaAngle(_previousPointerAngle, angleDegrees),
+                    _dragAngleLimits.Value.x, _dragAngleLimits.Value.y);
+                _previousPointerAngle = angleDegrees;
+                angleDegrees = _limitedAngle;
                 angleRadians = angleDegrees * Mathf.Deg2Rad;
             }
 
@@ -95,7 +142,10 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void StartInteraction(Vector3 hitPoint)
         {
+            _limitsLocked = false;
+            _previousPointerAngle = _limitedAngle = 0;
             base.StartInteraction(hitPoint);
+            if (!EnsureCamera()) return;
 
             _startRotation = ParentHandle.Space == Space.Self
                 ? ParentHandle.Pivot.localRotation
@@ -119,6 +169,7 @@ namespace TransformHandles
         /// <inheritdoc/>
         public override void EndInteraction()
         {
+            _limitsLocked = false;
             base.EndInteraction();
             Delta = 0;
         }

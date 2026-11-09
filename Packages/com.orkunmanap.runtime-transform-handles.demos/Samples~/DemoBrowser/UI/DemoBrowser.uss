@@ -1,0 +1,27 @@
+@import url("DemoTheme.uss");
+* { -unity-font: url("../Fonts/LiberationSans.ttf"); color: rgb(38, 42, 49); }
+.gallery { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgb(246, 247, 249); }
+.gallery-scroll { flex-grow: 1; }
+.content { padding: 48px 48px 28px 48px; max-width: 1280px; align-self: center; width: 100%; }
+.eyebrow { font-size: 14px; color: rgb(113, 119, 130); margin-bottom: 18px; }
+.heading { font-size: 44px; -unity-font-style: bold; margin-bottom: 14px; white-space: normal; }
+.intro { font-size: 20px; color: rgb(105, 111, 122); margin-bottom: 38px; white-space: normal; }
+.cards { flex-direction: row; flex-wrap: wrap; }
+.demo-card { flex-grow: 1; flex-basis: 280px; min-width: 250px; margin: 0 16px 16px 0; padding: 26px; background-color: white; border-width: 1px; border-color: rgb(225, 228, 233); border-radius: 16px; align-items: flex-start; white-space: normal; }
+.demo-card Label { -unity-text-align: upper-left; }
+.demo-card:hover { background-color: rgb(250, 252, 255); border-color: rgb(151, 177, 212); }
+.demo-card:focus { border-color: rgb(62, 116, 185); }
+#number { font-size: 15px; color: rgb(119, 133, 153); margin-bottom: 34px; }
+#title { font-size: 25px; -unity-font-style: bold; margin-bottom: 12px; white-space: normal; }
+#subtitle { font-size: 17px; color: rgb(92, 100, 114); margin-bottom: 20px; white-space: normal; }
+#description { font-size: 18px; color: rgb(108, 115, 127); white-space: normal; flex-grow: 1; margin-bottom: 36px; }
+#open { font-size: 17px; color: rgb(44, 99, 169); white-space: normal; }
+.status { font-size: 16px; color: rgb(113, 119, 130); margin-top: 20px; white-space: normal; }
+
+/* Four installed workspaces form a balanced two-column gallery. */
+.many-workspaces .demo-card { flex-basis: 40%; padding: 22px; }
+.many-workspaces #number { margin-bottom: 12px; }
+.many-workspaces #title { font-size: 23px; margin-bottom: 8px; }
+.many-workspaces #subtitle { margin-bottom: 12px; }
+.many-workspaces #description { font-size: 17px; margin-bottom: 18px; }
+.many-workspaces #open { font-size: 16px; }

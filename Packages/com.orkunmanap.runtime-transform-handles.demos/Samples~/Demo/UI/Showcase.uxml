@@ -1,0 +1,79 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Showcase.uss" />
+    <ui:VisualElement name="workshop" class="demo-shell" picking-mode="Ignore">
+        <ui:VisualElement name="header" class="header">
+            <ui:VisualElement class="identity" picking-mode="Ignore">
+                <ui:Button name="demo-gallery" text="‹ Demos" class="demo-gallery-link" />
+                <ui:Label text="Handle showcase" class="app-title" />
+                <ui:Label text="Tool study" class="project-name" />
+            </ui:VisualElement>
+            <ui:VisualElement class="header-actions" picking-mode="Ignore">
+                <ui:Button name="reset" text="Reset scene" class="quiet-button" />
+                <ui:Button name="help-toggle" text="Help" class="quiet-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:ScrollView name="inspector" class="inspector" horizontal-scroller-visibility="Hidden">
+            <ui:Label text="SELECTION" class="eyebrow" />
+            <ui:Label name="selection-name" text="Select a target" class="selection-name" />
+            <ui:Label name="selection-hint" text="Click a cube to create its handle." class="description selection-hint" />
+            <ui:VisualElement class="tools">
+                <ui:Button name="move" class="tool-button">
+                    <ui:VisualElement class="tool-icon move-icon" picking-mode="Ignore" />
+                    <ui:Label text="Move" />
+                </ui:Button>
+                <ui:Button name="rotate" class="tool-button">
+                    <ui:VisualElement class="tool-icon rotate-icon" picking-mode="Ignore" />
+                    <ui:Label text="Rotate" />
+                </ui:Button>
+                <ui:Button name="scale" class="tool-button"><ui:VisualElement class="tool-icon scale-icon" picking-mode="Ignore" /><ui:Label text="Scale" /></ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement class="constraints"><ui:Label text="Space" class="muted" /><ui:Button name="space" text="Local" class="constraint-button" /></ui:VisualElement>
+            <ui:VisualElement class="divider" picking-mode="Ignore" />
+            <ui:VisualElement class="size-row">
+                <ui:Label text="Handle size" class="section-title" />
+                <ui:VisualElement class="size-value">
+                    <ui:TextField name="size-input" value="192" max-length="10" />
+                    <ui:Label text="px" class="unit" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:SliderInt name="size-slider" low-value="64" high-value="512" value="192" />
+            <ui:VisualElement class="range-labels" picking-mode="Ignore">
+                <ui:Label text="64" /><ui:Label text="512" />
+            </ui:VisualElement>
+            <ui:Label text="Adjust to your display." class="description size-hint" />
+            <ui:Toggle name="auto-scale" label="Auto-scale with distance" value="true" />
+            <ui:Foldout name="advanced" text="Advanced tools" value="false">
+                <ui:VisualElement name="enum-fields" />
+                <ui:Slider name="position-snap" label="Position snap" low-value="0" high-value="5" class="advanced-field" />
+                <ui:Slider name="rotation-snap" label="Rotation snap" low-value="0" high-value="90" class="advanced-field" />
+                <ui:Slider name="scale-snap" label="Scale snap" low-value="0" high-value="1" class="advanced-field" />
+                <ui:Slider name="scale-multiplier" label="Scale multiplier" low-value="0.1" high-value="10" value="1" class="advanced-field" />
+                <ui:Toggle name="runtime-settings" label="Apply runtime settings" />
+                <ui:VisualElement class="action-row"><ui:Button name="group-all" text="Group all" /><ui:Button name="destroy-all" text="Clear handles" /></ui:VisualElement>
+            </ui:Foldout>
+            <ui:Foldout name="input-test" text="UI input test" value="false">
+                <ui:Toggle name="show-test" label="Show test region" />
+                <ui:Toggle name="block-test" label="Test region blocks input" value="true" />
+                <ui:Label text="The test region can allow clicks through. Application controls always block scene input." class="context-note" />
+            </ui:Foldout>
+            <ui:Foldout name="events" text="Event log" value="false"><ui:Label name="event-log" class="event-log" /></ui:Foldout>
+            <ui:Label name="inspector-status" class="inspector-status" />
+        </ui:ScrollView>
+        <ui:VisualElement name="test-region" class="test-region hidden"><ui:Label text="UI input test" class="section-title" /><ui:Label name="test-region-hint" text="This region blocks scene input." class="context-note" /></ui:VisualElement>
+        <ui:VisualElement name="help-backdrop" class="help-backdrop hidden">
+            <ui:VisualElement name="help-card" class="help-card">
+                <ui:VisualElement class="help-heading">
+                    <ui:Label text="Workshop controls" class="section-title" />
+                    <ui:Button name="help-close" text="×" class="close-button" />
+                </ui:VisualElement>
+                <ui:VisualElement class="help-row"><ui:Label text="Move / Rotate / Scale" /><ui:Label text="W / E / R" class="muted" /></ui:VisualElement>
+                <ui:VisualElement class="help-row"><ui:Label text="Orbit" /><ui:Label text="Middle-drag" class="muted" /></ui:VisualElement>
+                <ui:VisualElement class="help-row"><ui:Label text="Drop target" /><ui:Label text="Right-click" class="muted" /></ui:VisualElement>
+                <ui:VisualElement class="help-row"><ui:Label text="Zoom" /><ui:Label text="Scroll" class="muted" /></ui:VisualElement>
+                <ui:VisualElement class="divider" picking-mode="Ignore" />
+                <ui:Label name="status" class="description status" />
+                <ui:Label text="Shift-click adds a target. A selects all tools, X switches space, Z switches pivot. Reset restores this workspace." class="description help-note" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
