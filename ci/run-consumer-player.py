@@ -173,8 +173,12 @@ class PlayerDriver:
                           'y': point['y'] + 90 * (point['y'] - center['y']) / length})
         self.capture()
 
+        # W selects Position mode; X is the only World/Local toggle. From the
+        # post-scale World state, Local therefore needs W then X, and returning
+        # to World is X again.
         self.begin('local')
         self.key('w')
+        self.key('x')
         self.capture()
         self.begin('world')
         self.key('x')

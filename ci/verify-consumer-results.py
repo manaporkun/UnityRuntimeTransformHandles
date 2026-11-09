@@ -223,7 +223,7 @@ def verify_input(checkpoint, entries, window, customized, observations, previous
         require(coordinates and math.hypot(coordinates[0][0] - point['x'], coordinates[0][1] - point['y']) <= 3,
                 'external pointer did not start at observed target/control: ' + stage)
     key_programs = {'rotation-mode': ['t' if customized else 'e'], 'scale-mode': ['r'], 'old-shortcut': ['e'],
-                    'local': ['w'], 'world': ['x'], 'group': ['g'], 'disable-cleanup': ['d'],
+                    'local': ['w', 'x'], 'world': ['x'], 'group': ['g'], 'disable-cleanup': ['d'],
                     'reenable': ['d'], 'scene-cleanup': ['n']}
     if stage in key_programs:
         require(keys == key_programs[stage], 'missing/wrong external keyboard input: ' + stage)

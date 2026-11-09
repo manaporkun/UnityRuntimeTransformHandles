@@ -119,7 +119,7 @@ class ConsumerEvidenceTests(unittest.TestCase):
                 commands += [move, ['mousedown', '1'], *[['mousemove', '--window', '123', str(120 + step * 5), '90'] for step in range(1, 13)]]
                 if stage not in ('disable-cleanup', 'scene-cleanup'): commands.append(['mouseup', '1'])
             keys = {'rotation-mode': ['t' if customized else 'e'], 'scale-mode': ['r'], 'old-shortcut': ['e'],
-                    'local': ['w'], 'world': ['x'], 'group': ['g'], 'disable-cleanup': ['d'], 'reenable': ['d'], 'scene-cleanup': ['n']}
+                    'local': ['w', 'x'], 'world': ['x'], 'group': ['g'], 'disable-cleanup': ['d'], 'reenable': ['d'], 'scene-cleanup': ['n']}
             commands += [['key', '--window', '123', key] for key in keys.get(stage, [])]
             for number, command in enumerate(commands):
                 report['input'].append(dict(stage=stage, nonce=observation['nonce'], argv=['xdotool', *command],
