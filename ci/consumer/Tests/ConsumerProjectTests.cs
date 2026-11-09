@@ -42,6 +42,7 @@ namespace ConsumerJourney.Tests
             var manager = AssetDatabase.LoadAssetAtPath<GameObject>(UserAssets + "/Manager.prefab");
             var serialized = new SerializedObject(manager.GetComponent<TransformHandleManager>());
             Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("transformHandlePrefab").objectReferenceValue), Is.EqualTo(UserAssets + "/Handle.prefab"));
+            Assert.That(AssetDatabase.LoadAssetAtPath<GameObject>(UserAssets + "/Handle.prefab").GetComponent<Handle>().AutoScaleSizeInPixels, Is.EqualTo(192f));
             Assert.That(AssetDatabase.GetAssetPath(serialized.FindProperty("settings").objectReferenceValue), Is.EqualTo(UserAssets + "/Settings.asset"));
             Assert.That(AssetDatabase.LoadAssetAtPath<Material>(UserAssets + "/Target.mat"), Is.Not.Null);
             Assert.That(File.ReadAllText("Assets/UserNotes.txt"), Is.EqualTo("User-owned content. Preserve byte-for-byte.\n"));

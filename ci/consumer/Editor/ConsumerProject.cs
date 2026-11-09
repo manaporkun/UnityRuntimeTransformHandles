@@ -27,6 +27,14 @@ namespace ConsumerJourney
             serialized.ApplyModifiedPropertiesWithoutUndo();
             AssetDatabase.CreateAsset(settings, AssetsRoot + "/Settings.asset");
             AssetDatabase.CopyAsset(Core + "Runtime/Prefabs/PrecisionTransformHandle.prefab", AssetsRoot + "/Handle.prefab");
+            // Distinct from the shipped prefab's 96 so player evidence proves the
+            // consumer-owned copy (not the package prefab) is the one loaded.
+            var handleRoot = PrefabUtility.LoadPrefabContents(AssetsRoot + "/Handle.prefab");
+            var handle = new SerializedObject(handleRoot.GetComponent<Handle>());
+            handle.FindProperty("autoScaleSizeInPixels").floatValue = 192;
+            handle.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.SaveAsPrefabAsset(handleRoot, AssetsRoot + "/Handle.prefab");
+            PrefabUtility.UnloadPrefabContents(handleRoot);
             AssetDatabase.CopyAsset(Core + "Runtime/Resources/TransformHandleManager.prefab", AssetsRoot + "/Manager.prefab");
             var managerRoot = PrefabUtility.LoadPrefabContents(AssetsRoot + "/Manager.prefab");
             var manager = new SerializedObject(managerRoot.GetComponent<TransformHandleManager>());
